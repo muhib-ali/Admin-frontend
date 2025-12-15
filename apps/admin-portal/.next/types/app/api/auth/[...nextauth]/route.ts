@@ -1,4 +1,4 @@
-// File: D:\parent1\final-upgraded-frontend\apps\admin-portal\src\app\api\auth\[...nextauth]\route.ts
+// File: D:\parent1\github admin\Admin-frontend\apps\admin-portal\src\app\api\auth\[...nextauth]\route.ts
 import * as entry from '../../../../../../src/app/api/auth/[...nextauth]/route.js'
 import type { NextRequest } from 'next/server.js'
 

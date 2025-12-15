@@ -1,4 +1,4 @@
-// File: D:\parent1\final-upgraded-frontend\apps\admin-portal\src\app\layout.tsx
+// File: D:\parent1\github admin\Admin-frontend\apps\admin-portal\src\app\layout.tsx
 import * as entry from '../../../src/app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
