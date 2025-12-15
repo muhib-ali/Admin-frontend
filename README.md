@@ -1,60 +1,133 @@
-# Admin Dashboard
+# Admin Frontend (Admin Dashboard)
 
-A modern, full-stack admin dashboard built with Next.js 15, TypeScript, and Tailwind CSS with advanced RBAC (Role-Based Access Control).
+A modern admin dashboard built with Next.js (App Router), TypeScript, Tailwind CSS, and RBAC.
 
-## Features
+## Tech Stack
 
-- **Next.js 15** with App Router
-- **Advanced RBAC System** with granular permissions
-- **NextAuth.js** with JWT authentication
-- **Modern UI** with Tailwind CSS and Radix UI
-- **TypeScript** for type safety
-- **Nest.js Backend** compatible
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- NextAuth (Credentials/JWT)
+- pnpm workspaces (monorepo)
 
-## Getting Started
+## Repository Structure
 
-1. Install dependencies:
-```bash
-npm install
+This repo is a monorepo:
+
+- `apps/admin-portal` = the main Next.js app
+- `packages/*` = shared packages
+
+```
+final-upgraded-frontend/
+├─ apps/
+│  └─ admin-portal/         # Next.js app
+├─ packages/                # Shared packages
+├─ pnpm-workspace.yaml
+├─ pnpm-lock.yaml
+└─ package.json             # Repo-level scripts (forwards to apps/admin-portal)
 ```
 
-2. Copy `.env.example` to `.env.local` and configure:
+## Prerequisites
+
+- Node.js (LTS recommended)
+- pnpm (recommended version is defined in root `package.json` via `packageManager`)
+
+Install pnpm if you don’t have it:
+
+```bash
+npm i -g pnpm
+```
+
+If `pnpm` is not recognized on Windows, ensure npm global bin is in PATH (commonly `C:\Users\<YOU>\npm-global`).
+
+## Setup (Local Development)
+
+### 1) Clone
+
+```bash
+git clone <YOUR_GITHUB_REPO_URL>
+cd final-upgraded-frontend
+```
+
+### 2) Install dependencies
+
+```bash
+pnpm install
+```
+
+### 3) Configure environment variables
+
+Create `apps/admin-portal/.env.local` and set at least:
+
 ```env
-NEXTAUTH_SECRET=your_secret_key
-NEXTAUTH_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:5005
+
+NEXTAUTH_SECRET=your_secret_here
+NEXTAUTH_URL=http://localhost:3005
+AUTH_URL=http://localhost:3005
 ```
 
-3. Run the development server:
+Notes:
+- `NEXT_PUBLIC_API_URL` must point to your backend.
+- `NEXTAUTH_URL` must match the frontend URL/port you run locally, otherwise login/logout redirects can go to the wrong port.
+
+### 4) Run the dev server
+
+From repo root:
+
 ```bash
-npm run dev
+pnpm run dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000)
+App runs at:
+- http://localhost:3005
 
-## Project Structure
+## Production Build
 
-```
-src/
-├── app/              # Next.js app router pages
-├── components/       # React components
-├── contexts/         # React contexts
-├── hooks/           # Custom React hooks
-├── lib/             # Utility functions and API clients
-├── rbac/            # RBAC permission system
-├── services/        # API service layer
-├── stores/          # Zustand state management
-├── types/           # TypeScript type definitions
-└── utils/           # Utility functions
+From repo root:
+
+```bash
+pnpm run build
+pnpm run start
 ```
 
-## RBAC System
+## Scripts (Repo Root)
 
-The application includes a comprehensive RBAC system with:
-- Entity-level permissions (CRUD operations)
-- Route-level guards
-- Navigation guards
-- Permission hooks for UI components
+- `pnpm run dev` starts `apps/admin-portal` (Next dev on port 3005)
+- `pnpm run build` builds `apps/admin-portal`
+- `pnpm run start` runs the production server for `apps/admin-portal`
+- `pnpm run lint` lints `apps/admin-portal`
+
+## Common Troubleshooting
+
+### Port already in use (3005)
+
+Stop any running node processes and retry:
+
+```powershell
+taskkill /IM node.exe /F
+```
+
+### Logout redirects to wrong port
+
+Make sure in `apps/admin-portal/.env.local`:
+
+```env
+NEXTAUTH_URL=http://localhost:3005
+AUTH_URL=http://localhost:3005
+```
+
+Then restart `pnpm run dev`.
+
+### Windows EPERM issues (file locks)
+
+Stop node processes, remove app build output, and retry:
+
+```powershell
+taskkill /IM node.exe /F
+Remove-Item -Recurse -Force .\apps\admin-portal\.next
+pnpm run dev
+```
 
 ## License
 
