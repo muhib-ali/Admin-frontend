@@ -12,7 +12,8 @@ export function useAuthSession() {
   const { data, status } = useSession();
   const session = (data ?? null) as SessionWithPermissions | null;
 
-  const hasPermission = (route: string): boolean => {
+  const hasPermission = (route: string | undefined | null): boolean => {
+    if (!route) return false;
     if (!session?.permissions) return false;
 
     return session.permissions.some((mod) =>

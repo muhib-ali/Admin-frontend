@@ -29,18 +29,20 @@ export function ProductCard({
   renderCreatedDate,
   svgCardImage,
 }: Props) {
+  const imgSeed = (product.description || "").trim() || product.title;
+  const imageSrc = product.product_img_url || svgCardImage(imgSeed);
+  const statusLabel = product.is_active ? "Active" : "Inactive";
+
   return (
     <div className="group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.12)] transition-all duration-300 hover:scale-[1.02]">
       <div className="relative aspect-[4/3] w-full bg-gray-100 overflow-hidden">
         <img
-          src={product.image}
-          alt={product.name}
+          src={imageSrc}
+          alt={product.title}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
           onError={(e) => {
-            e.currentTarget.src = svgCardImage(
-              (product.description || "").trim() || product.name
-            );
+            e.currentTarget.src = svgCardImage(imgSeed);
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -49,12 +51,12 @@ export function ProductCard({
           <Badge
             variant="secondary"
             className={
-              product.status === "Active"
+              statusLabel === "Active"
                 ? "bg-green-200 text-green-800 hover:bg-green-200"
                 : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
             }
           >
-            {product.status}
+            {statusLabel}
           </Badge>
         </div>
 
@@ -90,23 +92,25 @@ export function ProductCard({
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-base text-gray-900 truncate">{product.name}</h3>
+            <h3 className="font-semibold text-base text-gray-900 truncate">{product.title}</h3>
             <p className="mt-1 text-xs text-gray-500 truncate">
-              {product.id} • {product.brand}
+              {product.id} • {product.brand?.name ?? "—"}
             </p>
           </div>
           <div className="text-right shrink-0">
             <div className="text-base font-bold text-gray-900">${product.price.toFixed(2)}</div>
             <div className="mt-1 text-xs text-gray-500">
-              Stock: {product.stock}
+              Stock: {product.stock_quantity}
             </div>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-2">
-          <Badge variant="outline" className="border-gray-300 text-gray-700">{product.category.label}</Badge>
+          <Badge variant="outline" className="border-gray-300 text-gray-700">
+            {product.category?.name ?? "—"}
+          </Badge>
           <div className="text-xs text-gray-500 whitespace-nowrap">
-            {renderCreatedDate(product.createdAt)}
+            {renderCreatedDate(product.created_at)}
           </div>
         </div>
       </div>

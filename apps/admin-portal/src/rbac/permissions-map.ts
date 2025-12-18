@@ -52,6 +52,20 @@ export const ENTITY_PERMS = {
     update: "products/update",
     delete: "products/delete",
   },
+  brands: {
+    list:   "brands/getAll",
+    create: "brands/create",
+    read:   "brands/getById",
+    update: "brands/update",
+    delete: "brands/delete",
+  },
+  categories: {
+    list:   "categories/getAll",
+    create: "categories/create",
+    read:   "categories/getById",
+    update: "categories/update",
+    delete: "categories/delete",
+  },
   clients: {
     list:   "clients/getAll",
     create: "clients/create",
@@ -81,6 +95,9 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/modules/[id]":            ENTITY_PERMS.modules.read,
   "/dashboard/modules/[id]/edit":       ENTITY_PERMS.modules.update,
 
+  "/dashboard/brands":                  ENTITY_PERMS.brands.list,
+  "/dashboard/categories":              ENTITY_PERMS.categories.list,
+
   "/dashboard/permissions":             ENTITY_PERMS.permissions.list,
   "/dashboard/permissions/create":      ENTITY_PERMS.permissions.create,
   "/dashboard/permissions/[id]":        ENTITY_PERMS.permissions.read,
@@ -108,10 +125,7 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/jobFiles/[id]":           ENTITY_PERMS.jobFiles.read,
   "/dashboard/jobFiles/[id]/edit":      ENTITY_PERMS.jobFiles.update,
 
-  //"/dashboard/products":                ENTITY_PERMS.products.list,
-  //"/dashboard/products/create":         ENTITY_PERMS.products.create,
-  //"/dashboard/products/[id]":           ENTITY_PERMS.products.read,
-  //"/dashboard/products/[id]/edit":      ENTITY_PERMS.products.update,
+  "/dashboard/products":                ENTITY_PERMS.products.list,
 
   "/dashboard/clients":                 ENTITY_PERMS.clients.list,
   "/dashboard/clients/create":          ENTITY_PERMS.clients.create,

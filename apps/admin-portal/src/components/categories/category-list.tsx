@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
-import type { CategoryKey } from "../products/product-form";
+
+type CategoryKey = "electronics" | "home" | "fashion" | "sports" | "beauty" | "books";
 
 export type Category = {
   key: CategoryKey;
