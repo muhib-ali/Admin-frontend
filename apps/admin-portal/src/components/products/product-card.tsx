@@ -50,8 +50,8 @@ export function ProductCard({
             variant="secondary"
             className={
               product.status === "Active"
-                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-100 font-semibold"
-                : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100 font-semibold"
+                ? "bg-green-200 text-green-800 hover:bg-green-200"
+                : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
             }
           >
             {product.status}

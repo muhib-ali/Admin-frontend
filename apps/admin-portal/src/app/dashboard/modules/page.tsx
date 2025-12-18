@@ -44,10 +44,10 @@ function StatusPill({ active }: { active: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold",
         active
-          ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-          : "bg-muted text-muted-foreground"
+          ? "bg-green-200 text-green-800"
+          : "bg-gray-200 text-muted-foreground"
       )}
     >
       {active ? "Active" : "Inactive"}

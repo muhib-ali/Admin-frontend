@@ -1,9 +1,1 @@
-{
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/login/page": "app/login/page.js",
-  "/dashboard/brands/page": "app/dashboard/brands/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/orders/page": "app/dashboard/orders/page.js",
-  "/dashboard/products/page": "app/dashboard/products/page.js",
-  "/dashboard/bulk-orders/page": "app/dashboard/bulk-orders/page.js"
-}
+{}

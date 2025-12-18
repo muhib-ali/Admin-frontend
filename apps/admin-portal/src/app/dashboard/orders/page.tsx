@@ -118,10 +118,17 @@ function nextOrderId(existing: OrderRow[]) {
 }
 
 function StatusBadge({ status }: { status: OrderStatus }) {
-  if (status === "Delivered") return <Badge variant="outline">Delivered</Badge>;
-  if (status === "Shipped") return <Badge variant="secondary">Shipped</Badge>;
-  if (status === "Processing") return <Badge>Processing</Badge>;
-  return <Badge variant="destructive">Pending</Badge>;
+  const map: Record<OrderStatus, string> = {
+    Pending: "bg-amber-500/10 text-amber-700",
+    Processing: "bg-sky-500/10 text-sky-700",
+    Shipped: "bg-indigo-500/10 text-indigo-700",
+    Delivered: "bg-emerald-500/10 text-emerald-700",
+  };
+  return (
+    <Badge variant="secondary" className={map[status]}>
+      {status}
+    </Badge>
+  );
 }
 
 export default function OrdersPage() {

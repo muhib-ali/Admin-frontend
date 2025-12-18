@@ -79,10 +79,17 @@ const DUMMY_BULK: BulkOrderRow[] = [
 ];
 
 function StatusBadge({ status }: { status: BulkOrderStatus }) {
-  if (status === "Completed") return <Badge>Completed</Badge>;
-  if (status === "Processing") return <Badge variant="secondary">Processing</Badge>;
-  if (status === "Queued") return <Badge variant="outline">Queued</Badge>;
-  return <Badge variant="destructive">Failed</Badge>;
+  const map: Record<BulkOrderStatus, string> = {
+    Completed: "bg-emerald-500/10 text-emerald-700",
+    Processing: "bg-sky-500/10 text-sky-700",
+    Queued: "bg-amber-500/10 text-amber-700",
+    Failed: "bg-red-500/10 text-red-700",
+  };
+  return (
+    <Badge variant="secondary" className={map[status]}>
+      {status}
+    </Badge>
+  );
 }
 
 export default function BulkOrdersPage() {

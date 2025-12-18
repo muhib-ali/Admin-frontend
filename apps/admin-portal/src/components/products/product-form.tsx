@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { BRANDS } from "@/components/brands/brand-list";
 
 export type CategoryKey = "electronics" | "home" | "fashion" | "sports" | "beauty" | "books";
 
@@ -286,36 +287,45 @@ export function ProductForm({
             )}
           </div>
 
-          <div className="grid gap-2">
-            <Label>Category</Label>
-            <Select
-              value={form.category}
-              onValueChange={(v) => setForm((p) => ({ ...p, category: v as any }))}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Choose category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.key} value={c.key}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="productBrand">Brand</Label>
-            <Input
-              id="productBrand"
-              value={form.brand}
-              onChange={(e) => setForm((p) => ({ ...p, brand: e.target.value }))}
-              placeholder="Brand"
-            />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Category</Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm((p) => ({ ...p, category: v as any }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Choose category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Brand</Label>
+              <Select
+                value={form.brand}
+                onValueChange={(v) => setForm((p) => ({ ...p, brand: v }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Choose brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BRANDS.map((b) => (
+                    <SelectItem key={b.id} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="productPrice">Price</Label>
               <Input
