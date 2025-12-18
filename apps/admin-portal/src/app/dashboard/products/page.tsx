@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +36,9 @@ export default function ProductsPage() {
   React.useEffect(() => setMounted(true), []);
 
   const [products, setProducts] = React.useState<ProductRow[]>(DUMMY_PRODUCTS);
+
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<ProductRow | null>(null);
 
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<ProductRow | null>(null);
@@ -133,12 +144,20 @@ export default function ProductsPage() {
   };
 
   const handleDelete = (p: ProductRow) => {
-    if (!confirm(`Delete ${p.name}?`)) return;
+    setDeleteTarget(p);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const p = deleteTarget;
     setProducts((prev) => prev.filter((x) => x.id !== p.id));
     if (selected?.id === p.id) {
       setSelected(null);
       setViewOpen(false);
     }
+    setDeleteOpen(false);
+    setDeleteTarget(null);
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -220,6 +239,35 @@ export default function ProductsPage() {
   return (
     <PermissionBoundary screen="/dashboard/products" mode="block">
       <div className="space-y-6 scrollbar-stable">
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle>Delete product?</DialogTitle>
+              <DialogDescription>
+                This action cannot be undone. This will permanently delete{" "}
+                <span className="font-semibold text-foreground">
+                  {deleteTarget ? `\"${deleteTarget.name}\"` : "this product"}
+                </span>
+                .
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteTarget(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold truncate">Products</h1>

@@ -497,7 +497,7 @@ export default function DashboardComponent() {
         <RecentActivity />
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-red-600 to-red-700 p-8 text-white shadow-[0_8px_24px_rgba(220,38,38,0.3)]">
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-red-600 via-red-700 to-black p-8 text-white shadow-[0_8px_24px_rgba(220,38,38,0.3)]">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h3 className="text-2xl font-bold">Ready to boost your sales?</h3>
