@@ -30,12 +30,12 @@ export function ProductCard({
   svgCardImage,
 }: Props) {
   return (
-    <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-      <div className="relative aspect-[4/3] w-full bg-muted">
+    <div className="group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.12)] transition-all duration-300 hover:scale-[1.02]">
+      <div className="relative aspect-[4/3] w-full bg-gray-100 overflow-hidden">
         <img
           src={product.image}
           alt={product.name}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
           onError={(e) => {
             e.currentTarget.src = svgCardImage(
@@ -43,8 +43,17 @@ export function ProductCard({
             );
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
         <div className="absolute left-3 top-3">
-          <Badge variant={product.status === "Active" ? "default" : "secondary"}>
+          <Badge
+            variant="secondary"
+            className={
+              product.status === "Active"
+                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-100 font-semibold"
+                : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100 font-semibold"
+            }
+          >
             {product.status}
           </Badge>
         </div>
@@ -55,12 +64,12 @@ export function ProductCard({
               <Button
                 variant="secondary"
                 size="icon"
-                className="h-8 w-8 bg-background/80 hover:bg-background"
+                className="h-9 w-9 bg-white/90 hover:bg-white shadow-md backdrop-blur-sm"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-40">
               <DropdownMenuItem onClick={() => onView(product)}>
                 <Package className="mr-2 h-4 w-4" />
                 View
@@ -69,7 +78,7 @@ export function ProductCard({
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(product)}>
+              <DropdownMenuItem onClick={() => onDelete(product)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -78,25 +87,25 @@ export function ProductCard({
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="font-semibold truncate">{product.name}</div>
-            <div className="mt-1 text-xs text-muted-foreground truncate">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-base text-gray-900 truncate">{product.name}</h3>
+            <p className="mt-1 text-xs text-gray-500 truncate">
               {product.id} • {product.brand}
-            </div>
+            </p>
           </div>
-          <div className="text-right">
-            <div className="text-sm font-semibold">${product.price.toFixed(2)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
+          <div className="text-right shrink-0">
+            <div className="text-base font-bold text-gray-900">${product.price.toFixed(2)}</div>
+            <div className="mt-1 text-xs text-gray-500">
               Stock: {product.stock}
             </div>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <Badge variant="outline">{product.category.label}</Badge>
-          <div className="text-xs text-muted-foreground whitespace-nowrap">
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <Badge variant="outline" className="border-gray-300 text-gray-700">{product.category.label}</Badge>
+          <div className="text-xs text-gray-500 whitespace-nowrap">
             {renderCreatedDate(product.createdAt)}
           </div>
         </div>

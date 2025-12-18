@@ -110,7 +110,18 @@ function nextBrandId(existing: BrandRow[]) {
 }
 
 function StatusBadge({ status }: { status: BrandRow["status"] }) {
-  return status === "Active" ? <Badge>Active</Badge> : <Badge variant="secondary">Inactive</Badge>;
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        status === "Active"
+          ? "bg-green-200 text-green-800 hover:bg-green-200"
+          : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
+      }
+    >
+      {status}
+    </Badge>
+  );
 }
 
 export default function BrandsPage() {
@@ -410,6 +421,7 @@ export default function BrandsPage() {
           }))
         }
         disabled={dialogMode === "view"}
+        className="data-[state=checked]:bg-green-600"
       />
     </div>
   </div>

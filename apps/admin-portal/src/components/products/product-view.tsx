@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -45,11 +46,14 @@ export function ProductView({
 
           <div className="grid gap-2">
             <div className="text-sm font-medium">Images</div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex gap-3 overflow-x-auto pb-2">
               {(product.images?.length ? product.images : [product.image])
-                .slice(0, 3)
+                .slice(0, 5)
                 .map((src, idx) => (
-                  <div key={idx} className="overflow-hidden rounded-lg border bg-muted aspect-[4/3]">
+                  <div
+                    key={idx}
+                    className="shrink-0 w-[140px] overflow-hidden rounded-lg border bg-muted aspect-[4/3]"
+                  >
                     <img
                       src={src}
                       alt={`${product.name} ${idx + 1}`}
@@ -82,6 +86,21 @@ export function ProductView({
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Stock</div>
               <div className="font-medium">{product.stock}</div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-xs text-muted-foreground">Status</div>
+              <div className="mt-1">
+                <Badge
+                  variant="secondary"
+                  className={
+                    product.status === "Active"
+                      ? "bg-green-200 text-green-800 hover:bg-green-200"
+                      : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
+                  }
+                >
+                  {product.status}
+                </Badge>
+              </div>
             </div>
           </div>
 

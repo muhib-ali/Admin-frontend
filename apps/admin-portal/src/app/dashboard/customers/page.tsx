@@ -84,7 +84,18 @@ const DUMMY_CUSTOMERS: CustomerRow[] = [
 ];
 
 function StatusBadge({ status }: { status: CustomerRow["status"] }) {
-  return status === "Active" ? <Badge>Active</Badge> : <Badge variant="secondary">Inactive</Badge>;
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        status === "Active"
+          ? "bg-green-200 text-green-800 hover:bg-green-200"
+          : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
+      }
+    >
+      {status}
+    </Badge>
+  );
 }
 
 export default function CustomersPage() {

@@ -122,7 +122,7 @@ export default function ProductsPage() {
       imageDataUrl: p.images?.[0] ?? p.image,
       imageFile: null,
       imageFiles: [],
-      imageDataUrls: (p.images ?? [p.image]).slice(0, 3),
+      imageDataUrls: (p.images ?? [p.image]).slice(0, 5),
     });
     setDialogOpen(true);
   };
@@ -160,7 +160,7 @@ export default function ProductsPage() {
       const imageSeed = form.description.trim() || name;
       const images =
         form.imageDataUrls.length > 0
-          ? form.imageDataUrls.slice(0, 3)
+          ? form.imageDataUrls.slice(0, 5)
           : [form.imageDataUrl || svgCardImage(imageSeed)];
 
       if (editingId) {

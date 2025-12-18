@@ -151,13 +151,13 @@ export default function Sidebar({ collapsed = false }: Props) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col max-w-full overflow-hidden",
+        "flex h-full min-h-0 flex-col max-w-full overflow-hidden bg-black",
         collapsed ? "w-20" : "w-72"
       )}
     >
-      <div className={cn("px-5 py-5", collapsed && "px-3")}>
+      <div className={cn("px-5 py-6", collapsed && "px-3")}>
         <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
-          <div className={cn("text-2xl font-bold text-white", collapsed && "text-lg")}>
+          <div className={cn("text-2xl font-bold text-white tracking-tight", collapsed && "text-lg")}>
             {!collapsed ? "Admin Dashboard" : "AD"}
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function Sidebar({ collapsed = false }: Props) {
         >
           <li
             className={cn(
-              "text-xs rounded-2xl px-4 text-white/90 py-1",
+              "text-xs font-semibold uppercase tracking-wider px-4 text-gray-500 py-2",
               collapsed && "mx-2 text-center px-2"
             )}
           >
@@ -193,12 +193,14 @@ export default function Sidebar({ collapsed = false }: Props) {
                 href={href}
                 onClick={(e) => handleNavigation(e, href)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
-                  active ? "bg-[#ebf3f7] text-nav-txt" : "hover:bg-white/10",
+                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                  active 
+                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
                   collapsed && "justify-center"
                 )}
               >
-                <IconByName name={icon} className="h-5 w-5 shrink-0 text-red-400" />
+                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                 {!collapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -222,27 +224,27 @@ export default function Sidebar({ collapsed = false }: Props) {
                   type="button"
                   onClick={() => setOrderMgmtOpen((v) => !v)}
                   className={cn(
-                    "group flex w-full items-center justify-between gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
+                    "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     (pathname?.startsWith("/dashboard/orders") ||
                       pathname?.startsWith("/dashboard/bulk-orders"))
-                      ? "bg-[#ebf3f7] text-nav-txt"
-                      : "hover:bg-white/10"
+                      ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
+                      : "text-gray-400 hover:bg-zinc-900 hover:text-white"
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <ShoppingCart className="h-5 w-5 shrink-0 text-red-400" />
+                    <ShoppingCart className={cn("h-5 w-5 shrink-0 transition-colors", (pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bulk-orders")) ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                     <span className="truncate">Order Management</span>
                   </span>
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 shrink-0 opacity-70 transition-transform",
+                      "h-4 w-4 shrink-0 transition-transform",
                       orderMgmtOpen && "rotate-180"
                     )}
                   />
                 </button>
 
                 {orderMgmtOpen && (
-                  <div className="mt-1 space-y-1 pl-8">
+                  <div className="mt-1 space-y-1 pl-6">
                     {orderMgmtLinks.map((c) => {
                       const childActive = pathname?.startsWith(c.href);
                       return (
@@ -251,13 +253,13 @@ export default function Sidebar({ collapsed = false }: Props) {
                           href={c.href}
                           onClick={(e) => handleNavigation(e, c.href)}
                           className={cn(
-                            "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                             childActive
-                              ? "bg-[#ebf3f7] text-nav-txt"
-                              : "hover:bg-white/10"
+                              ? "bg-zinc-900 text-white"
+                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
                           )}
                         >
-                          <ChevronRight className="h-4 w-4 shrink-0 text-red-400" />
+                          <ChevronRight className={cn("h-4 w-4 shrink-0 transition-colors", childActive ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
                           <span className="truncate">{c.label}</span>
                         </Link>
                       );
@@ -275,39 +277,39 @@ export default function Sidebar({ collapsed = false }: Props) {
                   type="button"
                   onClick={() => setProductMgmtOpen((v) => !v)}
                   className={cn(
-                    "group flex w-full items-center justify-between gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
+                    "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     (pathname?.startsWith("/dashboard/categories") ||
                       pathname?.startsWith("/dashboard/brands") ||
                       pathname?.startsWith("/dashboard/products"))
-                      ? "bg-[#ebf3f7] text-nav-txt"
-                      : "hover:bg-white/10"
+                      ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
+                      : "text-gray-400 hover:bg-zinc-900 hover:text-white"
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <Store className="h-5 w-5 shrink-0 text-red-400" />
+                    <Store className={cn("h-5 w-5 shrink-0 transition-colors", (pathname?.startsWith("/dashboard/categories") || pathname?.startsWith("/dashboard/brands") || pathname?.startsWith("/dashboard/products")) ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                     <span className="truncate">Product Management</span>
                   </span>
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 shrink-0 opacity-70 transition-transform",
+                      "h-4 w-4 shrink-0 transition-transform",
                       productMgmtOpen && "rotate-180"
                     )}
                   />
                 </button>
 
                 {productMgmtOpen && (
-                  <div className="mt-1 space-y-1 pl-8">
+                  <div className="mt-1 space-y-1 pl-6">
                     <Link
                       href="/dashboard/categories"
                       onClick={(e) => handleNavigation(e, "/dashboard/categories")}
                       className={cn(
-                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                         pathname?.startsWith("/dashboard/categories")
-                          ? "bg-[#ebf3f7] text-nav-txt"
-                          : "hover:bg-white/10"
+                          ? "bg-zinc-900 text-white"
+                          : "text-gray-500 hover:bg-zinc-900 hover:text-white"
                       )}
                     >
-                      <FolderTree className="h-4 w-4 shrink-0 text-red-400" />
+                      <FolderTree className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/categories") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
                       <span className="truncate">Categories</span>
                     </Link>
 
@@ -315,13 +317,13 @@ export default function Sidebar({ collapsed = false }: Props) {
                       href="/dashboard/brands"
                       onClick={(e) => handleNavigation(e, "/dashboard/brands")}
                       className={cn(
-                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                         pathname?.startsWith("/dashboard/brands")
-                          ? "bg-[#ebf3f7] text-nav-txt"
-                          : "hover:bg-white/10"
+                          ? "bg-zinc-900 text-white"
+                          : "text-gray-500 hover:bg-zinc-900 hover:text-white"
                       )}
                     >
-                      <Tags className="h-4 w-4 shrink-0 text-red-400" />
+                      <Tags className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/brands") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
                       <span className="truncate">Brands</span>
                     </Link>
 
@@ -329,13 +331,13 @@ export default function Sidebar({ collapsed = false }: Props) {
                       href="/dashboard/products"
                       onClick={(e) => handleNavigation(e, "/dashboard/products")}
                       className={cn(
-                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                         pathname?.startsWith("/dashboard/products")
-                          ? "bg-[#ebf3f7] text-nav-txt"
-                          : "hover:bg-white/10"
+                          ? "bg-zinc-900 text-white"
+                          : "text-gray-500 hover:bg-zinc-900 hover:text-white"
                       )}
                     >
-                      <Package className="h-4 w-4 shrink-0 text-red-400" />
+                      <Package className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/products") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
                       <span className="truncate">Products</span>
                     </Link>
                   </div>
@@ -353,12 +355,14 @@ export default function Sidebar({ collapsed = false }: Props) {
                 href={href}
                 onClick={(e) => handleNavigation(e, href)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
-                  active ? "bg-[#ebf3f7] text-nav-txt" : "hover:bg-white/10",
+                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                  active 
+                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
                   collapsed && "justify-center"
                 )}
               >
-                <IconByName name={icon} className="h-5 w-5 shrink-0 text-red-400" />
+                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                 {!collapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -384,12 +388,14 @@ export default function Sidebar({ collapsed = false }: Props) {
                 href={href}
                 onClick={(e) => handleNavigation(e, href)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
-                  active ? "bg-[#ebf3f7] text-nav-txt" : "hover:bg-white/10",
+                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                  active 
+                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
                   collapsed && "justify-center"
                 )}
               >
-                <IconByName name={icon} className="h-5 w-5 shrink-0 text-red-400" />
+                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                 {!collapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -411,16 +417,16 @@ export default function Sidebar({ collapsed = false }: Props) {
       <div className="lg:hidden px-2 py-2">
         <button
           onClick={handleLogout}
-          className="group flex items-center gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition w-full hover:bg-white/10 text-white/90"
+          className="group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all w-full text-gray-400 hover:bg-zinc-900 hover:text-white"
         >
-          <LogOut className="h-5 w-5 shrink-0 text-red-400" />
+          <LogOut className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-red-600 transition-colors" />
           {!collapsed && <span className="truncate">Log out</span>}
         </button>
       </div>
 
       <div
         className={cn(
-          "mt-auto px-5 py-4 text-[11px] opacity-80",
+          "mt-auto px-5 py-4 text-[11px] text-gray-600",
           collapsed && "text-center px-0"
         )}
       >
