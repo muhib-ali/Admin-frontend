@@ -31,20 +31,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/page.js"
     ],
-    "/dashboard/products/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/products/page.js"
-    ],
     "/dashboard/categories/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/categories/page.js"
     ],
-    "/dashboard/modules/page": [
+    "/dashboard/brands/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/modules/page.js"
+      "static/chunks/app/dashboard/brands/page.js"
+    ],
+    "/dashboard/products/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/dashboard/products/page.js"
     ]
   }
 }
