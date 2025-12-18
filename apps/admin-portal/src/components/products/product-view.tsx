@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,84 @@ type Props = {
   onDelete: (p: ProductRow) => void;
   svgCardImage: (seed: string) => string;
 };
+
+function ImageCarousel({
+  images,
+  productName,
+  productDescription,
+  svgCardImage,
+}: {
+  images: string[];
+  productName: string;
+  productDescription?: string;
+  svgCardImage: (seed: string) => string;
+}) {
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const displayImages = images.slice(0, 5);
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === displayImages.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="grid gap-2">
+      <div className="text-sm font-medium">Images</div>
+      <div className="relative">
+        <div className="overflow-hidden rounded-lg border bg-muted aspect-[16/9]">
+          <img
+            src={displayImages[currentIndex]}
+            alt={`${productName} ${currentIndex + 1}`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.src = svgCardImage(
+                (productDescription || "").trim() || productName
+              );
+            }}
+          />
+        </div>
+
+        {displayImages.length > 1 && (
+          <>
+            <button
+              onClick={goToPrevious}
+              className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md bg-white/90 hover:bg-white shadow-md flex items-center justify-center transition-all hover:scale-110"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="h-5 w-5 text-gray-700" />
+            </button>
+            <button
+              onClick={goToNext}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md bg-white/90 hover:bg-white shadow-md flex items-center justify-center transition-all hover:scale-110"
+              aria-label="Next image"
+            >
+              <ChevronRight className="h-5 w-5 text-gray-700" />
+            </button>
+
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {displayImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`h-2 rounded-full transition-all ${
+                    idx === currentIndex
+                      ? "w-6 bg-white"
+                      : "w-2 bg-white/60 hover:bg-white/80"
+                  }`}
+                  aria-label={`Go to image ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ProductView({
   open,
@@ -44,31 +122,12 @@ export function ProductView({
             <div className="text-sm text-muted-foreground">{product.id}</div>
           </div>
 
-          <div className="grid gap-2">
-            <div className="text-sm font-medium">Images</div>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {(product.images?.length ? product.images : [product.image])
-                .slice(0, 5)
-                .map((src, idx) => (
-                  <div
-                    key={idx}
-                    className="shrink-0 w-[140px] overflow-hidden rounded-lg border bg-muted aspect-[4/3]"
-                  >
-                    <img
-                      src={src}
-                      alt={`${product.name} ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.src = svgCardImage(
-                          (product.description || "").trim() || product.name
-                        );
-                      }}
-                    />
-                  </div>
-                ))}
-            </div>
-          </div>
+          <ImageCarousel
+            images={product.images?.length ? product.images : [product.image]}
+            productName={product.name}
+            productDescription={product.description}
+            svgCardImage={svgCardImage}
+          />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border p-3">

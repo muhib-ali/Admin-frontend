@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Plus, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -228,10 +228,20 @@ export default function ProductsPage() {
             </p>
           </div>
 
-          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              className="gap-2 w-full sm:w-auto bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300"
+              onClick={() => alert('Upload Excel functionality')}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Upload Excel
+            </Button>
+            <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Button>
+          </div>
         </div>
 
         <ProductForm
