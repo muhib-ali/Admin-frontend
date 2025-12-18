@@ -46,7 +46,7 @@ function StatusPill({ active }: { active: boolean }) {
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
         active
-          ? "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+          ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
           : "bg-muted text-muted-foreground"
       )}
     >

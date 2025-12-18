@@ -1,10 +1,17 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/utils/cn";
 import {
   BarChart2,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  ShoppingCart,
+  Store,
+  Tags,
   FileText,
   Receipt,
   Users,
@@ -46,6 +53,7 @@ export const nav = [
   { href: "/dashboard/invoices", label: "Invoices", icon: "FileText" as IconName },
   { href: "/dashboard/quotations", label: "Quotations", icon: "Receipt" as IconName },
   { href: "/dashboard/clients", label: "Clients", icon: "Users" as IconName },
+  { href: "/dashboard/customers", label: "Customers", icon: "Users" as IconName },
   { href: "/dashboard/products", label: "Products", icon: "Package" as IconName },
 ];
 
@@ -77,6 +85,48 @@ export default function Sidebar({ collapsed = false }: Props) {
   const pathname = usePathname();
   const { hasUnsavedChanges } = useUnsavedChanges();
   const { data: session } = useSession();
+
+  const [orderMgmtOpen, setOrderMgmtOpen] = React.useState(false);
+  const [productMgmtOpen, setProductMgmtOpen] = React.useState(false);
+
+  const dashboardItem = React.useMemo(
+    () => nav.find((i) => i.href === "/dashboard/dashboard"),
+    []
+  );
+  const navRest = React.useMemo(
+    () =>
+      nav.filter(
+        (i) => i.href !== "/dashboard/dashboard" && i.href !== "/dashboard/products"
+      ),
+    []
+  );
+
+  const orderMgmtLinks = React.useMemo(
+    () =>
+      [
+        { href: "/dashboard/orders", label: "Orders" },
+        { href: "/dashboard/bulk-orders", label: "Bulk Orders" },
+      ] as const,
+    []
+  );
+
+  React.useEffect(() => {
+    if (!pathname) return;
+    if (
+      pathname.startsWith("/dashboard/orders") ||
+      pathname.startsWith("/dashboard/bulk-orders")
+    ) {
+      setOrderMgmtOpen(true);
+    }
+
+    if (
+      pathname.startsWith("/dashboard/categories") ||
+      pathname.startsWith("/dashboard/brands") ||
+      pathname.startsWith("/dashboard/products")
+    ) {
+      setProductMgmtOpen(true);
+    }
+  }, [pathname]);
 
   const handleLogout = async () => {
     try {
@@ -133,7 +183,168 @@ export default function Sidebar({ collapsed = false }: Props) {
             {!collapsed ? "Navigation" : "Nav"}
           </li>
 
-          {nav.map(({ href, label, icon }) => {
+          {dashboardItem && (() => {
+            const { href, label, icon } = dashboardItem;
+            const active = pathname?.startsWith(href);
+            const perm = ADMIN_LINK_PERM[href];
+
+            const dashboardLink = (
+              <Link
+                href={href}
+                onClick={(e) => handleNavigation(e, href)}
+                className={cn(
+                  "group flex items-center gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
+                  active ? "bg-[#ebf3f7] text-nav-txt" : "hover:bg-white/10",
+                  collapsed && "justify-center"
+                )}
+              >
+                <IconByName name={icon} className="h-5 w-5 shrink-0 text-red-400" />
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+            );
+
+            if (perm) {
+              return (
+                <li key={href}>
+                  <PermissionGate route={perm} fallback={null}>
+                    {dashboardLink}
+                  </PermissionGate>
+                </li>
+              );
+            }
+            return <li key={href}>{dashboardLink}</li>;
+          })()}
+
+          {!collapsed && (
+            <li>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setOrderMgmtOpen((v) => !v)}
+                  className={cn(
+                    "group flex w-full items-center justify-between gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
+                    (pathname?.startsWith("/dashboard/orders") ||
+                      pathname?.startsWith("/dashboard/bulk-orders"))
+                      ? "bg-[#ebf3f7] text-nav-txt"
+                      : "hover:bg-white/10"
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ShoppingCart className="h-5 w-5 shrink-0 text-red-400" />
+                    <span className="truncate">Order Management</span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 opacity-70 transition-transform",
+                      orderMgmtOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+
+                {orderMgmtOpen && (
+                  <div className="mt-1 space-y-1 pl-8">
+                    {orderMgmtLinks.map((c) => {
+                      const childActive = pathname?.startsWith(c.href);
+                      return (
+                        <Link
+                          key={c.href}
+                          href={c.href}
+                          onClick={(e) => handleNavigation(e, c.href)}
+                          className={cn(
+                            "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                            childActive
+                              ? "bg-[#ebf3f7] text-nav-txt"
+                              : "hover:bg-white/10"
+                          )}
+                        >
+                          <ChevronRight className="h-4 w-4 shrink-0 text-red-400" />
+                          <span className="truncate">{c.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </li>
+          )}
+
+          {!collapsed && (
+            <li>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setProductMgmtOpen((v) => !v)}
+                  className={cn(
+                    "group flex w-full items-center justify-between gap-3 rounded-l-2xl px-4 py-2.5 text-sm transition",
+                    (pathname?.startsWith("/dashboard/categories") ||
+                      pathname?.startsWith("/dashboard/brands") ||
+                      pathname?.startsWith("/dashboard/products"))
+                      ? "bg-[#ebf3f7] text-nav-txt"
+                      : "hover:bg-white/10"
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Store className="h-5 w-5 shrink-0 text-red-400" />
+                    <span className="truncate">Product Management</span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 opacity-70 transition-transform",
+                      productMgmtOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+
+                {productMgmtOpen && (
+                  <div className="mt-1 space-y-1 pl-8">
+                    <Link
+                      href="/dashboard/categories"
+                      onClick={(e) => handleNavigation(e, "/dashboard/categories")}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        pathname?.startsWith("/dashboard/categories")
+                          ? "bg-[#ebf3f7] text-nav-txt"
+                          : "hover:bg-white/10"
+                      )}
+                    >
+                      <FolderTree className="h-4 w-4 shrink-0 text-red-400" />
+                      <span className="truncate">Categories</span>
+                    </Link>
+
+                    <Link
+                      href="/dashboard/brands"
+                      onClick={(e) => handleNavigation(e, "/dashboard/brands")}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        pathname?.startsWith("/dashboard/brands")
+                          ? "bg-[#ebf3f7] text-nav-txt"
+                          : "hover:bg-white/10"
+                      )}
+                    >
+                      <Tags className="h-4 w-4 shrink-0 text-red-400" />
+                      <span className="truncate">Brands</span>
+                    </Link>
+
+                    <Link
+                      href="/dashboard/products"
+                      onClick={(e) => handleNavigation(e, "/dashboard/products")}
+                      className={cn(
+                        "group flex items-center gap-2 rounded-l-2xl px-4 py-2 text-sm transition",
+                        pathname?.startsWith("/dashboard/products")
+                          ? "bg-[#ebf3f7] text-nav-txt"
+                          : "hover:bg-white/10"
+                      )}
+                    >
+                      <Package className="h-4 w-4 shrink-0 text-red-400" />
+                      <span className="truncate">Products</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </li>
+          )}
+
+          {navRest.map(({ href, label, icon }) => {
             const active = pathname?.startsWith(href);
             const perm = ADMIN_LINK_PERM[href];
 

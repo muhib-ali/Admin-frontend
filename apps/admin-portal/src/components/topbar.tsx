@@ -86,7 +86,7 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
-                className="grid h-10 w-10 place-items-center rounded-full border bg-blue-600 text-white shadow"
+                className="grid h-10 w-10 place-items-center rounded-full border bg-red-600 text-white shadow"
                 aria-label="User menu"
                 title={user?.email || "User"}
               >

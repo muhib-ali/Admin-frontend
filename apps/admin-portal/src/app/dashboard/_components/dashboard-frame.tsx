@@ -14,7 +14,7 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
     <div className="min-h-screen overflow-x-hidden">
       <aside
         className={cn(
-          "fixed left-0 top-0 z-30 hidden h-screen rounded-r-4xl bg-blue-800 text-white transition-[width] duration-300 lg:block",
+          "fixed left-0 top-0 z-30 hidden h-screen rounded-r-4xl bg-black text-white transition-[width] duration-300 lg:block",
           collapsed ? "w-20" : "w-72"
         )}
       >
@@ -53,7 +53,7 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-72 max-w-[85%] bg-[#064F99] text-white shadow-xl">
+          <div className="absolute left-0 top-0 h-full w-72 max-w-[85%] bg-black text-white shadow-xl">
             <div className="flex items-center justify-between h-14 px-4 border-b">
               <div className="font-semibold">Menu</div>
               <button

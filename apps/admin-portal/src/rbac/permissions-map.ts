@@ -108,15 +108,17 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/jobFiles/[id]":           ENTITY_PERMS.jobFiles.read,
   "/dashboard/jobFiles/[id]/edit":      ENTITY_PERMS.jobFiles.update,
 
-  "/dashboard/products":                ENTITY_PERMS.products.list,
-  "/dashboard/products/create":         ENTITY_PERMS.products.create,
-  "/dashboard/products/[id]":           ENTITY_PERMS.products.read,
-  "/dashboard/products/[id]/edit":      ENTITY_PERMS.products.update,
+  //"/dashboard/products":                ENTITY_PERMS.products.list,
+  //"/dashboard/products/create":         ENTITY_PERMS.products.create,
+  //"/dashboard/products/[id]":           ENTITY_PERMS.products.read,
+  //"/dashboard/products/[id]/edit":      ENTITY_PERMS.products.update,
 
   "/dashboard/clients":                 ENTITY_PERMS.clients.list,
   "/dashboard/clients/create":          ENTITY_PERMS.clients.create,
   "/dashboard/clients/[id]":            ENTITY_PERMS.clients.read,
   "/dashboard/clients/[id]/edit":       ENTITY_PERMS.clients.update,
+
+  "/dashboard/customers":               ENTITY_PERMS.clients.list,
 
   "/dashboard/quotations":              ENTITY_PERMS.quotations.list,
   "/dashboard/quotations/new":          ENTITY_PERMS.quotations.create,
