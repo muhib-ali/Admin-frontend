@@ -3,13 +3,13 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/utils/cn"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:-translate-y-px hover:shadow-lg active:translate-y-0",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:-translate-y-px hover:shadow-lg active:translate-y-0 active:shadow-md active:brightness-95",
   {
     variants: {
       variant: {
         default: "bg-red-600 text-white shadow-md hover:bg-red-700 active:scale-95",
         destructive: "bg-red-600 text-white shadow-md hover:bg-red-700 active:scale-95",
-        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 hover:border-gray-400 hover:shadow-md",
+        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 hover:border-gray-400 hover:shadow-md active:bg-gray-100",
         secondary: "bg-black text-white shadow-md hover:bg-zinc-800 active:scale-95",
         ghost: "hover:bg-gray-100 hover:text-gray-900",
         link: "text-red-600 underline-offset-4 hover:underline hover:text-red-700",

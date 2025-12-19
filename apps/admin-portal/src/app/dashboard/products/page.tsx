@@ -49,6 +49,9 @@ export default function ProductsPage() {
   const [rows, setRows] = React.useState<ProductRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<ProductRow | null>(null);
+
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<ProductRow | null>(null);
 
@@ -238,13 +241,8 @@ export default function ProductsPage() {
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  };
-
-  const openCreate = () => {
-    if (!canCreate) return;
-    setFormMode("create");
-    setCurrent(undefined);
-    setFormOpen(true);
+    setDeleteOpen(false);
+    setDeleteTarget(null);
   };
 
   const openEdit = async (p: ProductRow) => {
@@ -283,6 +281,13 @@ export default function ProductsPage() {
       console.error(e);
       toast.error(e?.response?.data?.message || "Failed to open product");
     }
+  };
+
+  const openCreate = () => {
+    if (!canCreate) return;
+    setFormMode("create");
+    setCurrent(undefined);
+    setFormOpen(true);
   };
 
   const upsert = async (values: ProductFormValues) => {

@@ -1,10 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/utils/cn";
+
+function TopLineLoader() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    const t = setTimeout(() => setLoading(false), 650);
+    return () => clearTimeout(t);
+  }, [pathname, searchParams]);
+
+  if (!loading) return null;
+
+  return (
+    <div className="fixed left-0 top-0 z-[60] h-[3px] w-full bg-emerald-600">
+      <div className="h-full w-full origin-left animate-[dashboardTopLoader_650ms_ease-in-out_infinite] bg-emerald-600" />
+    </div>
+  );
+}
 
 export default function DashboardFrame({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -12,6 +33,7 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-screen overflow-x-hidden">
+      <TopLineLoader />
       <aside
         className={cn(
           "fixed left-0 top-0 z-30 hidden h-screen rounded-r-4xl bg-black text-white transition-[width] duration-300 lg:block",
@@ -70,6 +92,23 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        @keyframes dashboardTopLoader {
+          0% {
+            transform: scaleX(0.08);
+            opacity: 0.9;
+          }
+          50% {
+            transform: scaleX(0.6);
+            opacity: 1;
+          }
+          100% {
+            transform: scaleX(0.98);
+            opacity: 0.9;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -64,10 +64,10 @@ export function ProductCard({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="secondary"
-                size="icon"
-                className="h-9 w-9 bg-white/90 hover:bg-white shadow-md backdrop-blur-sm"
-              >
+                variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-white/90 hover:shadow-md backdrop-blur-sm text-red-500 hover:text-red-600"
+               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

@@ -49,7 +49,7 @@ const ICONS = {
 type IconName = keyof typeof ICONS;
 
 export const nav = [
-  { href: "/dashboard/dashboard", label: "Dashboard", icon: "BarChart2" as IconName },
+  { href: "/dashboard", label: "Dashboard", icon: "BarChart2" as IconName },
   { href: "/dashboard/invoices", label: "Invoices", icon: "FileText" as IconName },
   { href: "/dashboard/quotations", label: "Quotations", icon: "Receipt" as IconName },
   { href: "/dashboard/clients", label: "Clients", icon: "Users" as IconName },
@@ -99,13 +99,13 @@ export default function Sidebar({ collapsed = false }: Props) {
   const [productMgmtOpen, setProductMgmtOpen] = React.useState(false);
 
   const dashboardItem = React.useMemo(
-    () => nav.find((i) => i.href === "/dashboard/dashboard"),
+    () => nav.find((i) => i.href === "/dashboard"),
     []
   );
   const navRest = React.useMemo(
     () =>
       nav.filter(
-        (i) => i.href !== "/dashboard/dashboard" && i.href !== "/dashboard/products"
+        (i) => i.href !== "/dashboard" && i.href !== "/dashboard/products"
       ),
     []
   );
@@ -194,7 +194,7 @@ export default function Sidebar({ collapsed = false }: Props) {
 
           {dashboardItem && (() => {
             const { href, label, icon } = dashboardItem;
-            const active = pathname?.startsWith(href);
+            const active = pathname === "/dashboard" || pathname === "/dashboard/dashboard";
             const perm = ADMIN_LINK_PERM[href];
 
             const dashboardLink = (
