@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Upload, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   Select,
@@ -21,167 +21,312 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BRANDS } from "@/components/brands/brand-list";
+import { deleteProductImage, uploadProductImage } from "@/services/products";
 
-export type CategoryKey = "electronics" | "home" | "fashion" | "sports" | "beauty" | "books";
-
-export type ProductFormData = {
+export type CategoryOption = {
+  id: string;
   name: string;
-  description: string;
-  category: CategoryKey | "all";
-  brand: string;
-  price: string;
-  stock: string;
-  status: "Active" | "Inactive";
-  imageDataUrl: string;
-  imageFile: File | null;
-  imageFiles: File[];
-  imageDataUrls: string[];
+};
+
+export type BrandOption = {
+  id: string;
+  name: string;
 };
 
 export type ProductRow = {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  category: { key: CategoryKey; label: string };
-  brand: string;
   price: number;
-  stock: number;
-  status: "Active" | "Inactive";
-  createdAt: string;
-  image: string;
-  images: string[];
+  stock_quantity: number;
+  category_id: string;
+  brand_id: string;
+  currency: string;
+  product_img_url?: string | null;
+  sku?: string | null;
+  is_active: boolean;
+  created_at: string;
+  category?: { id: string; name: string };
+  brand?: { id: string; name: string };
 };
 
-export type Category = {
-  key: CategoryKey;
-  label: string;
+export type ProductFormValues = {
+  id?: string;
+  title: string;
+  description: string;
+  price: string;
+  stock_quantity: string;
+  category_id: string;
+  brand_id: string;
+  currency: string;
+  is_active: boolean;
+  product_img_url?: string | null;
+  product_img_fileName?: string | null;
 };
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  editingId: string | null;
-  form: ProductFormData;
-  setForm: React.Dispatch<React.SetStateAction<ProductFormData>>;
-  categories: Category[];
-  onSubmit: (e: React.FormEvent) => void;
+  mode: "create" | "edit";
+  initial?: ProductFormValues;
+  categories: CategoryOption[];
+  brands: BrandOption[];
+  onSubmit: (values: ProductFormValues) => Promise<void> | void;
 };
 
 export function ProductForm({
   open,
   onOpenChange,
-  editingId,
-  form,
-  setForm,
+  mode,
+  initial,
   categories,
+  brands,
   onSubmit,
 }: Props) {
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
+  const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadedThisSessionFileName, setUploadedThisSessionFileName] =
+    React.useState<string | null>(null);
+  const [uploadedThisSessionUrl, setUploadedThisSessionUrl] = React.useState<
+    string | null
+  >(null);
 
-    if (files.length > 5) {
-      toast.error("More than 5 images cannot be uploaded.", { autoClose: 3000 });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      return;
-    }
+  const [values, setValues] = React.useState<ProductFormValues>(() => ({
+    id: initial?.id,
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    price: initial?.price ?? "",
+    stock_quantity: initial?.stock_quantity ?? "",
+    category_id: initial?.category_id ?? "",
+    brand_id: initial?.brand_id ?? "",
+    currency: initial?.currency ?? "USD",
+    is_active: initial?.is_active ?? true,
+    product_img_url: initial?.product_img_url ?? null,
+    product_img_fileName: initial?.product_img_fileName ?? null,
+  }));
 
-    if (files.length === 0) {
-      setForm((p) => ({
-        ...p,
-        imageDataUrl: "",
-        imageFile: null,
-        imageFiles: [],
-        imageDataUrls: [],
-      }));
-      return;
-    }
-
-    const readers = files.map(
-      (file) =>
-        new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve(typeof reader.result === "string" ? reader.result : "");
-          };
-          reader.readAsDataURL(file);
-        })
-    );
-
-    Promise.all(readers).then((dataUrls) => {
-      const validDataUrls = dataUrls.filter((u) => typeof u === "string" && u.length > 0);
-
-      setForm((p) => ({
-        ...p,
-        imageDataUrl: validDataUrls[0] ?? "",
-        imageFile: files[0] ?? null,
-        imageFiles: files,
-        imageDataUrls: validDataUrls,
-      }));
-
-      setCurrentImageIndex(0);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    });
-  };
-
+  const initialRef = React.useRef<ProductFormValues | undefined>(undefined);
   React.useEffect(() => {
-    if (currentImageIndex > Math.max(0, form.imageDataUrls.length - 1)) {
-      setCurrentImageIndex(0);
-    }
-  }, [currentImageIndex, form.imageDataUrls.length]);
+    if (!open) return;
 
-  const removeImage = (index: number) => {
-    setForm((p) => {
-      const newFiles = p.imageFiles.filter((_, i) => i !== index);
-      const newDataUrls = p.imageDataUrls.filter((_, i) => i !== index);
-      return {
-        ...p,
-        imageFiles: newFiles,
-        imageDataUrls: newDataUrls,
-        imageDataUrl: newDataUrls[0] ?? "",
-        imageFile: newFiles[0] ?? null,
-      };
+    initialRef.current = initial;
+
+    setValues({
+      id: initial?.id,
+      title: initial?.title ?? "",
+      description: initial?.description ?? "",
+      price: initial?.price ?? "",
+      stock_quantity: initial?.stock_quantity ?? "",
+      category_id: initial?.category_id ?? "",
+      brand_id: initial?.brand_id ?? "",
+      currency: initial?.currency ?? "USD",
+      is_active: initial?.is_active ?? true,
+      product_img_url: initial?.product_img_url ?? null,
+      product_img_fileName: initial?.product_img_fileName ?? null,
     });
-    if (currentImageIndex >= form.imageDataUrls.length - 1) {
-      setCurrentImageIndex(Math.max(0, form.imageDataUrls.length - 2));
+    setUploadedThisSessionFileName(null);
+    setUploadedThisSessionUrl(null);
+  }, [open, initial]);
+
+  const isDirty = React.useMemo(() => {
+    const i = initialRef.current;
+    const imgUrl = uploadedThisSessionUrl ?? values.product_img_url ?? null;
+    const imgName =
+      uploadedThisSessionFileName ?? values.product_img_fileName ?? null;
+
+    if (!i) {
+      return Boolean(
+        values.title.trim() ||
+          values.description.trim() ||
+          values.price.trim() ||
+          values.stock_quantity.trim() ||
+          values.category_id ||
+          values.brand_id ||
+          values.currency ||
+          imgUrl ||
+          imgName
+      );
+    }
+
+    return (
+      values.title !== i.title ||
+      values.description !== i.description ||
+      values.price !== i.price ||
+      values.stock_quantity !== i.stock_quantity ||
+      values.category_id !== i.category_id ||
+      values.brand_id !== i.brand_id ||
+      values.currency !== i.currency ||
+      values.is_active !== i.is_active ||
+      imgUrl !== (i.product_img_url ?? null) ||
+      imgName !== (i.product_img_fileName ?? null) ||
+      Boolean(uploadedThisSessionFileName)
+    );
+  }, [values, uploadedThisSessionFileName, uploadedThisSessionUrl]);
+
+  const extractFileName = (url?: string | null): string | null => {
+    if (!url) return null;
+    try {
+      const u = new URL(url);
+      const last = u.pathname.split("/").filter(Boolean).pop();
+      return last || null;
+    } catch {
+      const parts = String(url).split("/").filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : null;
     }
   };
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => 
-      prev < form.imageDataUrls.length - 1 ? prev + 1 : 0
+  const handleOpenChange = async (v: boolean) => {
+    if (v) {
+      onOpenChange(true);
+      return;
+    }
+
+    if (!isDirty && !uploadedThisSessionFileName) {
+      onOpenChange(false);
+      return;
+    }
+
+    const ok = window.confirm(
+      "Close this form? Your unsaved changes will be lost."
     );
+    if (!ok) return;
+
+    if (uploadedThisSessionFileName) {
+      try {
+        await deleteProductImage(uploadedThisSessionFileName);
+      } catch (e: any) {
+        console.error(e);
+      }
+    }
+
+    onOpenChange(false);
   };
 
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => 
-      prev > 0 ? prev - 1 : form.imageDataUrls.length - 1
-    );
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = (e.target.files ?? [])[0];
+    if (!file) {
+      return;
+    }
+
+    (async () => {
+      setUploading(true);
+      try {
+        if (uploadedThisSessionFileName) {
+          try {
+            await deleteProductImage(uploadedThisSessionFileName);
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        const uploadId =
+          mode === "edit" ? String(values.id) : crypto.randomUUID();
+
+        const { url, fileName } = await uploadProductImage(uploadId, file);
+        setUploadedThisSessionUrl(url);
+        setUploadedThisSessionFileName(fileName);
+
+        setValues((p) => ({
+          ...p,
+          product_img_url: url,
+          product_img_fileName: fileName,
+        }));
+        toast.success("Image uploaded");
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err?.message || "Image upload failed", { autoClose: 3000 });
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    })();
+  };
+
+  const removeImage = async () => {
+    if (uploadedThisSessionFileName) {
+      try {
+        await deleteProductImage(uploadedThisSessionFileName);
+      } catch (e: any) {
+        console.error(e);
+        toast.error(e?.message || "Failed to delete image", { autoClose: 3000 });
+      }
+    }
+
+    setUploadedThisSessionFileName(null);
+    setUploadedThisSessionUrl(null);
+    setValues((p) => ({
+      ...p,
+      product_img_url: null,
+      product_img_fileName: null,
+    }));
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+
+    const title = values.title.trim();
+    if (!title) {
+      toast.error("Please enter a product title", { autoClose: 3000 });
+      return;
+    }
+    if (!values.category_id) {
+      toast.error("Please select a category", { autoClose: 3000 });
+      return;
+    }
+    if (!values.brand_id) {
+      toast.error("Please select a brand", { autoClose: 3000 });
+      return;
+    }
+
+    const price = Number(values.price);
+    const stock = Number(values.stock_quantity);
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error("Please enter a valid price", { autoClose: 3000 });
+      return;
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      toast.error("Please enter a valid stock quantity", { autoClose: 3000 });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await onSubmit({
+        ...values,
+        title,
+        product_img_url: uploadedThisSessionUrl ?? values.product_img_url ?? null,
+        product_img_fileName:
+          uploadedThisSessionFileName ?? values.product_img_fileName ?? null,
+      });
+      onOpenChange(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Save failed", { autoClose: 3000 });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingId ? "Edit Product" : "Add Product"}</DialogTitle>
+          <DialogTitle>{mode === "edit" ? "Edit Product" : "Add Product"}</DialogTitle>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" onSubmit={submit}>
           <div className="grid gap-2">
-            <Label htmlFor="productName">Name</Label>
+            <Label htmlFor="productTitle">Title</Label>
             <Input
-              id="productName"
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="Product name"
+              id="productTitle"
+              value={values.title}
+              onChange={(e) =>
+                setValues((p) => ({ ...p, title: e.target.value }))
+              }
+              placeholder="Product title"
             />
           </div>
 
@@ -189,9 +334,9 @@ export function ProductForm({
             <Label htmlFor="productDescription">Description</Label>
             <Textarea
               id="productDescription"
-              value={form.description}
+              value={values.description}
               onChange={(e) =>
-                setForm((p) => ({ ...p, description: e.target.value }))
+                setValues((p) => ({ ...p, description: e.target.value }))
               }
               rows={3}
             />
@@ -206,7 +351,6 @@ export function ProductForm({
                 id="productImage"
                 type="file"
                 accept="image/*"
-                multiple
                 onChange={handleImageUpload}
                 className="hidden"
               />
@@ -216,72 +360,40 @@ export function ProductForm({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                  disabled={uploading}
                 >
                   <Upload className="h-4 w-4" />
-                  Upload Images
+                  {uploading ? "Uploading..." : "Upload Image"}
                 </Button>
                 <div className="text-xs text-muted-foreground text-center">
-                  {form.imageFiles.length === 0
-                    ? "No images selected (max 5)"
-                    : `${form.imageFiles.length} image(s) selected (max 5)`}
+                  {values.product_img_url
+                    ? "1 image selected"
+                    : "No image selected"}
                 </div>
               </div>
             </div>
 
-            {form.imageDataUrls.length > 0 && (
+            {values.product_img_url && (
               <div className="mt-4 rounded-lg bg-gray-800 p-4">
                 <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-900">
                   <img
-                    src={form.imageDataUrls[currentImageIndex]}
-                    alt={`Preview ${currentImageIndex + 1}`}
+                    src={values.product_img_url}
+                    alt="Preview"
                     className="h-full w-full object-contain"
                   />
-                  
+
                   <button
                     type="button"
-                    onClick={() => removeImage(currentImageIndex)}
+                    onClick={() => removeImage()}
                     className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white hover:bg-red-700"
+                    aria-label="Remove image"
                   >
                     <X className="h-4 w-4" />
                   </button>
-
-                  {form.imageDataUrls.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={prevImage}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-gray-700/80 p-2 text-white hover:bg-gray-600"
-                      >
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={nextImage}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-gray-700/80 p-2 text-white hover:bg-gray-600"
-                      >
-                        <ChevronRight className="h-5 w-5" />
-                      </button>
-                    </>
-                  )}
-
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {form.imageDataUrls.map((_, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setCurrentImageIndex(idx)}
-                        className={`h-2 w-2 rounded-full transition-all ${
-                          idx === currentImageIndex
-                            ? "bg-white w-6"
-                            : "bg-gray-500 hover:bg-gray-400"
-                        }`}
-                      />
-                    ))}
-                  </div>
                 </div>
 
-                <div className="mt-3 text-center text-sm text-gray-300">
-                  Image {currentImageIndex + 1} of {form.imageDataUrls.length}
+                <div className="mt-3 text-center text-xs text-gray-300">
+                  {extractFileName(values.product_img_url) || "Image"}
                 </div>
               </div>
             )}
@@ -291,16 +403,18 @@ export function ProductForm({
             <div className="grid gap-2">
               <Label>Category</Label>
               <Select
-                value={form.category}
-                onValueChange={(v) => setForm((p) => ({ ...p, category: v as any }))}
+                value={values.category_id}
+                onValueChange={(v) =>
+                  setValues((p) => ({ ...p, category_id: v }))
+                }
               >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Choose category" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
-                    <SelectItem key={c.key} value={c.key}>
-                      {c.label}
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -310,15 +424,17 @@ export function ProductForm({
             <div className="grid gap-2">
               <Label>Brand</Label>
               <Select
-                value={form.brand}
-                onValueChange={(v) => setForm((p) => ({ ...p, brand: v }))}
+                value={values.brand_id}
+                onValueChange={(v) =>
+                  setValues((p) => ({ ...p, brand_id: v }))
+                }
               >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Choose brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  {BRANDS.map((b) => (
-                    <SelectItem key={b.id} value={b.name}>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
                       {b.name}
                     </SelectItem>
                   ))}
@@ -331,8 +447,10 @@ export function ProductForm({
               <Input
                 id="productPrice"
                 inputMode="decimal"
-                value={form.price}
-                onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
+                value={values.price}
+                onChange={(e) =>
+                  setValues((p) => ({ ...p, price: e.target.value }))
+                }
                 placeholder="0"
               />
             </div>
@@ -342,10 +460,29 @@ export function ProductForm({
               <Input
                 id="productStock"
                 inputMode="numeric"
-                value={form.stock}
-                onChange={(e) => setForm((p) => ({ ...p, stock: e.target.value }))}
+                value={values.stock_quantity}
+                onChange={(e) =>
+                  setValues((p) => ({ ...p, stock_quantity: e.target.value }))
+                }
                 placeholder="0"
               />
+            </div>
+
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>Currency</Label>
+              <Select
+                value={values.currency}
+                onValueChange={(v) => setValues((p) => ({ ...p, currency: v }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Choose currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="PKR">PKR</SelectItem>
+                  <SelectItem value="AED">AED</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -355,17 +492,12 @@ export function ProductForm({
             <div className="rounded-lg border p-4 bg-muted/30">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {form.status === "Active" ? "Active" : "Inactive"}
+                  {values.is_active ? "Active" : "Inactive"}
                 </p>
 
                 <Switch
-                  checked={form.status === "Active"}
-                  onCheckedChange={(v) =>
-                    setForm((p) => ({
-                      ...p,
-                      status: v ? "Active" : "Inactive",
-                    }))
-                  }
+                  checked={values.is_active}
+                  onCheckedChange={(v) => setValues((p) => ({ ...p, is_active: v }))}
                   className="data-[state=checked]:bg-green-600"
                 />
               </div>
@@ -373,14 +505,25 @@ export function ProductForm({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={saving}
+            >
               Close
             </Button>
             <Button
               type="submit"
-              disabled={!form.name.trim() || form.category === "all"}
+              disabled={
+                saving ||
+                uploading ||
+                !values.title.trim() ||
+                !values.category_id ||
+                !values.brand_id
+              }
             >
-              {editingId ? "Update" : "Save"}
+              {saving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
             </Button>
           </div>
         </form>

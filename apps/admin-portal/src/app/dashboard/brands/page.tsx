@@ -7,15 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,94 +23,38 @@ import {
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
+import BrandFormDialog, {
+  BrandFormValues,
+} from "@/components/brands/brand-form";
+import { ENTITY_PERMS } from "@/rbac/permissions-map";
+import { useHasPermission } from "@/hooks/use-permission";
+import {
+  createBrand,
+  deleteBrand,
+  getBrandById,
+  listBrands,
+  updateBrand,
+} from "@/services/brands";
 
 type BrandRow = {
   id: string;
   name: string;
   description: string;
-  products: number;
-  status: "Active" | "Inactive";
+  active: boolean;
   createdAt: string;
 };
 
-const DUMMY_BRANDS: BrandRow[] = [
-  {
-    id: "BR-001",
-    name: "Acme",
-    description: "",
-    products: 24,
-    status: "Active",
-    createdAt: "2025-12-14T10:15:00Z",
-  },
-  {
-    id: "BR-002",
-    name: "Nova",
-    description: "",
-    products: 12,
-    status: "Active",
-    createdAt: "2025-12-13T12:05:00Z",
-  },
-  {
-    id: "BR-003",
-    name: "Zenith",
-    description: "",
-    products: 8,
-    status: "Inactive",
-    createdAt: "2025-12-10T15:42:00Z",
-  },
-  {
-    id: "BR-004",
-    name: "Evergreen",
-    description: "",
-    products: 17,
-    status: "Active",
-    createdAt: "2025-12-08T09:20:00Z",
-  },
-  {
-    id: "BR-005",
-    name: "Pulse",
-    description: "",
-    products: 6,
-    status: "Active",
-    createdAt: "2025-12-07T18:11:00Z",
-  },
-  {
-    id: "BR-006",
-    name: "Vertex",
-    description: "",
-    products: 3,
-    status: "Inactive",
-    createdAt: "2025-12-05T08:33:00Z",
-  },
-];
-
-type BrandFormValues = {
-  id: string;
-  name: string;
-  description: string;
-  products: number;
-  status: BrandRow["status"];
-};
-
-function nextBrandId(existing: BrandRow[]) {
-  const nums = existing
-    .map((b) => Number(String(b.id).replace(/\D/g, "")))
-    .filter((n) => Number.isFinite(n));
-  const max = nums.length ? Math.max(...nums) : 0;
-  return `BR-${String(max + 1).padStart(3, "0")}`;
-}
-
-function StatusBadge({ status }: { status: BrandRow["status"] }) {
+function StatusBadge({ active }: { active: boolean }) {
   return (
     <Badge
       variant="secondary"
       className={
-        status === "Active"
+        active
           ? "bg-green-200 text-green-800 hover:bg-green-200"
           : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
       }
     >
-      {status}
+      {active ? "Active" : "Inactive"}
     </Badge>
   );
 }
@@ -128,45 +63,80 @@ export default function BrandsPage() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  const [brands, setBrands] = React.useState<BrandRow[]>(DUMMY_BRANDS);
+  const [rows, setRows] = React.useState<BrandRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [dialogMode, setDialogMode] = React.useState<"create" | "view" | "edit">(
-    "create"
-  );
-  const [activeBrand, setActiveBrand] = React.useState<BrandRow | null>(null);
-  const [form, setForm] = React.useState<BrandFormValues>({
-    id: "",
-    name: "",
-    description: "",
-    products: 0,
-    status: "Active",
-  });
-
-  const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
   const limit = 5;
+  const [pagination, setPagination] = React.useState<any | null>(null);
 
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return brands;
-    return brands.filter((b) =>
-      [b.id, b.name, b.status].some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [query, brands]);
+  const [query, setQuery] = React.useState("");
+  const [debouncedQuery, setDebouncedQuery] = React.useState("");
 
-  React.useEffect(() => setPage(1), [query]);
+  const [openForm, setOpenForm] = React.useState(false);
+  const [formMode, setFormMode] = React.useState<"create" | "edit" | "view">(
+    "create"
+  );
+  const [current, setCurrent] = React.useState<BrandFormValues | undefined>(
+    undefined
+  );
 
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const pagPage = Math.min(page, totalPages);
-  const pagStart = total === 0 ? 0 : (pagPage - 1) * limit + 1;
-  const pagEnd = total === 0 ? 0 : Math.min(pagPage * limit, total);
+  const canList = useHasPermission(ENTITY_PERMS.brands.list);
+  const canCreate = useHasPermission(ENTITY_PERMS.brands.create);
+  const canRead = useHasPermission(ENTITY_PERMS.brands.read);
+  const canUpdate = useHasPermission(ENTITY_PERMS.brands.update);
+  const canDelete = useHasPermission(ENTITY_PERMS.brands.delete);
 
-  const rows = React.useMemo(() => {
-    const start = (pagPage - 1) * limit;
-    return filtered.slice(start, start + limit);
-  }, [filtered, pagPage]);
+  const normalizeRows = React.useCallback(
+    (brands: any[]): BrandRow[] =>
+      brands.map((b) => ({
+        id: b.id,
+        name: b.name,
+        description: b.description ?? "",
+        active: b.is_active ?? false,
+        createdAt: b.created_at,
+      })),
+    []
+  );
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
+
+  React.useEffect(() => {
+    if (!mounted) return;
+    const ac = new AbortController();
+    (async () => {
+      try {
+        setLoading(true);
+        if (!canList) {
+          setRows([]);
+          setPagination(null);
+          return;
+        }
+        const { rows: list, pagination: pg } = await listBrands(
+          page,
+          limit,
+          debouncedQuery || undefined,
+          { signal: ac.signal }
+        );
+        setRows(normalizeRows(list));
+        setPagination(pg ?? null);
+      } catch (e: any) {
+        if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
+        console.error(e);
+        toast.error(e?.response?.data?.message || "Failed to load brands");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => ac.abort();
+  }, [mounted, canList, page, limit, debouncedQuery, normalizeRows]);
 
   const renderCreatedAt = (iso: string) => {
     if (!mounted) return "—";
@@ -177,61 +147,122 @@ export default function BrandsPage() {
     }
   };
 
+  const refetch = React.useCallback(async () => {
+    if (!canList) return;
+    const { rows: list, pagination: pg } = await listBrands(
+      page,
+      limit,
+      debouncedQuery || undefined
+    );
+    setRows(normalizeRows(list));
+    setPagination(pg ?? null);
+  }, [canList, page, limit, debouncedQuery, normalizeRows]);
+
   const openCreate = () => {
-    const id = nextBrandId(brands);
-    setDialogMode("create");
-    setActiveBrand(null);
-    setForm({ id, name: "", description: "", products: 0, status: "Active" });
-    setDialogOpen(true);
+    if (!canCreate) return;
+    setFormMode("create");
+    setCurrent(undefined);
+    setOpenForm(true);
   };
 
-  const openView = (b: BrandRow) => {
-    setDialogMode("view");
-    setActiveBrand(b);
-    setForm({ id: b.id, name: b.name, description: b.description ?? "", products: b.products, status: b.status });
-    setDialogOpen(true);
+  const openView = async (b: BrandRow) => {
+    if (!canRead) return;
+    try {
+      const res = await getBrandById(b.id);
+      setFormMode("view");
+      setCurrent({
+        id: res.id,
+        name: res.name,
+        description: res.description ?? "",
+      });
+      setOpenForm(true);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || "Failed to open brand");
+    }
   };
 
-  const openEdit = (b: BrandRow) => {
-    setDialogMode("edit");
-    setActiveBrand(b);
-    setForm({ id: b.id, name: b.name, description: b.description ?? "", products: b.products, status: b.status });
-    setDialogOpen(true);
+  const openEdit = async (b: BrandRow) => {
+    if (!canUpdate) return;
+    try {
+      const res = await getBrandById(b.id);
+      setFormMode("edit");
+      setCurrent({
+        id: res.id,
+        name: res.name,
+        description: res.description ?? "",
+      });
+      setOpenForm(true);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || "Failed to open brand");
+    }
   };
 
-  const handleDelete = (b: BrandRow) => {
+  const upsert = async (data: BrandFormValues) => {
+    try {
+      if (formMode === "create") {
+        if (!canCreate) return;
+        await createBrand({
+          name: data.name,
+          description: data.description || "",
+        });
+        toast.success("Brand created");
+      } else {
+        if (!canUpdate) return;
+        await updateBrand({
+          id: data.id,
+          name: data.name,
+          description: data.description || "",
+        });
+        toast.success("Brand updated");
+      }
+
+      await refetch();
+      setOpenForm(false);
+      setCurrent(undefined);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || "Save failed");
+    }
+  };
+
+  const remove = async (b: BrandRow) => {
+    if (!canDelete) return;
     const ok = window.confirm(`Delete brand ${b.name}?`);
     if (!ok) return;
-    setBrands((prev) => prev.filter((x) => x.id !== b.id));
-    toast.success("Brand deleted");
+
+    try {
+      await deleteBrand(b.id);
+      toast.success("Brand deleted");
+
+      const { rows: list, pagination: pg } = await listBrands(
+        page,
+        limit,
+        debouncedQuery || undefined
+      );
+      if ((list?.length ?? 0) === 0 && page > 1) {
+        setPage((p) => p - 1);
+      } else {
+        setRows(normalizeRows(list));
+        setPagination(pg ?? null);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || "Delete failed");
+    }
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload: BrandRow = {
-      id: form.id.trim(),
-      name: form.name.trim(),
-      description: form.description.trim(),
-      products: Math.max(0, Number(form.products) || 0),
-      status: form.status,
-      createdAt: activeBrand?.createdAt ?? new Date().toISOString(),
-    };
+  const pagTotal = pagination?.total ?? rows.length;
+  const pagPage = pagination?.page ?? page;
+  const totalPages =
+    (pagination?.totalPages ?? Math.ceil(pagTotal / limit)) || 1;
 
-    if (!payload.name) {
-      toast.error("Please enter a brand name");
-      return;
-    }
+  const pagHasPrev = pagination?.hasPrev ?? pagPage > 1;
+  const pagHasNext = pagination?.hasNext ?? pagPage < totalPages;
 
-    if (dialogMode === "create") {
-      setBrands((prev) => [payload, ...prev]);
-      toast.success("Brand created");
-    } else if (dialogMode === "edit" && activeBrand) {
-      setBrands((prev) => prev.map((x) => (x.id === activeBrand.id ? payload : x)));
-      toast.success("Brand updated");
-    }
-
-    setDialogOpen(false);
-  };
+  const pagStart = pagTotal === 0 ? 0 : (pagPage - 1) * limit + 1;
+  const pagEnd = pagTotal === 0 ? 0 : Math.min(pagPage * limit, pagTotal);
 
   return (
     <PermissionBoundary screen="/dashboard/brands" mode="block">
@@ -244,7 +275,11 @@ export default function BrandsPage() {
             </p>
           </div>
 
-          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
+          <Button
+            className="gap-2 w-full sm:w-auto"
+            onClick={openCreate}
+            disabled={!canCreate}
+          >
             <Plus className="h-4 w-4" />
             Add Brand
           </Button>
@@ -273,14 +308,26 @@ export default function BrandsPage() {
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Brand</TableHead>
-                    <TableHead>Products</TableHead>
+                    <TableHead>Description</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                     <TableHead className="text-right rounded-tr-xl">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
+                        Loading brands…
+                      </TableCell>
+                    </TableRow>
+                  ) : !canList ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
+                        You don't have permission to view brands.
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
                         No brands found.
@@ -303,10 +350,12 @@ export default function BrandsPage() {
                             </div>
                           </TableCell>
 
-                          <TableCell>{b.products}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {b.description || "—"}
+                          </TableCell>
 
                           <TableCell>
-                            <StatusBadge status={b.status} />
+                            <StatusBadge active={b.active} />
                           </TableCell>
 
                           <TableCell className="text-sm text-muted-foreground">{renderCreatedAt(b.createdAt)}</TableCell>
@@ -319,15 +368,24 @@ export default function BrandsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => openView(b)}>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => openView(b)}
+                                  disabled={!canRead}
+                                >
                                   View
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => openEdit(b)}>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => openEdit(b)}
+                                  disabled={!canUpdate}
+                                >
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="cursor-pointer text-red-600 focus:text-red-600"
-                                  onClick={() => handleDelete(b)}
+                                  onClick={() => remove(b)}
+                                  disabled={!canDelete}
                                 >
                                   Delete
                                 </DropdownMenuItem>
@@ -343,10 +401,10 @@ export default function BrandsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">Showing {pagStart} to {pagEnd} of {total} brands</div>
+              <div className="text-sm text-muted-foreground">Showing {pagStart} to {pagEnd} of {pagTotal} brands</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <Button variant="outline" size="sm" disabled={pagPage <= 1} className="gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <Button variant="outline" size="sm" disabled={!pagHasPrev} className="gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                   <ChevronLeft className="h-4 w-4" />
                   <span className="hidden xs:inline">Previous</span>
                 </Button>
@@ -359,7 +417,7 @@ export default function BrandsPage() {
                   ))}
                 </div>
 
-                <Button variant="outline" size="sm" disabled={pagPage >= totalPages} className="gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                <Button variant="outline" size="sm" disabled={!pagHasNext} className="gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                   <span className="hidden xs:inline">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -368,75 +426,16 @@ export default function BrandsPage() {
           </CardContent>
         </Card>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[560px]">
-            <DialogHeader>
-              <DialogTitle>
-                {dialogMode === "create"
-                  ? "Add Brand"
-                  : dialogMode === "edit"
-                  ? "Edit Brand"
-                  : "View Brand"}
-              </DialogTitle>
-            </DialogHeader>
-
-            <form className="space-y-4" onSubmit={handleSave}>
-              <div className="grid gap-2">
-                <Label htmlFor="brandName">Name</Label>
-                <Input
-                  id="brandName"
-                  value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  disabled={dialogMode === "view"}
-                  placeholder="Brand name"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="brandDescription">Description</Label>
-                <Textarea
-                  id="brandDescription"
-                  value={form.description}
-                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                  disabled={dialogMode === "view"}
-                  rows={3}
-                />
-              </div>
-
-         <div className="grid gap-2 mt-4">
-  <Label>Status</Label>
-
-  <div className="rounded-lg border p-4 bg-muted/30">
-    <div className="flex items-center justify-between">
-      <p className="text-xs text-muted-foreground">
-        {form.status === "Active" ? "Active" : "Inactive"}
-      </p>
-
-      <Switch
-        checked={form.status === "Active"}
-        onCheckedChange={(v) =>
-          setForm((p) => ({
-            ...p,
-            status: v ? "Active" : "Inactive",
-          }))
-        }
-        disabled={dialogMode === "view"}
-        className="data-[state=checked]:bg-green-600"
-      />
-    </div>
-  </div>
-</div>
-
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Close
-                </Button>
-                {dialogMode !== "view" && <Button type="submit">Save</Button>}
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <BrandFormDialog
+          open={openForm}
+          onOpenChange={(v) => {
+            setOpenForm(v);
+            if (!v) setCurrent(undefined);
+          }}
+          mode={formMode}
+          initial={current}
+          onSubmit={upsert}
+        />
       </div>
     </PermissionBoundary>
   );

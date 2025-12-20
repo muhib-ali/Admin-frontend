@@ -1,9 +1,8 @@
 "use client";
 
-import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,79 +20,33 @@ type Props = {
   svgCardImage: (seed: string) => string;
 };
 
-function ImageCarousel({
-  images,
-  productName,
+function ImagePreview({
+  url,
+  productTitle,
   productDescription,
   svgCardImage,
 }: {
-  images: string[];
-  productName: string;
+  url?: string | null;
+  productTitle: string;
   productDescription?: string;
   svgCardImage: (seed: string) => string;
 }) {
-  const [currentIndex, setCurrentIndex] = React.useState(0);
-  const displayImages = images.slice(0, 5);
-
-  const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev === 0 ? displayImages.length - 1 : prev - 1));
-  };
-
-  const goToNext = () => {
-    setCurrentIndex((prev) => (prev === displayImages.length - 1 ? 0 : prev + 1));
-  };
+  const seed = (productDescription || "").trim() || productTitle;
+  const src = url || svgCardImage(seed);
 
   return (
     <div className="grid gap-2">
-      <div className="text-sm font-medium">Images</div>
-      <div className="relative">
-        <div className="overflow-hidden rounded-lg border bg-muted aspect-[16/9]">
-          <img
-            src={displayImages[currentIndex]}
-            alt={`${productName} ${currentIndex + 1}`}
-            className="h-full w-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.src = svgCardImage(
-                (productDescription || "").trim() || productName
-              );
-            }}
-          />
-        </div>
-
-        {displayImages.length > 1 && (
-          <>
-            <button
-              onClick={goToPrevious}
-              className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md bg-white/90 hover:bg-white shadow-md flex items-center justify-center transition-all hover:scale-110"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="h-5 w-5 text-gray-700" />
-            </button>
-            <button
-              onClick={goToNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md bg-white/90 hover:bg-white shadow-md flex items-center justify-center transition-all hover:scale-110"
-              aria-label="Next image"
-            >
-              <ChevronRight className="h-5 w-5 text-gray-700" />
-            </button>
-
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {displayImages.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-2 rounded-full transition-all ${
-                    idx === currentIndex
-                      ? "w-6 bg-white"
-                      : "w-2 bg-white/60 hover:bg-white/80"
-                  }`}
-                  aria-label={`Go to image ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
+      <div className="text-sm font-medium">Image</div>
+      <div className="overflow-hidden rounded-lg border bg-muted aspect-[16/9]">
+        <img
+          src={src}
+          alt={productTitle}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.src = svgCardImage(seed);
+          }}
+        />
       </div>
     </div>
   );
@@ -118,13 +71,13 @@ export function ProductView({
 
         <div className="space-y-4">
           <div className="grid gap-2">
-            <div className="text-lg font-semibold">{product.name}</div>
+            <div className="text-lg font-semibold">{product.title}</div>
             <div className="text-sm text-muted-foreground">{product.id}</div>
           </div>
 
-          <ImageCarousel
-            images={product.images?.length ? product.images : [product.image]}
-            productName={product.name}
+          <ImagePreview
+            url={product.product_img_url}
+            productTitle={product.title}
             productDescription={product.description}
             svgCardImage={svgCardImage}
           />
@@ -132,11 +85,11 @@ export function ProductView({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Category</div>
-              <div className="font-medium">{product.category.label}</div>
+              <div className="font-medium">{product.category?.name ?? "—"}</div>
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Brand</div>
-              <div className="font-medium">{product.brand}</div>
+              <div className="font-medium">{product.brand?.name ?? "—"}</div>
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Price</div>
@@ -144,7 +97,7 @@ export function ProductView({
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Stock</div>
-              <div className="font-medium">{product.stock}</div>
+              <div className="font-medium">{product.stock_quantity}</div>
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Status</div>
@@ -152,12 +105,12 @@ export function ProductView({
                 <Badge
                   variant="secondary"
                   className={
-                    product.status === "Active"
+                    product.is_active
                       ? "bg-green-200 text-green-800 hover:bg-green-200"
                       : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
                   }
                 >
-                  {product.status}
+                  {product.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { authService } from "@/services/auth";
-import { User, Module } from "@/types/auth.types";
+import { User, Module } from "@/types/auth.types"; 
 
 interface AuthContextType {
   user: User | null;
