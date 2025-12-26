@@ -373,9 +373,15 @@ export default function PermissionsPage() {
                           key={row.id}
                           className="odd:bg-muted/30 even:bg-white hover:bg-transparent"
                         >
-                          <TableCell>
-                            <Shield className="h-4 w-4 text-muted-foreground" />
-                          </TableCell>
+                        <TableCell>
+                          <Avatar className="h-9 w-9 shrink-0">
+                            <AvatarFallback className="bg-gray-200">
+                              <Shield className="h-4 w-4 text-muted-foreground" />
+                            </AvatarFallback>
+                          </Avatar>
+                        </TableCell>
+
+                          
 
                           <TableCell
                             className={`font-medium ${
