@@ -82,7 +82,7 @@ export function ProductView({
           <ImagePreview
             url={product.product_img_url}
             productTitle={product.title}
-            productDescription={product.description}
+            productDescription={product.id}
             svgCardImage={svgCardImage}
           />
 

@@ -764,11 +764,11 @@ export default function RolesPage() {
                       <Table className="min-w-[640px]">
                         <TableHeader>
                           <TableRow className="bg-gray-200">
-                            <TableHead className="rounded-tl-xl">
+                            <TableHead className="rounded-tl-xl pl-14 ">
                               Role
                             </TableHead>
                             <TableHead>Created At</TableHead>
-                            <TableHead>Permissions</TableHead>
+                            <TableHead className="text-center">Permissions</TableHead>
                             <TableHead className="text-right rounded-tr-xl">
                               Actions
                             </TableHead>
@@ -829,8 +829,10 @@ export default function RolesPage() {
                                     {renderCreatedAt(r.created_at)}
                                   </TableCell>
 
-                                  <TableCell>
-                                    <Badge>{displayPermCount(r)}</Badge>
+                                  <TableCell className="text-center">
+                                    <Badge className="mx-auto min-w-[120px] justify-center border border-red-700 bg-red-100 text-red-700 ">
+                                     {displayPermCount(r)}
+                                    </Badge>
                                   </TableCell>
 
                                   <TableCell
