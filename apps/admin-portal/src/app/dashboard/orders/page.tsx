@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Package, Truck } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Package, Truck, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type OrderStatus = "Pending" | "Processing" | "Shipped" | "Delivered";
 
@@ -147,6 +148,9 @@ export default function OrdersPage() {
   );
   const [activeOrder, setActiveOrder] = React.useState<OrderRow | null>(null);
 
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<OrderRow | null>(null);
+
   const [form, setForm] = React.useState<OrderFormValues>({
     id: "",
     customer: "",
@@ -211,11 +215,17 @@ export default function OrdersPage() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (o: OrderRow) => {
-    const ok = window.confirm(`Delete order ${o.id}?`);
-    if (!ok) return;
-    setOrders((prev) => prev.filter((x) => x.id !== o.id));
+  const requestDelete = (o: OrderRow) => {
+    setDeleteTarget(o);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    setOrders((prev) => prev.filter((x) => x.id !== deleteTarget.id));
     toast.success("Order deleted");
+    setDeleteOpen(false);
+    setDeleteTarget(null);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -375,9 +385,10 @@ export default function OrdersPage() {
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="cursor-pointer text-destructive focus:text-destructive"
-                                  onClick={() => handleDelete(o)}
+                                  className="gap-2 text-destructive"
+                                  onClick={() => requestDelete(o)}
                                 >
+                                  <Trash2 className="h-4 w-4" />
                                   Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -392,13 +403,12 @@ export default function OrdersPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {pagStart} to {pagEnd} of {total} orders
-              </div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={pagPage <= 1}
                   className="gap-1"
@@ -408,22 +418,9 @@ export default function OrdersPage() {
                   <span className="hidden xs:inline">Previous</span>
                 </Button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                    <Button
-                      key={pg}
-                      variant={pg === pagPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setPage(pg)}
-                      className="w-8 h-8 p-0 text-xs"
-                    >
-                      {pg}
-                    </Button>
-                  ))}
-                </div>
-
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={pagPage >= totalPages}
                   className="gap-1"
@@ -546,6 +543,20 @@ export default function OrdersPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v) => {
+            if (!v) setDeleteTarget(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete order"
+          description={deleteTarget ? `Are you sure you want to delete order ${deleteTarget.id}? This action cannot be undone.` : "This action cannot be undone."}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          onConfirm={confirmDelete}
+        />
       </div>
     </PermissionBoundary>
   );
