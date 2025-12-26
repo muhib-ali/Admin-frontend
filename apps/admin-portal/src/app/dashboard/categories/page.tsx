@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronLeft, ChevronRight, MoreHorizontal, FolderTree, Plus } from "lucide-react";
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  FolderTree,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
 import CategoryFormDialog, {
@@ -80,6 +90,10 @@ export default function CategoriesPage() {
   const [current, setCurrent] = React.useState<CategoryFormValues | undefined>(
     undefined
   );
+
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<CategoryRow | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const canList = useHasPermission(ENTITY_PERMS.categories.list);
   const canCreate = useHasPermission(ENTITY_PERMS.categories.create);
@@ -227,13 +241,19 @@ export default function CategoriesPage() {
     }
   };
 
-  const remove = async (c: CategoryRow) => {
+  const requestRemove = (c: CategoryRow) => {
     if (!canDelete) return;
-    const ok = window.confirm(`Delete category ${c.name}?`);
-    if (!ok) return;
+    setDeleteTarget(c);
+    setDeleteOpen(true);
+  };
+
+  const confirmRemove = async () => {
+    if (!canDelete) return;
+    if (!deleteTarget) return;
 
     try {
-      await deleteCategory(c.id);
+      setDeleting(true);
+      await deleteCategory(deleteTarget.id);
       toast.success("Category deleted");
 
       const { rows: list, pagination: pg } = await listCategories(
@@ -247,9 +267,14 @@ export default function CategoriesPage() {
         setRows(normalizeRows(list));
         setPagination(pg ?? null);
       }
+
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -368,27 +393,24 @@ export default function CategoriesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openView(c)}
-                                  disabled={!canRead}
-                                >
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openEdit(c)}
-                                  disabled={!canUpdate}
-                                >
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer text-red-600 focus:text-red-600"
-                                  onClick={() => remove(c)}
-                                  disabled={!canDelete}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openEdit(c)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    className="gap-2 text-destructive focus:text-destructive"
+                                    onClick={() => requestRemove(c)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -401,13 +423,12 @@ export default function CategoriesPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {pagStart} to {pagEnd} of {pagTotal} categories
-              </div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasPrev}
                   className="gap-1"
@@ -417,22 +438,9 @@ export default function CategoriesPage() {
                   <span className="hidden xs:inline">Previous</span>
                 </Button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                    <Button
-                      key={pg}
-                      variant={pg === pagPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setPage(pg)}
-                      className="w-8 h-8 p-0 text-xs"
-                    >
-                      {pg}
-                    </Button>
-                  ))}
-                </div>
-
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasNext}
                   className="gap-1"
@@ -455,6 +463,21 @@ export default function CategoriesPage() {
           mode={formMode}
           initial={current}
           onSubmit={upsert}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v) => {
+            if (!v) setDeleteTarget(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete category"
+          description={deleteTarget ? `Are you sure you want to delete category “${deleteTarget.name}”? This action cannot be undone.` : "This action cannot be undone."}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmRemove}
         />
       </div>
     </PermissionBoundary>
