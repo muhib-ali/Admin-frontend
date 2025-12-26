@@ -32,6 +32,9 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
   const [password, setPassword] = React.useState("");
   const [roleId, setRoleId] = React.useState(initialData?.roleId ?? "");
 
+  type Errors = Partial<Record<"name" | "email" | "password" | "roleId", string>>;
+  const [errors, setErrors] = React.useState<Errors>({});
+
   React.useEffect(() => {
     if (!open) return;
     setName(initialData?.name ?? "");
@@ -42,6 +45,18 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const nextErrors: Errors = {};
+    if (!name.trim()) nextErrors.name = "Name is required";
+    if (!email.trim()) nextErrors.email = "Email is required";
+    else if (!/^\S+@\S+\.\S+$/.test(email.trim())) nextErrors.email = "Enter a valid email";
+    if (!roleId) nextErrors.roleId = "Role is required";
+    if (mode === "create" && !password) nextErrors.password = "Password is required";
+    else if (password && password.length < 8) nextErrors.password = "Password must be at least 8 characters";
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
     const payload: UserData = {
       id: initialData?.id,
       name: name.trim(),
@@ -77,6 +92,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
               onChange={(e) => setName(e.target.value)}
               required
             />
+            {errors.name ? <p className="text-xs text-red-600">{errors.name}</p> : null}
           </div>
 
           <div className="space-y-2">
@@ -89,6 +105,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+            {errors.email ? <p className="text-xs text-red-600">{errors.email}</p> : null}
           </div>
 
           <div className="space-y-2">
@@ -103,6 +120,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
               onChange={(e) => setPassword(e.target.value)}
               required={mode === "create"}
             />
+            {errors.password ? <p className="text-xs text-red-600">{errors.password}</p> : null}
           </div>
 
           <div className="space-y-2">
@@ -119,6 +137,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
                 ))}
               </SelectContent>
             </Select>
+            {errors.roleId ? <p className="text-xs text-red-600">{errors.roleId}</p> : null}
           </div>
 
           <DialogFooter>

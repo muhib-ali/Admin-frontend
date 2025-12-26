@@ -450,13 +450,12 @@ export default function PermissionsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {pagStart} to {pagEnd} of {pagTotal} permissions
-              </div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasPrev}
                   onClick={goToPrevious}
@@ -466,24 +465,9 @@ export default function PermissionsPage() {
                   <span className="hidden sm:inline">Previous</span>
                 </Button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (pg) => (
-                      <Button
-                        key={pg}
-                        variant={pg === pagPage ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => goToPage(pg)}
-                        className="w-8 h-8 p-0 text-xs"
-                      >
-                        {pg}
-                      </Button>
-                    )
-                  )}
-                </div>
-
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasNext}
                   onClick={goToNext}

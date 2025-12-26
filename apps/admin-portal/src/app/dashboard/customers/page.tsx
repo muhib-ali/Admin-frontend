@@ -242,11 +242,12 @@ export default function CustomersPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">Showing {pagStart} to {pagEnd} of {total} customers</div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={pagPage <= 1}
                   className="gap-1"
@@ -256,22 +257,9 @@ export default function CustomersPage() {
                   <span className="hidden xs:inline">Previous</span>
                 </Button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                    <Button
-                      key={pg}
-                      variant={pg === pagPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setPage(pg)}
-                      className="w-8 h-8 p-0 text-xs"
-                    >
-                      {pg}
-                    </Button>
-                  ))}
-                </div>
-
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={pagPage >= totalPages}
                   className="gap-1"

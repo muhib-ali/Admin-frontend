@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import PermissionBoundary from "@/components/permission-boundary";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductView } from "@/components/products/product-view";
 import { ProductCard } from "@/components/products/product-card";
@@ -51,6 +52,7 @@ export default function ProductsPage() {
 
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<ProductRow | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<ProductRow | null>(null);
@@ -345,15 +347,21 @@ export default function ProductsPage() {
     setCurrent(undefined);
   };
 
-  const remove = async (p: ProductRow) => {
+  const requestRemove = (p: ProductRow) => {
     if (!canDelete) return;
+    setDeleteTarget(p);
+    setDeleteOpen(true);
+  };
 
-    const ok = window.confirm(`Delete ${p.title}?`);
-    if (!ok) return;
+  const confirmRemove = async () => {
+    if (!canDelete) return;
+    if (!deleteTarget) return;
 
+    const p = deleteTarget;
     const fileName = extractFileName(p.product_img_url ?? null);
 
     try {
+      setDeleting(true);
       await deleteProduct(p.id);
       if (fileName) {
         try {
@@ -380,9 +388,14 @@ export default function ProductsPage() {
         setSelected(null);
         setViewOpen(false);
       }
+
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -449,10 +462,25 @@ export default function ProductsPage() {
           onOpenChange={setViewOpen}
           product={selected}
           onEdit={openEdit}
-          onDelete={remove}
+          onDelete={requestRemove}
           svgCardImage={svgCardImage}
           canUpdate={canUpdate}
           canDelete={canDelete}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v) => {
+            if (!v) setDeleteTarget(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete product"
+          description={deleteTarget ? `Are you sure you want to delete “${deleteTarget.title}”? This action cannot be undone.` : "This action cannot be undone."}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmRemove}
         />
 
         <Card className="shadow-sm">
@@ -514,7 +542,7 @@ export default function ProductsPage() {
                     product={p}
                     onView={openView}
                     onEdit={openEdit}
-                    onDelete={remove}
+                    onDelete={requestRemove}
                     renderCreatedDate={renderCreatedDate}
                     svgCardImage={svgCardImage}
                     canRead={canRead}
@@ -541,13 +569,12 @@ export default function ProductsPage() {
 
                 return (
                   <>
-                    <div className="text-sm text-muted-foreground">
-                      Showing {pagStart} to {pagEnd} of {pagTotal} products
-                    </div>
+                    <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
                     <div className="flex flex-wrap items-center gap-2 justify-end">
                       <Button
-                        variant="outline"
+                        variant="pagination"
+                        clickVariant="default"
                         size="sm"
                         disabled={!pagHasPrev}
                         className="gap-1"
@@ -557,24 +584,9 @@ export default function ProductsPage() {
                         <span className="hidden xs:inline">Previous</span>
                       </Button>
 
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                          (pg) => (
-                            <Button
-                              key={pg}
-                              variant={pg === pagPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setPage(pg)}
-                              className="w-8 h-8 p-0 text-xs"
-                            >
-                              {pg}
-                            </Button>
-                          )
-                        )}
-                      </div>
-
                       <Button
-                        variant="outline"
+                        variant="pagination"
+                        clickVariant="default"
                         size="sm"
                         disabled={!pagHasNext}
                         className="gap-1"

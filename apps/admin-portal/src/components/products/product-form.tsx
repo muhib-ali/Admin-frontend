@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteProductImage, uploadProductImage } from "@/services/products";
 
 export type CategoryOption = {
@@ -85,6 +86,20 @@ export function ProductForm({
 }: Props) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  type Errors = Partial<
+    Record<
+      | "title"
+      | "description"
+      | "category_id"
+      | "brand_id"
+      | "price"
+      | "stock_quantity"
+      | "currency"
+      | "product_img_url",
+      string
+    >
+  >;
+
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [uploadedThisSessionFileName, setUploadedThisSessionFileName] =
@@ -92,6 +107,9 @@ export function ProductForm({
   const [uploadedThisSessionUrl, setUploadedThisSessionUrl] = React.useState<
     string | null
   >(null);
+
+  const [confirmCloseOpen, setConfirmCloseOpen] = React.useState(false);
+  const [errors, setErrors] = React.useState<Errors>({});
 
   const [values, setValues] = React.useState<ProductFormValues>(() => ({
     id: initial?.id,
@@ -177,6 +195,19 @@ export function ProductForm({
     }
   };
 
+  const doClose = async () => {
+    if (uploadedThisSessionFileName) {
+      try {
+        await deleteProductImage(uploadedThisSessionFileName);
+      } catch (e: any) {
+        console.error(e);
+      }
+    }
+
+    setConfirmCloseOpen(false);
+    onOpenChange(false);
+  };
+
   const handleOpenChange = async (v: boolean) => {
     if (v) {
       onOpenChange(true);
@@ -188,20 +219,7 @@ export function ProductForm({
       return;
     }
 
-    const ok = window.confirm(
-      "Close this form? Your unsaved changes will be lost."
-    );
-    if (!ok) return;
-
-    if (uploadedThisSessionFileName) {
-      try {
-        await deleteProductImage(uploadedThisSessionFileName);
-      } catch (e: any) {
-        console.error(e);
-      }
-    }
-
-    onOpenChange(false);
+    setConfirmCloseOpen(true);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,28 +285,46 @@ export function ProductForm({
     e.preventDefault();
     if (saving) return;
 
+    const nextErrors: Errors = {};
+
     const title = values.title.trim();
     if (!title) {
-      toast.error("Please enter a product title", { autoClose: 3000 });
-      return;
+      nextErrors.title = "Title is required";
     }
+
+    const description = values.description.trim();
+    if (!description) {
+      nextErrors.description = "Description is required";
+    }
+
     if (!values.category_id) {
-      toast.error("Please select a category", { autoClose: 3000 });
-      return;
+      nextErrors.category_id = "Category is required";
     }
     if (!values.brand_id) {
-      toast.error("Please select a brand", { autoClose: 3000 });
-      return;
+      nextErrors.brand_id = "Brand is required";
+    }
+
+    if (!values.currency) {
+      nextErrors.currency = "Currency is required";
     }
 
     const price = Number(values.price);
     const stock = Number(values.stock_quantity);
     if (!Number.isFinite(price) || price < 0) {
-      toast.error("Please enter a valid price", { autoClose: 3000 });
-      return;
+      nextErrors.price = "Enter a valid price";
     }
     if (!Number.isFinite(stock) || stock < 0) {
-      toast.error("Please enter a valid stock quantity", { autoClose: 3000 });
+      nextErrors.stock_quantity = "Enter a valid stock quantity";
+    }
+
+    const imgUrl = uploadedThisSessionUrl ?? values.product_img_url ?? null;
+    if (!imgUrl) {
+      nextErrors.product_img_url = "Product image is required";
+    }
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      toast.error("Please fix the highlighted fields", { autoClose: 3000 });
       return;
     }
 
@@ -297,6 +333,7 @@ export function ProductForm({
       await onSubmit({
         ...values,
         title,
+        description,
         product_img_url: uploadedThisSessionUrl ?? values.product_img_url ?? null,
         product_img_fileName:
           uploadedThisSessionFileName ?? values.product_img_fileName ?? null,
@@ -322,12 +359,14 @@ export function ProductForm({
             <Label htmlFor="productTitle">Title</Label>
             <Input
               id="productTitle"
+              className="h-10"
               value={values.title}
               onChange={(e) =>
                 setValues((p) => ({ ...p, title: e.target.value }))
               }
               placeholder="Product title"
             />
+            {errors.title ? <p className="text-xs text-red-600">{errors.title}</p> : null}
           </div>
 
           <div className="grid gap-2">
@@ -340,6 +379,9 @@ export function ProductForm({
               }
               rows={3}
             />
+            {errors.description ? (
+              <p className="text-xs text-red-600">{errors.description}</p>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
@@ -397,6 +439,9 @@ export function ProductForm({
                 </div>
               </div>
             )}
+            {errors.product_img_url ? (
+              <p className="text-xs text-red-600">{errors.product_img_url}</p>
+            ) : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -408,7 +453,7 @@ export function ProductForm({
                   setValues((p) => ({ ...p, category_id: v }))
                 }
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="Choose category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -419,6 +464,9 @@ export function ProductForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.category_id ? (
+                <p className="text-xs text-red-600">{errors.category_id}</p>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
@@ -429,7 +477,7 @@ export function ProductForm({
                   setValues((p) => ({ ...p, brand_id: v }))
                 }
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="Choose brand" />
                 </SelectTrigger>
                 <SelectContent>
@@ -440,12 +488,16 @@ export function ProductForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.brand_id ? (
+                <p className="text-xs text-red-600">{errors.brand_id}</p>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="productPrice">Price</Label>
               <Input
                 id="productPrice"
+                className="h-10"
                 inputMode="decimal"
                 value={values.price}
                 onChange={(e) =>
@@ -453,12 +505,14 @@ export function ProductForm({
                 }
                 placeholder="0"
               />
+              {errors.price ? <p className="text-xs text-red-600">{errors.price}</p> : null}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="productStock">Stock</Label>
+              <Label htmlFor="productStock">Stock Quantity</Label>
               <Input
                 id="productStock"
+                className="h-10"
                 inputMode="numeric"
                 value={values.stock_quantity}
                 onChange={(e) =>
@@ -466,15 +520,21 @@ export function ProductForm({
                 }
                 placeholder="0"
               />
+              {errors.stock_quantity ? (
+                <p className="text-xs text-red-600">{errors.stock_quantity}</p>
+              ) : null}
             </div>
 
-            <div className="grid gap-2 sm:col-span-2">
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
               <Label>Currency</Label>
               <Select
                 value={values.currency}
                 onValueChange={(v) => setValues((p) => ({ ...p, currency: v }))}
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="Choose currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -483,21 +543,22 @@ export function ProductForm({
                   <SelectItem value="AED">AED</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.currency ? (
+                <p className="text-xs text-red-600">{errors.currency}</p>
+              ) : null}
             </div>
-          </div>
 
-          <div className="grid gap-2 mt-4">
-            <Label>Status</Label>
-
-            <div className="rounded-lg border p-4 bg-muted/30">
-              <div className="flex items-center justify-between">
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <div className="w-full rounded-lg border px-3 bg-muted/30 h-10 flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
                   {values.is_active ? "Active" : "Inactive"}
                 </p>
-
                 <Switch
                   checked={values.is_active}
-                  onCheckedChange={(v) => setValues((p) => ({ ...p, is_active: v }))}
+                  onCheckedChange={(v) =>
+                    setValues((p) => ({ ...p, is_active: v }))
+                  }
                   className="data-[state=checked]:bg-green-600"
                 />
               </div>
@@ -519,8 +580,13 @@ export function ProductForm({
                 saving ||
                 uploading ||
                 !values.title.trim() ||
+                !values.description.trim() ||
                 !values.category_id ||
-                !values.brand_id
+                !values.brand_id ||
+                !values.currency ||
+                !String(values.price).trim() ||
+                !String(values.stock_quantity).trim() ||
+                !(uploadedThisSessionUrl ?? values.product_img_url ?? null)
               }
             >
               {saving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
@@ -528,6 +594,17 @@ export function ProductForm({
           </div>
         </form>
       </DialogContent>
+
+      <ConfirmDialog
+        open={confirmCloseOpen}
+        onOpenChange={setConfirmCloseOpen}
+        title="Discard changes?"
+        description="Close this form? Your unsaved changes will be lost."
+        confirmText="Discard"
+        cancelText="Keep editing"
+        destructive
+        onConfirm={doClose}
+      />
     </Dialog>
   );
 }

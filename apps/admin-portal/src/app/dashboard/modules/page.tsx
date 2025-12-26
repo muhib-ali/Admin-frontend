@@ -18,6 +18,7 @@ import ModuleFormDialog, {
   ModuleRow,
 } from "@/components/modules/module-form";
 import PermissionBoundary from "@/components/permission-boundary";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import {
   listModules,
@@ -69,6 +70,10 @@ export default function ModulesPage() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [current, setCurrent] = useState<ModuleRow | undefined>(undefined);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const canList = useHasPermission(ENTITY_PERMS.modules.list);
   const canCreate = useHasPermission(ENTITY_PERMS.modules.create);
@@ -193,15 +198,20 @@ export default function ModulesPage() {
     }
   };
 
-  const remove = async (moduleId: string) => {
+  const requestRemove = (moduleId: string) => {
     if (!canDelete) return;
+    setDeleteTargetId(moduleId);
+    setDeleteOpen(true);
+  };
 
-    const ok = window.confirm(
-      "This will delete all permissions under this module, then delete the module. Continue?"
-    );
-    if (!ok) return;
+  const confirmRemove = async () => {
+    if (!canDelete) return;
+    if (!deleteTargetId) return;
+
+    const moduleId = deleteTargetId;
 
     try {
+      setDeleting(true);
       const perms = await listPermissionsByModuleId(moduleId);
 
       for (const p of perms) {
@@ -227,11 +237,15 @@ export default function ModulesPage() {
         setRows(normalizeRows(list));
         setPagination(pg ?? null);
       }
+
+      setDeleteOpen(false);
+      setDeleteTargetId(null);
     } catch (e: any) {
       console.error(e);
-      const msg =
-        e?.response?.data?.message || e?.message || "Delete failed";
+      const msg = e?.response?.data?.message || e?.message || "Delete failed";
       toast.error(msg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -277,9 +291,8 @@ export default function ModulesPage() {
         <Card className="shadow-sm">
           <CardHeader className="space-y-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <CardTitle className="text-xl sm:text-2xl">
-                All Modules
-              </CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">All Modules</CardTitle>
+
               <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -390,7 +403,7 @@ export default function ModulesPage() {
                                     {canDelete && (
                                       <DropdownMenuItem
                                         className="gap-2 text-destructive focus:text-destructive"
-                                        onClick={() => remove(m.id)}
+                                        onClick={() => requestRemove(m.id)}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         Delete
@@ -403,6 +416,7 @@ export default function ModulesPage() {
                           </tr>
                         );
                       })}
+
                       {filtered.length === 0 && (
                         <tr>
                           <td
@@ -420,12 +434,12 @@ export default function ModulesPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {pagStart} to {pagEnd} of {pagTotal} modules
-              </div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {pagTotalPages}</div>
+
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasPrev}
                   className="gap-1"
@@ -434,23 +448,10 @@ export default function ModulesPage() {
                   <ChevronLeft className="h-4 w-4" />
                   <span className="hidden sm:inline">Previous</span>
                 </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: pagTotalPages }, (_, i) => i + 1).map(
-                    (pg) => (
-                      <Button
-                        key={pg}
-                        variant={pg === pagPage ? "default" : "outline"}
-                        size="sm"
-                        className="w-8 h-8 p-0 text-xs"
-                        onClick={() => setPage(pg)}
-                      >
-                        {pg}
-                      </Button>
-                    )
-                  )}
-                </div>
+
                 <Button
-                  variant="outline"
+                  variant="pagination"
+                  clickVariant="default"
                   size="sm"
                   disabled={!pagHasNext}
                   className="gap-1"
@@ -467,12 +468,27 @@ export default function ModulesPage() {
         <ModuleFormDialog
           open={open}
           onOpenChange={(v) => {
-            setOpen(v);
             if (!v) setCurrent(undefined);
+            setOpen(v);
           }}
           mode={mode}
           initial={current}
           onSubmit={upsert}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v) => {
+            if (!v) setDeleteTargetId(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete module"
+          description="This will delete all permissions under this module, then delete the module. Continue?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmRemove}
         />
       </div>
     </PermissionBoundary>

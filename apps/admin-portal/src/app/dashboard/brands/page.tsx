@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Tags, Plus } from "lucide-react";
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Tags,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +44,7 @@ import {
   listBrands,
   updateBrand,
 } from "@/services/brands";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type BrandRow = {
   id: string;
@@ -80,6 +90,10 @@ export default function BrandsPage() {
   const [current, setCurrent] = React.useState<BrandFormValues | undefined>(
     undefined
   );
+
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<BrandRow | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const canList = useHasPermission(ENTITY_PERMS.brands.list);
   const canCreate = useHasPermission(ENTITY_PERMS.brands.create);
@@ -227,13 +241,19 @@ export default function BrandsPage() {
     }
   };
 
-  const remove = async (b: BrandRow) => {
+  const requestRemove = (b: BrandRow) => {
     if (!canDelete) return;
-    const ok = window.confirm(`Delete brand ${b.name}?`);
-    if (!ok) return;
+    setDeleteTarget(b);
+    setDeleteOpen(true);
+  };
+
+  const confirmRemove = async () => {
+    if (!canDelete) return;
+    if (!deleteTarget) return;
 
     try {
-      await deleteBrand(b.id);
+      setDeleting(true);
+      await deleteBrand(deleteTarget.id);
       toast.success("Brand deleted");
 
       const { rows: list, pagination: pg } = await listBrands(
@@ -247,9 +267,14 @@ export default function BrandsPage() {
         setRows(normalizeRows(list));
         setPagination(pg ?? null);
       }
+
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -368,27 +393,24 @@ export default function BrandsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openView(b)}
-                                  disabled={!canRead}
-                                >
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openEdit(b)}
-                                  disabled={!canUpdate}
-                                >
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer text-red-600 focus:text-red-600"
-                                  onClick={() => remove(b)}
-                                  disabled={!canDelete}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openEdit(b)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    className="gap-2 text-destructive focus:text-destructive"
+                                    onClick={() => requestRemove(b)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -401,23 +423,15 @@ export default function BrandsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">Showing {pagStart} to {pagEnd} of {pagTotal} brands</div>
+              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <Button variant="outline" size="sm" disabled={!pagHasPrev} className="gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <Button variant="pagination" clickVariant="default" size="sm" disabled={!pagHasPrev} className="gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                   <ChevronLeft className="h-4 w-4" />
                   <span className="hidden xs:inline">Previous</span>
                 </Button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                    <Button key={pg} variant={pg === pagPage ? "default" : "outline"} size="sm" onClick={() => setPage(pg)} className="w-8 h-8 p-0 text-xs">
-                      {pg}
-                    </Button>
-                  ))}
-                </div>
-
-                <Button variant="outline" size="sm" disabled={!pagHasNext} className="gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                <Button variant="pagination" clickVariant="default" size="sm" disabled={!pagHasNext} className="gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                   <span className="hidden xs:inline">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -435,6 +449,21 @@ export default function BrandsPage() {
           mode={formMode}
           initial={current}
           onSubmit={upsert}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v) => {
+            if (!v) setDeleteTarget(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete brand"
+          description={deleteTarget ? `Are you sure you want to delete brand “${deleteTarget.name}”? This action cannot be undone.` : "This action cannot be undone."}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmRemove}
         />
       </div>
     </PermissionBoundary>
