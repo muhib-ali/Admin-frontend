@@ -19,6 +19,9 @@ type Props = {
   onDelete: (p: ProductRow) => void;
   renderCreatedDate: (iso: string) => string;
   svgCardImage: (seed: string) => string;
+  canRead?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 };
 
 export function ProductCard({
@@ -28,6 +31,9 @@ export function ProductCard({
   onDelete,
   renderCreatedDate,
   svgCardImage,
+  canRead = true,
+  canUpdate = true,
+  canDelete = true,
 }: Props) {
   const imgSeed = (product.description || "").trim() || product.title;
   const imageSrc = product.product_img_url || svgCardImage(imgSeed);
@@ -72,15 +78,19 @@ export function ProductCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={() => onView(product)}>
+              <DropdownMenuItem onClick={() => onView(product)} disabled={!canRead}>
                 <Package className="mr-2 h-4 w-4" />
                 View
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(product)}>
+              <DropdownMenuItem onClick={() => onEdit(product)} disabled={!canUpdate}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(product)} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem
+                onClick={() => onDelete(product)}
+                disabled={!canDelete}
+                className="text-red-600 focus:text-red-600"
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>

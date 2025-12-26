@@ -1,8 +1,7 @@
 {
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/dashboard/modules/page": "app/dashboard/modules/page.js",
-  "/dashboard/products/page": "app/dashboard/products/page.js",
-  "/dashboard/brands/page": "app/dashboard/brands/page.js",
-  "/dashboard/permissions/page": "app/dashboard/permissions/page.js",
-  "/dashboard/roles/page": "app/dashboard/roles/page.js"
+  "/login/page": "app/login/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/roles/page": "app/dashboard/roles/page.js",
+  "/dashboard/permissions/page": "app/dashboard/permissions/page.js"
 }

@@ -464,6 +464,8 @@ export default function ProductsPage() {
           onEdit={openEdit}
           onDelete={requestRemove}
           svgCardImage={svgCardImage}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
         />
 
         <ConfirmDialog
@@ -543,6 +545,9 @@ export default function ProductsPage() {
                     onDelete={requestRemove}
                     renderCreatedDate={renderCreatedDate}
                     svgCardImage={svgCardImage}
+                    canRead={canRead}
+                    canUpdate={canUpdate}
+                    canDelete={canDelete}
                   />
                 ))}
               </div>
