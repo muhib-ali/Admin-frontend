@@ -451,6 +451,8 @@ export default function ProductsPage() {
           onEdit={openEdit}
           onDelete={remove}
           svgCardImage={svgCardImage}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
         />
 
         <Card className="shadow-sm">
@@ -515,6 +517,9 @@ export default function ProductsPage() {
                     onDelete={remove}
                     renderCreatedDate={renderCreatedDate}
                     svgCardImage={svgCardImage}
+                    canRead={canRead}
+                    canUpdate={canUpdate}
+                    canDelete={canDelete}
                   />
                 ))}
               </div>

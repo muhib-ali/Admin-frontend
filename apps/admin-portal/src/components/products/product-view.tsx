@@ -18,6 +18,8 @@ type Props = {
   onEdit: (p: ProductRow) => void;
   onDelete: (p: ProductRow) => void;
   svgCardImage: (seed: string) => string;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 };
 
 function ImagePreview({
@@ -59,6 +61,8 @@ export function ProductView({
   onEdit,
   onDelete,
   svgCardImage,
+  canUpdate = true,
+  canDelete = true,
 }: Props) {
   if (!product) return null;
 
@@ -122,11 +126,21 @@ export function ProductView({
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onEdit(product)} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onEdit(product)}
+              className="gap-2"
+              disabled={!canUpdate}
+            >
               <Pencil className="h-4 w-4" />
               Edit
             </Button>
-            <Button variant="destructive" onClick={() => onDelete(product)} className="gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => onDelete(product)}
+              className="gap-2"
+              disabled={!canDelete}
+            >
               <Trash2 className="h-4 w-4" />
               Delete
             </Button>
