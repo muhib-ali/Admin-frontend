@@ -21,6 +21,26 @@ type CategoriesDropdownData = {
   categoriesDropdown: DropdownItem[];
 };
 
+type TaxesDropdownData = {
+  taxesDropdown: DropdownItem[];
+};
+
+type SuppliersDropdownData = {
+  suppliersDropdown: DropdownItem[];
+};
+
+type WarehousesDropdownData = {
+  warehousesDropdown: DropdownItem[];
+};
+
+type VariantTypesDropdownData = {
+  variantTypesDropdown: DropdownItem[];
+};
+
+type CustomerVisibilityGroupsDropdownData = {
+  customerVisibilityGroupsDropdown: DropdownItem[];
+};
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function parseRetryAfter(hdr?: string): number | null {
@@ -82,4 +102,64 @@ export async function getAllCategoriesDropdown(opts?: { signal?: AbortSignal }) 
     )
   );
   return data?.data?.categoriesDropdown ?? [];
+}
+
+export async function getAllTaxesDropdown(opts?: { signal?: AbortSignal }) {
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<TaxesDropdownData>>(
+      "/dropdowns/getAllTaxes",
+      {
+        signal: opts?.signal,
+      }
+    )
+  );
+  return data?.data?.taxesDropdown ?? [];
+}
+
+export async function getAllSuppliersDropdown(opts?: { signal?: AbortSignal }) {
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<SuppliersDropdownData>>(
+      "/dropdowns/getAllSuppliers",
+      {
+        signal: opts?.signal,
+      }
+    )
+  );
+  return data?.data?.suppliersDropdown ?? [];
+}
+
+export async function getAllWarehousesDropdown(opts?: { signal?: AbortSignal }) {
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<WarehousesDropdownData>>(
+      "/dropdowns/getAllWarehouses",
+      {
+        signal: opts?.signal,
+      }
+    )
+  );
+  return data?.data?.warehousesDropdown ?? [];
+}
+
+export async function getAllVariantTypesDropdown(opts?: { signal?: AbortSignal }) {
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<VariantTypesDropdownData>>(
+      "/dropdowns/getAllVariantTypes",
+      {
+        signal: opts?.signal,
+      }
+    )
+  );
+  return data?.data?.variantTypesDropdown ?? [];
+}
+
+export async function getAllCustomerVisibilityGroupsDropdown(opts?: { signal?: AbortSignal }) {
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<CustomerVisibilityGroupsDropdownData>>(
+      "/dropdowns/getAllCustomerVisibilityGroups",
+      {
+        signal: opts?.signal,
+      }
+    )
+  );
+  return data?.data?.customerVisibilityGroupsDropdown ?? [];
 }

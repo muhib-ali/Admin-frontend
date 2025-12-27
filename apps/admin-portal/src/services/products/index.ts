@@ -312,7 +312,22 @@ export async function createProduct(payload: {
   brand_id: string;
   currency: string;
   product_img_url?: string | null;
+  product_video_url?: string | null;
   is_active?: boolean;
+  discount?: number;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  tax_id?: string;
+  supplier_id?: string;
+  warehouse_id?: string;
+  total_price?: number;
+  variants?: { vtype_id: number; value: string; product_id?: string }[];
+  customer_groups?: { cvg_ids: string[] };
+  bulk_prices?: { quantity: number; price_per_product: number }[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -343,6 +358,20 @@ export async function updateProduct(payload: {
   currency?: string;
   product_img_url?: string | null;
   is_active?: boolean;
+  discount?: number;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  tax_id?: string;
+  supplier_id?: string;
+  warehouse_id?: string;
+  total_price?: number;
+  variants?: { vtype_id: number; value: string; product_id?: string }[];
+  customer_groups?: { cvg_ids: string[] };
+  bulk_prices?: { quantity: number; price_per_product: number }[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -439,6 +468,107 @@ export async function deleteProductImage(fileName: string) {
       message && error
         ? `${message}: ${error}`
         : message || error || `Image delete failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Image upload for multiple files (max 5)
+export async function uploadProductImages(productId: string, files: File[]) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  // Validate files
+  const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+  const maxFileSize = 5 * 1024 * 1024; // 5MB
+  const maxFiles = 5;
+
+  if (files.length > maxFiles) {
+    throw new Error(`Maximum ${maxFiles} images allowed`);
+  }
+
+  for (const file of files) {
+    if (!allowedImageTypes.includes(file.type)) {
+      throw new Error(`Invalid file type: ${file.type}. Only JPEG, PNG, and WebP images are allowed`);
+    }
+    if (file.size > maxFileSize) {
+      throw new Error(`File ${file.name} is too large. Maximum size is 5MB`);
+    }
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const form = new FormData();
+  files.forEach((file) => {
+    form.append("files", file);
+  });
+
+  const res = await fetch(`${base}/products/images/${productId}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Image upload failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Video upload for single file
+export async function uploadProductVideo(productId: string, file: File) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  // Validate video file
+  const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+  const maxVideoSize = 50 * 1024 * 1024; // 50MB
+
+  if (!allowedVideoTypes.includes(file.type)) {
+    throw new Error(`Invalid file type: ${file.type}. Only MP4, WebM, OGG, and QuickTime videos are allowed`);
+  }
+  if (file.size > maxVideoSize) {
+    throw new Error(`Video file is too large. Maximum size is 50MB`);
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${base}/products/video/${productId}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Video upload failed (${res.status})`;
     throw new Error(msg);
   }
 
