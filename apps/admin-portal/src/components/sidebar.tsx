@@ -29,6 +29,7 @@ import { useSession, signOut } from "next-auth/react";
 import PermissionGate from "@/components/permission-gate";
 import { ADMIN_LINK_PERM } from "@/rbac/link-permissions";
 import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
+import { useHasPermission } from "@/hooks/use-permission";
 
 const ICONS = {
   BarChart2,
@@ -59,7 +60,8 @@ export const nav = [
 
 export const nav_admin = [
   { href: "/dashboard/jobFiles", label: "Job files", icon: "Tag" as IconName },
-  { href: "/dashboard/tax", label: "Tax", icon: "BadgePercent" as IconName },
+  { href: "/dashboard/tax", label: "Taxes", icon: "BadgePercent" as IconName },
+  { href: "/dashboard/suppliers", label: "Suppliers", icon: "Users" as IconName },
   { href: "/dashboard/modules", label: "Modules", icon: "Boxes" as IconName },
   { href: "/dashboard/permissions", label: "Permissions", icon: "ShieldCheck" as IconName },
   { href: "/dashboard/roles", label: "Roles", icon: "Shield" as IconName },
@@ -91,9 +93,17 @@ export default function Sidebar({ collapsed = false }: Props) {
       categories: ADMIN_LINK_PERM["/dashboard/categories"],
       brands: ADMIN_LINK_PERM["/dashboard/brands"],
       products: ADMIN_LINK_PERM["/dashboard/products"],
+      warehouses: ADMIN_LINK_PERM["/dashboard/warehouses"],
     }),
     []
   );
+
+  const canSeeCategories = useHasPermission(productMgmtPerms.categories);
+  const canSeeBrands = useHasPermission(productMgmtPerms.brands);
+  const canSeeProducts = useHasPermission(productMgmtPerms.products);
+  const canSeeWarehouses = useHasPermission(productMgmtPerms.warehouses);
+  const canSeeProductMgmt =
+    canSeeCategories || canSeeBrands || canSeeProducts || canSeeWarehouses;
 
   const [orderMgmtOpen, setOrderMgmtOpen] = React.useState(false);
   const [productMgmtOpen, setProductMgmtOpen] = React.useState(false);
@@ -131,7 +141,8 @@ export default function Sidebar({ collapsed = false }: Props) {
     if (
       pathname.startsWith("/dashboard/categories") ||
       pathname.startsWith("/dashboard/brands") ||
-      pathname.startsWith("/dashboard/products")
+      pathname.startsWith("/dashboard/products") ||
+      pathname.startsWith("/dashboard/warehouses")
     ) {
       setProductMgmtOpen(true);
     }
@@ -279,132 +290,143 @@ export default function Sidebar({ collapsed = false }: Props) {
             </li>
           )}
 
-          {!collapsed && (
-            <PermissionGate
-              route={
-                productMgmtPerms.categories ||
-                productMgmtPerms.brands ||
-                productMgmtPerms.products ||
-                ""
-              }
-              fallback={null}
-            >
-              <li>
-                <div className="flex flex-col">
-                  <button
-                    type="button"
-                    onClick={() => setProductMgmtOpen((v) => !v)}
-                    className={cn(
-                      "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                      (pathname?.startsWith("/dashboard/categories") ||
-                        pathname?.startsWith("/dashboard/brands") ||
-                        pathname?.startsWith("/dashboard/products"))
-                        ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
-                        : "text-gray-400 hover:bg-zinc-900 hover:text-white"
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <Store
-                        className={cn(
-                          "h-5 w-5 shrink-0 transition-colors",
-                          pathname?.startsWith("/dashboard/categories") ||
-                            pathname?.startsWith("/dashboard/brands") ||
-                            pathname?.startsWith("/dashboard/products")
-                            ? "text-red-600"
-                            : "text-gray-400 group-hover:text-red-600"
-                        )}
-                      />
-                      <span className="truncate">Product Management</span>
-                    </span>
-                    <ChevronDown
+          {!collapsed && canSeeProductMgmt && (
+            <li>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setProductMgmtOpen((v) => !v)}
+                  className={cn(
+                    "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                    (pathname?.startsWith("/dashboard/categories") ||
+                      pathname?.startsWith("/dashboard/brands") ||
+                      pathname?.startsWith("/dashboard/products") ||
+                      pathname?.startsWith("/dashboard/warehouses"))
+                      ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
+                      : "text-gray-400 hover:bg-zinc-900 hover:text-white"
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Store
                       className={cn(
-                        "h-4 w-4 shrink-0 transition-transform",
-                        productMgmtOpen && "rotate-180"
+                        "h-5 w-5 shrink-0 transition-colors",
+                        pathname?.startsWith("/dashboard/categories") ||
+                          pathname?.startsWith("/dashboard/brands") ||
+                          pathname?.startsWith("/dashboard/products") ||
+                          pathname?.startsWith("/dashboard/warehouses")
+                          ? "text-red-600"
+                          : "text-gray-400 group-hover:text-red-600"
                       )}
                     />
-                  </button>
+                    <span className="truncate">Product Management</span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform",
+                      productMgmtOpen && "rotate-180"
+                    )}
+                  />
+                </button>
 
-                  {productMgmtOpen && (
-                    <div className="mt-1 space-y-1 pl-6">
-                      <PermissionGate
-                        route={productMgmtPerms.categories}
-                        fallback={null}
+                {productMgmtOpen && (
+                  <div className="mt-1 space-y-1 pl-6">
+                    <PermissionGate route={productMgmtPerms.categories} fallback={null}>
+                      <Link
+                        href="/dashboard/categories"
+                        onClick={(e) => handleNavigation(e, "/dashboard/categories")}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                          pathname?.startsWith("/dashboard/categories")
+                            ? "bg-zinc-900 text-white"
+                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                        )}
                       >
-                        <Link
-                          href="/dashboard/categories"
-                          onClick={(e) => handleNavigation(e, "/dashboard/categories")}
+                        <FolderTree
                           className={cn(
-                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                            "h-4 w-4 shrink-0 transition-colors",
                             pathname?.startsWith("/dashboard/categories")
-                              ? "bg-zinc-900 text-white"
-                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                              ? "text-red-600"
+                              : "text-gray-500 group-hover:text-red-600"
                           )}
-                        >
-                          <FolderTree
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              pathname?.startsWith("/dashboard/categories")
-                                ? "text-red-600"
-                                : "text-gray-500 group-hover:text-red-600"
-                            )}
-                          />
-                          <span className="truncate">Categories</span>
-                        </Link>
-                      </PermissionGate>
+                        />
+                        <span className="truncate">Categories</span>
+                      </Link>
+                    </PermissionGate>
 
-                      <PermissionGate route={productMgmtPerms.brands} fallback={null}>
-                        <Link
-                          href="/dashboard/brands"
-                          onClick={(e) => handleNavigation(e, "/dashboard/brands")}
-                          className={cn(
-                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
-                            pathname?.startsWith("/dashboard/brands")
-                              ? "bg-zinc-900 text-white"
-                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
-                          )}
-                        >
-                          <Tags
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              pathname?.startsWith("/dashboard/brands")
-                                ? "text-red-600"
-                                : "text-gray-500 group-hover:text-red-600"
-                            )}
-                          />
-                          <span className="truncate">Brands</span>
-                        </Link>
-                      </PermissionGate>
-
-                      <PermissionGate
-                        route={productMgmtPerms.products}
-                        fallback={null}
+                    <PermissionGate route={productMgmtPerms.brands} fallback={null}>
+                      <Link
+                        href="/dashboard/brands"
+                        onClick={(e) => handleNavigation(e, "/dashboard/brands")}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                          pathname?.startsWith("/dashboard/brands")
+                            ? "bg-zinc-900 text-white"
+                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                        )}
                       >
-                        <Link
-                          href="/dashboard/products"
-                          onClick={(e) => handleNavigation(e, "/dashboard/products")}
+                        <Tags
                           className={cn(
-                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
-                            pathname?.startsWith("/dashboard/products")
-                              ? "bg-zinc-900 text-white"
-                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                            "h-4 w-4 shrink-0 transition-colors",
+                            pathname?.startsWith("/dashboard/brands")
+                              ? "text-red-600"
+                              : "text-gray-500 group-hover:text-red-600"
                           )}
-                        >
-                          <Package
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              pathname?.startsWith("/dashboard/products")
-                                ? "text-red-600"
-                                : "text-gray-500 group-hover:text-red-600"
-                            )}
-                          />
-                          <span className="truncate">Products</span>
-                        </Link>
-                      </PermissionGate>
-                    </div>
-                  )}
-                </div>
-              </li>
-            </PermissionGate>
+                        />
+                        <span className="truncate">Brands</span>
+                      </Link>
+                    </PermissionGate>
+
+                    <PermissionGate route={productMgmtPerms.products} fallback={null}>
+                      <Link
+                        href="/dashboard/products"
+                        onClick={(e) => handleNavigation(e, "/dashboard/products")}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                          pathname?.startsWith("/dashboard/products")
+                            ? "bg-zinc-900 text-white"
+                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                        )}
+                      >
+                        <Package
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors",
+                            pathname?.startsWith("/dashboard/products")
+                              ? "text-red-600"
+                              : "text-gray-500 group-hover:text-red-600"
+                          )}
+                        />
+                        <span className="truncate">Products</span>
+                      </Link>
+                    </PermissionGate>
+
+                    <PermissionGate route={productMgmtPerms.warehouses} fallback={null}>
+                      <Link
+                        href="/dashboard/warehouses"
+                        onClick={(e) =>
+                          handleNavigation(e, "/dashboard/warehouses")
+                        }
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                          pathname?.startsWith("/dashboard/warehouses")
+                            ? "bg-zinc-900 text-white"
+                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                        )}
+                      >
+                        <Box
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors",
+                            pathname?.startsWith("/dashboard/warehouses")
+                              ? "text-red-600"
+                              : "text-gray-500 group-hover:text-red-600"
+                          )}
+                        />
+                        <span className="truncate">Warehouses</span>
+                      </Link>
+                    </PermissionGate>
+                  </div>
+                )}
+              </div>
+            </li>
           )}
 
           {navRest.map(({ href, label, icon }) => {

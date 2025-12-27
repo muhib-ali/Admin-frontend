@@ -38,6 +38,13 @@ export const ENTITY_PERMS = {
     update: "taxes/update",
     delete: "taxes/delete",
   },
+  suppliers: {
+    list:   "suppliers/getAll",
+    create: "suppliers/create",
+    read:   "suppliers/getById",
+    update: "suppliers/update",
+    delete: "suppliers/delete",
+  },
   jobFiles: {
     list:   "job_files/getAll",
     create: "job_files/create",
@@ -65,6 +72,13 @@ export const ENTITY_PERMS = {
     read:   "categories/getById",
     update: "categories/update",
     delete: "categories/delete",
+  },
+  warehouses: {
+    list:   "warehouses/getAll",
+    create: "warehouses/create",
+    read:   "warehouses/getById",
+    update: "warehouses/update",
+    delete: "warehouses/delete",
   },
   clients: {
     list:   "clients/getAll",
@@ -97,6 +111,7 @@ export const SCREEN_PERM: Record<string, string> = {
 
   "/dashboard/brands":                  ENTITY_PERMS.brands.list,
   "/dashboard/categories":              ENTITY_PERMS.categories.list,
+  "/dashboard/warehouses":              ENTITY_PERMS.warehouses.list,
 
   "/dashboard/permissions":             ENTITY_PERMS.permissions.list,
   "/dashboard/permissions/create":      ENTITY_PERMS.permissions.create,
@@ -119,6 +134,11 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/tax/create":              ENTITY_PERMS.taxes.create,
   "/dashboard/tax/[id]":                ENTITY_PERMS.taxes.read,
   "/dashboard/tax/[id]/edit":           ENTITY_PERMS.taxes.update,
+
+  "/dashboard/suppliers":               ENTITY_PERMS.suppliers.list,
+  "/dashboard/suppliers/create":        ENTITY_PERMS.suppliers.create,
+  "/dashboard/suppliers/[id]":          ENTITY_PERMS.suppliers.read,
+  "/dashboard/suppliers/[id]/edit":     ENTITY_PERMS.suppliers.update,
 
   "/dashboard/jobFiles":                ENTITY_PERMS.jobFiles.list,
   "/dashboard/jobFiles/create":         ENTITY_PERMS.jobFiles.create,

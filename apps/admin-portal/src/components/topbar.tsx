@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const { data: session } = useSession();
   const user = session?.user;
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
@@ -55,7 +57,7 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
 
         <button
           onClick={onToggleSidebar}
-          className="hidden lg:grid h-10 w-10 place-items-center rounded-xl border bg-white shadow dark:bg-neutral-900"
+          className={`hidden lg:grid h-10 w-10 place-items-center rounded-xl border bg-white shadow dark:bg-neutral-900 transition-[margin] duration-300 ${collapsed ? "-ml-14" : "ml-0"}`}
           aria-label="Toggle sidebar"
           title="Collapse / Expand sidebar"
         >
@@ -111,11 +113,23 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2">
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  router.push("/dashboard/profile-settings");
+                }}
+              >
                 <User2 className="h-4 w-4" />
                 Profile Settings
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2">
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  router.push("/dashboard/account-settings");
+                }}
+              >
                 <Settings className="h-4 w-4" />
                 Account Settings
               </DropdownMenuItem>

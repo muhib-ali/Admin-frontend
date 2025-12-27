@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import {
   listUsers,
@@ -67,6 +68,10 @@ export default function UsersPage() {
   const [openForm, setOpenForm] = React.useState(false);
   const [formMode, setFormMode] = React.useState<"create" | "edit">("create");
   const [editUser, setEditUser] = React.useState<AdminUser | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const canList = useHasPermission(ENTITY_PERMS.users.list);
   const canCreate = useHasPermission(ENTITY_PERMS.users.create);
@@ -189,11 +194,19 @@ export default function UsersPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  function requestDelete(id: string) {
     if (!mounted || !canDelete) return;
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    setDeleteTargetId(id);
+    setDeleteOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!mounted || !canDelete) return;
+    if (!deleteTargetId) return;
+
     try {
-      await deleteUser(id);
+      setDeleting(true);
+      await deleteUser(deleteTargetId);
       toast.success("User deleted");
 
       const { rows, pagination: pg } = await listUsers(
@@ -207,9 +220,14 @@ export default function UsersPage() {
         setUsers(rows);
         setPagination(pg ?? null);
       }
+
+      setDeleteOpen(false);
+      setDeleteTargetId(null);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -367,7 +385,12 @@ export default function UsersPage() {
 
                               <TableCell>
                                 <Badge
-                                  variant={u.is_active ? "default" : "secondary"}
+                                  variant="secondary"
+                                  className={
+                                    u.is_active
+                                      ? "bg-green-200 text-green-800 hover:bg-green-200"
+                                      : "bg-gray-200 text-muted-foreground hover:bg-gray-200"
+                                  }
                                 >
                                   {u.is_active ? "Active" : "Inactive"}
                                 </Badge>
@@ -405,7 +428,7 @@ export default function UsersPage() {
                                     {canDelete && (
                                       <DropdownMenuItem
                                         className="gap-2 text-destructive focus:text-destructive"
-                                        onClick={() => handleDelete(u.id)}
+                                        onClick={() => requestDelete(u.id)}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         Delete
@@ -423,13 +446,12 @@ export default function UsersPage() {
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {pagStart} to {pagEnd} of {pagTotal} users
-                  </div>
+                  <div className="text-sm text-muted-foreground">Page {pagPage} of {pagTotalPages}</div>
 
                   <div className="flex flex-wrap items-center gap-2 justify-end">
                     <Button
-                      variant="outline"
+                      variant="pagination"
+                      clickVariant="default"
                       size="sm"
                       disabled={!pagHasPrev}
                       className="gap-1"
@@ -439,25 +461,9 @@ export default function UsersPage() {
                       <span className="hidden sm:inline">Previous</span>
                     </Button>
 
-                    <div className="flex items-center gap-1">
-                      {Array.from(
-                        { length: pagTotalPages },
-                        (_, i) => i + 1
-                      ).map((pg) => (
-                        <Button
-                          key={pg}
-                          variant={pg === pagPage ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setPage(pg)}
-                          className="w-8 h-8 p-0 text-xs"
-                        >
-                          {pg}
-                        </Button>
-                      ))}
-                    </div>
-
                     <Button
-                      variant="outline"
+                      variant="pagination"
+                      clickVariant="default"
                       size="sm"
                       disabled={!pagHasNext}
                       className="gap-1"
@@ -492,6 +498,21 @@ export default function UsersPage() {
           }
           roles={roles}
           onSubmit={formMode === "create" ? handleCreate : handleUpdate}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={(v: boolean) => {
+            if (!v) setDeleteTargetId(null);
+            setDeleteOpen(v);
+          }}
+          title="Delete user"
+          description="Are you sure you want to delete this user? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmDelete}
         />
       </div>
     </PermissionBoundary>

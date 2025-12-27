@@ -6,10 +6,11 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
-  FolderTree,
+  Users,
   Plus,
   Pencil,
   Trash2,
+  Eye,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,23 +34,26 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
-import CategoryFormDialog, {
-  CategoryFormValues,
-} from "@/components/categories/category-form";
+
+import SupplierFormDialog, {
+  SupplierFormValues,
+} from "@/components/suppliers/supplier-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { useHasPermission } from "@/hooks/use-permission";
 import {
-  createCategory,
-  deleteCategory,
-  getCategoryById,
-  listCategories,
-  updateCategory,
-} from "@/services/categories";
+  createSupplier,
+  deleteSupplier,
+  getSupplierById,
+  listSuppliers,
+  updateSupplier,
+} from "@/services/suppliers";
 
-type CategoryRow = {
+type SupplierRow = {
   id: string;
   name: string;
-  description: string;
+  address: string;
+  email: string;
+  phone: string;
   active: boolean;
   createdAt: string;
 };
@@ -69,11 +73,11 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-export default function CategoriesPage() {
+export default function SuppliersPage() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  const [rows, setRows] = React.useState<CategoryRow[]>([]);
+  const [rows, setRows] = React.useState<SupplierRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const [page, setPage] = React.useState(1);
@@ -87,28 +91,30 @@ export default function CategoriesPage() {
   const [formMode, setFormMode] = React.useState<"create" | "edit" | "view">(
     "create"
   );
-  const [current, setCurrent] = React.useState<CategoryFormValues | undefined>(
+  const [current, setCurrent] = React.useState<SupplierFormValues | undefined>(
     undefined
   );
 
   const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<CategoryRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<SupplierRow | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
-  const canList = useHasPermission(ENTITY_PERMS.categories.list);
-  const canCreate = useHasPermission(ENTITY_PERMS.categories.create);
-  const canRead = useHasPermission(ENTITY_PERMS.categories.read);
-  const canUpdate = useHasPermission(ENTITY_PERMS.categories.update);
-  const canDelete = useHasPermission(ENTITY_PERMS.categories.delete);
+  const canList = useHasPermission(ENTITY_PERMS.suppliers.list);
+  const canCreate = useHasPermission(ENTITY_PERMS.suppliers.create);
+  const canRead = useHasPermission(ENTITY_PERMS.suppliers.read);
+  const canUpdate = useHasPermission(ENTITY_PERMS.suppliers.update);
+  const canDelete = useHasPermission(ENTITY_PERMS.suppliers.delete);
 
   const normalizeRows = React.useCallback(
-    (categories: any[]): CategoryRow[] =>
-      categories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description ?? "",
-        active: c.is_active ?? false,
-        createdAt: c.created_at,
+    (suppliers: any[]): SupplierRow[] =>
+      suppliers.map((s) => ({
+        id: s.id,
+        name: s.name,
+        address: s.address ?? "",
+        email: s.email ?? "",
+        phone: s.phone ?? "",
+        active: s.is_active ?? false,
+        createdAt: s.created_at,
       })),
     []
   );
@@ -133,7 +139,7 @@ export default function CategoriesPage() {
           setPagination(null);
           return;
         }
-        const { rows: list, pagination: pg } = await listCategories(
+        const { rows: list, pagination: pg } = await listSuppliers(
           page,
           limit,
           debouncedQuery || undefined,
@@ -144,7 +150,7 @@ export default function CategoriesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load categories");
+        toast.error(e?.response?.data?.message || "Failed to load suppliers");
       } finally {
         setLoading(false);
       }
@@ -163,7 +169,7 @@ export default function CategoriesPage() {
 
   const refetch = React.useCallback(async () => {
     if (!canList) return;
-    const { rows: list, pagination: pg } = await listCategories(
+    const { rows: list, pagination: pg } = await listSuppliers(
       page,
       limit,
       debouncedQuery || undefined
@@ -179,57 +185,69 @@ export default function CategoriesPage() {
     setOpenForm(true);
   };
 
-  const openView = async (c: CategoryRow) => {
+  const openView = async (s: SupplierRow) => {
     if (!canRead) return;
     try {
-      const res = await getCategoryById(c.id);
+      const res = await getSupplierById(s.id);
       setFormMode("view");
       setCurrent({
         id: res.id,
         name: res.name,
-        description: res.description ?? "",
+        address: res.address ?? "",
+        email: res.email ?? "",
+        phone: res.phone ?? "",
+        active: res.is_active ?? false,
       });
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      toast.error(e?.response?.data?.message || "Failed to open supplier");
     }
   };
 
-  const openEdit = async (c: CategoryRow) => {
+  const openEdit = async (s: SupplierRow) => {
     if (!canUpdate) return;
     try {
-      const res = await getCategoryById(c.id);
+      const res = await getSupplierById(s.id);
       setFormMode("edit");
       setCurrent({
         id: res.id,
         name: res.name,
-        description: res.description ?? "",
+        address: res.address ?? "",
+        email: res.email ?? "",
+        phone: res.phone ?? "",
+        active: res.is_active ?? false,
       });
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      toast.error(e?.response?.data?.message || "Failed to open supplier");
     }
   };
 
-  const upsert = async (data: CategoryFormValues) => {
+  const upsert = async (data: SupplierFormValues) => {
     try {
       if (formMode === "create") {
         if (!canCreate) return;
-        await createCategory({
+        await createSupplier({
           name: data.name,
-          description: data.description || "",
+          address: data.address || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          is_active: data.active,
         });
-        toast.success("Category created");
+        toast.success("Supplier created");
       } else {
         if (!canUpdate) return;
-        await updateCategory({
+        await updateSupplier({
           id: data.id,
           name: data.name,
-          description: data.description || "",
+          address: data.address || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          is_active: data.active,
         });
-        toast.success("Category updated");
+        toast.success("Supplier updated");
       }
 
       await refetch();
@@ -241,9 +259,9 @@ export default function CategoriesPage() {
     }
   };
 
-  const requestRemove = (c: CategoryRow) => {
+  const requestRemove = (s: SupplierRow) => {
     if (!canDelete) return;
-    setDeleteTarget(c);
+    setDeleteTarget(s);
     setDeleteOpen(true);
   };
 
@@ -253,10 +271,10 @@ export default function CategoriesPage() {
 
     try {
       setDeleting(true);
-      await deleteCategory(deleteTarget.id);
-      toast.success("Category deleted");
+      await deleteSupplier(deleteTarget.id);
+      toast.success("Supplier deleted");
 
-      const { rows: list, pagination: pg } = await listCategories(
+      const { rows: list, pagination: pg } = await listSuppliers(
         page,
         limit,
         debouncedQuery || undefined
@@ -280,23 +298,19 @@ export default function CategoriesPage() {
 
   const pagTotal = pagination?.total ?? rows.length;
   const pagPage = pagination?.page ?? page;
-  const totalPages =
-    (pagination?.totalPages ?? Math.ceil(pagTotal / limit)) || 1;
+  const totalPages = (pagination?.totalPages ?? Math.ceil(pagTotal / limit)) || 1;
 
   const pagHasPrev = pagination?.hasPrev ?? pagPage > 1;
   const pagHasNext = pagination?.hasNext ?? pagPage < totalPages;
 
-  const pagStart = pagTotal === 0 ? 0 : (pagPage - 1) * limit + 1;
-  const pagEnd = pagTotal === 0 ? 0 : Math.min(pagPage * limit, pagTotal);
-
   return (
-    <PermissionBoundary screen="/dashboard/categories" mode="block">
+    <PermissionBoundary screen="/dashboard/suppliers" mode="block">
       <div className="space-y-6 scrollbar-stable">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold truncate">Categories</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">Suppliers</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage product categories
+              Manage suppliers and contact details
             </p>
           </div>
 
@@ -306,20 +320,20 @@ export default function CategoriesPage() {
             disabled={!canCreate}
           >
             <Plus className="h-4 w-4" />
-            Add Category
+            Add Supplier
           </Button>
         </div>
 
         <Card className="shadow-sm">
           <CardHeader className="space-y-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <CardTitle className="text-xl sm:text-2xl">All Categories</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">All Suppliers</CardTitle>
 
               <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-9 pl-9 w-full"
-                  placeholder="Search categories..."
+                  placeholder="Search suppliers..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -329,74 +343,118 @@ export default function CategoriesPage() {
 
           <CardContent className="px-3 sm:px-6">
             <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-              <Table className="min-w-[760px]">
+              <Table className="min-w-[980px]">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
-                    <TableHead className="rounded-tl-xl">Category</TableHead>
+                    <TableHead className="rounded-tl-xl">Supplier</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
-                    <TableHead className="text-right rounded-tr-xl">Actions</TableHead>
+                    <TableHead className="text-right rounded-tr-xl">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
-                        Loading categories…
+                      <TableCell
+                        colSpan={7}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        Loading suppliers…
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
-                        You don't have permission to view categories.
+                      <TableCell
+                        colSpan={7}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        You don't have permission to view suppliers.
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
-                        No categories found.
+                      <TableCell
+                        colSpan={7}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        No suppliers found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    rows.map((c, idx) => {
+                    rows.map((s, idx) => {
                       const isLast = idx === rows.length - 1;
                       return (
                         <TableRow
-                          key={c.id}
+                          key={s.id}
                           className="odd:bg-muted/30 even:bg-white hover:bg-transparent"
                         >
                           <TableCell className={isLast ? "rounded-bl-xl" : ""}>
                             <div className="flex items-center gap-3">
                               <span className="grid h-9 w-9 place-items-center rounded-md bg-muted">
-                                <FolderTree className="h-4 w-4" />
+                                <Users className="h-4 w-4" />
                               </span>
                               <div className="min-w-0">
-                                <div className="font-medium truncate">{c.name}</div>
-                                <div className="text-xs text-muted-foreground">{c.id}</div>
+                                <div className="font-medium truncate">{s.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {s.id}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
 
-                          <TableCell>
-                            <StatusBadge active={c.active} />
+                          <TableCell className="text-sm text-muted-foreground">
+                            {s.address || "—"}
                           </TableCell>
 
                           <TableCell className="text-sm text-muted-foreground">
-                            {renderCreatedAt(c.createdAt)}
+                            {s.email || "—"}
                           </TableCell>
 
-                          <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""}`}>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {s.phone || "—"}
+                          </TableCell>
+
+                          <TableCell>
+                            <StatusBadge active={s.active} />
+                          </TableCell>
+
+                          <TableCell className="text-sm text-muted-foreground">
+                            {renderCreatedAt(s.createdAt)}
+                          </TableCell>
+
+                          <TableCell
+                            className={`text-right ${isLast ? "rounded-br-xl" : ""}`}
+                          >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="More actions"
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
+                                {canRead && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openView(s)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdate && (
                                   <DropdownMenuItem
                                     className="gap-2"
-                                    onClick={() => openEdit(c)}
+                                    onClick={() => openEdit(s)}
                                   >
                                     <Pencil className="h-4 w-4" />
                                     Edit
@@ -405,7 +463,7 @@ export default function CategoriesPage() {
                                 {canDelete && (
                                   <DropdownMenuItem
                                     className="gap-2 text-destructive focus:text-destructive"
-                                    onClick={() => requestRemove(c)}
+                                    onClick={() => requestRemove(s)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                     Delete
@@ -423,7 +481,9 @@ export default function CategoriesPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-              <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
+              <div className="text-sm text-muted-foreground">
+                Page {pagPage} of {totalPages}
+              </div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button
@@ -454,7 +514,7 @@ export default function CategoriesPage() {
           </CardContent>
         </Card>
 
-        <CategoryFormDialog
+        <SupplierFormDialog
           open={openForm}
           onOpenChange={(v) => {
             setOpenForm(v);
@@ -471,8 +531,12 @@ export default function CategoriesPage() {
             if (!v) setDeleteTarget(null);
             setDeleteOpen(v);
           }}
-          title="Delete category"
-          description={deleteTarget ? `Are you sure you want to delete category “${deleteTarget.name}”? This action cannot be undone.` : "This action cannot be undone."}
+          title="Delete supplier"
+          description={
+            deleteTarget
+              ? `Are you sure you want to delete supplier “${deleteTarget.name}”? This action cannot be undone.`
+              : "This action cannot be undone."
+          }
           confirmText="Delete"
           cancelText="Cancel"
           destructive

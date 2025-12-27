@@ -1,35 +1,31 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Search, ChevronLeft, ChevronRight, Plus, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import PermissionBoundary from "@/components/permission-boundary";
-import { ProductForm } from "@/components/products/product-form";
-import { ProductView } from "@/components/products/product-view";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProductCard } from "@/components/products/product-card";
 import { svgCardImage } from "@/components/products/product-utils";
 import type {
   BrandOption,
   CategoryOption,
-  ProductFormValues,
   ProductRow,
 } from "@/components/products/product-form";
 import { useHasPermission } from "@/hooks/use-permission";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { toast } from "react-toastify";
 import {
-  createProduct,
   getProductsBulkUploadState,
   resetProductsBulkUploadState,
   startProductsBulkUploadExcel,
   subscribeProductsBulkUpload,
   deleteProduct,
   deleteProductImage,
-  getProductById,
   listProducts,
-  updateProduct,
 } from "@/services/products";
 import {
   getAllBrandsDropdown,
@@ -37,8 +33,22 @@ import {
 } from "@/services/dropdowns";
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
+
+  const STORAGE_KEY = "admin_portal_static_products_v1";
+
+  const readStoredProducts = React.useCallback((): ProductRow[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? (arr as ProductRow[]) : [];
+    } catch {
+      return [];
+    }
+  }, []);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const lastBulkToastRef = React.useRef<number>(0);
@@ -51,15 +61,7 @@ export default function ProductsPage() {
 
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<ProductRow | null>(null);
-
-  const [viewOpen, setViewOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<ProductRow | null>(null);
-
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [formMode, setFormMode] = React.useState<"create" | "edit">("create");
-  const [current, setCurrent] = React.useState<ProductFormValues | undefined>(
-    undefined
-  );
+  const [deleting, setDeleting] = React.useState(false);
 
   const [categories, setCategories] = React.useState<CategoryOption[]>([]);
   const [brands, setBrands] = React.useState<BrandOption[]>([]);
@@ -135,7 +137,9 @@ export default function ProductsPage() {
           debouncedQuery || undefined,
           { signal: ac.signal }
         );
-        setRows(normalizeRows(list));
+        const stored = readStoredProducts();
+        const combined = [...stored, ...normalizeRows(list)];
+        setRows(combined);
         setPagination(pg ?? null);
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
@@ -174,9 +178,11 @@ export default function ProductsPage() {
       limit,
       debouncedQuery || undefined
     );
-    setRows(normalizeRows(list));
+    const stored = readStoredProducts();
+    const combined = [...stored, ...normalizeRows(list)];
+    setRows(combined);
     setPagination(pg ?? null);
-  }, [canList, page, limit, debouncedQuery, normalizeRows]);
+  }, [canList, page, limit, debouncedQuery, normalizeRows, readStoredProducts]);
 
   React.useEffect(() => {
     if (!mounted) return;
@@ -245,115 +251,36 @@ export default function ProductsPage() {
     setDeleteTarget(null);
   };
 
-  const openEdit = async (p: ProductRow) => {
-    if (!canUpdate) return;
-    try {
-      const res = await getProductById(p.id);
-      const url = res.product_img_url ?? null;
-      setFormMode("edit");
-      setCurrent({
-        id: res.id,
-        title: res.title,
-        description: res.description ?? "",
-        price: String(res.price),
-        stock_quantity: String(res.stock_quantity ?? 0),
-        category_id: res.category_id,
-        brand_id: res.brand_id,
-        currency: res.currency ?? "USD",
-        is_active: Boolean(res.is_active),
-        product_img_url: url,
-        product_img_fileName: extractFileName(url),
-      });
-      setFormOpen(true);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open product");
-    }
-  };
-
-  const openView = async (p: ProductRow) => {
+  const goToView = (p: ProductRow) => {
     if (!canRead) return;
-    try {
-      const res = await getProductById(p.id);
-      setSelected(normalizeRows([res])[0] ?? p);
-      setViewOpen(true);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open product");
-    }
+    router.push(`/dashboard/products/view/${p.id}`);
   };
 
-  const openCreate = () => {
+  const goToEdit = (p: ProductRow) => {
+    if (!canUpdate) return;
+    router.push(`/dashboard/products/edit/${p.id}`);
+  };
+
+  const goToCreate = () => {
     if (!canCreate) return;
-    setFormMode("create");
-    setCurrent(undefined);
-    setFormOpen(true);
+    router.push("/dashboard/products/new");
   };
 
-  const upsert = async (values: ProductFormValues) => {
-    const price = Number(values.price);
-    const stock = Number(values.stock_quantity);
-    if (!Number.isFinite(price) || price < 0) throw new Error("Invalid price");
-    if (!Number.isFinite(stock) || stock < 0)
-      throw new Error("Invalid stock quantity");
-
-    if (formMode === "create") {
-      if (!canCreate) return;
-      await createProduct({
-        title: values.title,
-        description: values.description || "",
-        price,
-        stock_quantity: stock,
-        category_id: values.category_id,
-        brand_id: values.brand_id,
-        currency: values.currency,
-        product_img_url: values.product_img_url ?? null,
-        is_active: values.is_active,
-      });
-      toast.success("Product created");
-    } else {
-      if (!canUpdate) return;
-
-      const oldFileName = current?.product_img_fileName || null;
-      const newFileName = values.product_img_fileName || extractFileName(values.product_img_url ?? null);
-
-      await updateProduct({
-        id: String(values.id),
-        title: values.title,
-        description: values.description || "",
-        price,
-        stock_quantity: stock,
-        category_id: values.category_id,
-        brand_id: values.brand_id,
-        currency: values.currency,
-        product_img_url: values.product_img_url ?? null,
-        is_active: values.is_active,
-      });
-      toast.success("Product updated");
-
-      if (oldFileName && newFileName && oldFileName !== newFileName) {
-        try {
-          await deleteProductImage(oldFileName);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
-    await refetch();
-    setFormOpen(false);
-    setCurrent(undefined);
-  };
-
-  const remove = async (p: ProductRow) => {
+  const requestRemove = (p: ProductRow) => {
     if (!canDelete) return;
+    setDeleteTarget(p);
+    setDeleteOpen(true);
+  };
 
-    const ok = window.confirm(`Delete ${p.title}?`);
-    if (!ok) return;
+  const confirmRemove = async () => {
+    if (!canDelete) return;
+    if (!deleteTarget) return;
 
+    const p = deleteTarget;
     const fileName = extractFileName(p.product_img_url ?? null);
 
     try {
+      setDeleting(true);
       await deleteProduct(p.id);
       if (fileName) {
         try {
@@ -364,25 +291,23 @@ export default function ProductsPage() {
       }
       toast.success("Product deleted");
 
-      const { rows: list, pagination: pg } = await listProducts(
-        page,
-        limit,
-        debouncedQuery || undefined
-      );
-      if ((list?.length ?? 0) === 0 && page > 1) {
-        setPage((pp) => pp - 1);
-      } else {
-        setRows(normalizeRows(list));
-        setPagination(pg ?? null);
+      try {
+        const stored = readStoredProducts();
+        const nextStored = stored.filter((x) => x.id !== p.id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored));
+      } catch {
+        // ignore
       }
 
-      if (selected?.id === p.id) {
-        setSelected(null);
-        setViewOpen(false);
-      }
+      await refetch();
+
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.response?.data?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -424,33 +349,26 @@ export default function ProductsPage() {
               <FileSpreadsheet className="h-4 w-4" />
               {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
             </Button>
-            <Button className="gap-2 w-full sm:w-auto" onClick={openCreate} disabled={!canCreate}>
+            <Button className="gap-2 w-full sm:w-auto" onClick={goToCreate} disabled={!canCreate}>
               <Plus className="h-4 w-4" />
               Add Product
             </Button>
           </div>
         </div>
 
-        <ProductForm
-          open={formOpen}
+        <ConfirmDialog
+          open={deleteOpen}
           onOpenChange={(v) => {
-            setFormOpen(v);
-            if (!v) setCurrent(undefined);
+            if (!v) setDeleteTarget(null);
+            setDeleteOpen(v);
           }}
-          mode={formMode}
-          initial={current}
-          categories={categories}
-          brands={brands}
-          onSubmit={upsert}
-        />
-
-        <ProductView
-          open={viewOpen}
-          onOpenChange={setViewOpen}
-          product={selected}
-          onEdit={openEdit}
-          onDelete={remove}
-          svgCardImage={svgCardImage}
+          title="Delete product"
+          description={deleteTarget ? `Are you sure you want to delete “${deleteTarget.title}”? This action cannot be undone.` : "This action cannot be undone."}
+          confirmText="Delete"
+          cancelText="Cancel"
+          destructive
+          loading={deleting}
+          onConfirm={confirmRemove}
         />
 
         <Card className="shadow-sm">
@@ -510,11 +428,14 @@ export default function ProductsPage() {
                   <ProductCard
                     key={p.id}
                     product={p}
-                    onView={openView}
-                    onEdit={openEdit}
-                    onDelete={remove}
+                    onView={goToView}
+                    onEdit={goToEdit}
+                    onDelete={requestRemove}
                     renderCreatedDate={renderCreatedDate}
                     svgCardImage={svgCardImage}
+                    canRead={canRead}
+                    canUpdate={canUpdate}
+                    canDelete={canDelete}
                   />
                 ))}
               </div>
@@ -536,13 +457,12 @@ export default function ProductsPage() {
 
                 return (
                   <>
-                    <div className="text-sm text-muted-foreground">
-                      Showing {pagStart} to {pagEnd} of {pagTotal} products
-                    </div>
+                    <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
                     <div className="flex flex-wrap items-center gap-2 justify-end">
                       <Button
-                        variant="outline"
+                        variant="pagination"
+                        clickVariant="default"
                         size="sm"
                         disabled={!pagHasPrev}
                         className="gap-1"
@@ -552,24 +472,9 @@ export default function ProductsPage() {
                         <span className="hidden xs:inline">Previous</span>
                       </Button>
 
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                          (pg) => (
-                            <Button
-                              key={pg}
-                              variant={pg === pagPage ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setPage(pg)}
-                              className="w-8 h-8 p-0 text-xs"
-                            >
-                              {pg}
-                            </Button>
-                          )
-                        )}
-                      </div>
-
                       <Button
-                        variant="outline"
+                        variant="pagination"
+                        clickVariant="default"
                         size="sm"
                         disabled={!pagHasNext}
                         className="gap-1"

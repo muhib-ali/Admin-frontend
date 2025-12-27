@@ -380,44 +380,65 @@ export default function RolesPage() {
     return () => ac.abort();
   }, [mounted, canList, page, limit, debouncedQuery]);
 
+  const roleIdsKey = React.useMemo(
+    () => roles.map((r) => r.id).join(","),
+    [roles]
+  );
+
   // Load permission counts for roles
   React.useEffect(() => {
     if (!mounted || !canList || !canViewRolePerms) return;
 
+    let cancelled = false;
+
     (async () => {
       try {
-        const countPromises = roles.map(async (role) => {
-          try {
-            const perms = await getRolePerms(role.id);
-            const count = perms.reduce(
-              (sum: number, m: any) =>
-                sum + m.permissions.filter((p: any) => p.is_allowed).length,
-              0
-            );
-            return { roleId: role.id, count };
-          } catch (error: any) {
-            if (error?.response?.status === 403) {
-              return { roleId: role.id, count: 0 };
-            }
-            console.error(
-              `Failed to load permissions for role ${role.id}:`,
-              error
-            );
-            return { roleId: role.id, count: 0 };
-          }
-        });
-
-        const results = await Promise.all(countPromises);
+        const limitConcurrency = 3;
         const newCountMap: Record<string, number> = {};
-        results.forEach(({ roleId, count }) => {
-          newCountMap[roleId] = count;
-        });
+
+        for (let i = 0; i < roles.length; i += limitConcurrency) {
+          if (cancelled) return;
+          const chunk = roles.slice(i, i + limitConcurrency);
+
+          const results = await Promise.all(
+            chunk.map(async (role) => {
+              try {
+                const perms = await getRolePerms(role.id);
+                const count = perms.reduce(
+                  (sum: number, m: any) =>
+                    sum + m.permissions.filter((p: any) => p.is_allowed).length,
+                  0
+                );
+                return { roleId: role.id, count };
+              } catch (error: any) {
+                if (error?.response?.status === 403) {
+                  return { roleId: role.id, count: 0 };
+                }
+                console.error(
+                  `Failed to load permissions for role ${role.id}:`,
+                  error
+                );
+                return { roleId: role.id, count: 0 };
+              }
+            })
+          );
+
+          results.forEach(({ roleId, count }) => {
+            newCountMap[roleId] = count;
+          });
+        }
+
+        if (cancelled) return;
         setPermCountMap(newCountMap);
       } catch {
         // ignore
       }
     })();
-  }, [mounted, canList, canViewRolePerms, roles.length]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, canList, canViewRolePerms, roleIdsKey]);
 
   const filtered = roles;
 
@@ -743,11 +764,11 @@ export default function RolesPage() {
                       <Table className="min-w-[640px]">
                         <TableHeader>
                           <TableRow className="bg-gray-200">
-                            <TableHead className="rounded-tl-xl">
+                            <TableHead className="rounded-tl-xl pl-14 ">
                               Role
                             </TableHead>
                             <TableHead>Created At</TableHead>
-                            <TableHead>Permissions</TableHead>
+                            <TableHead className="text-center">Permissions</TableHead>
                             <TableHead className="text-right rounded-tr-xl">
                               Actions
                             </TableHead>
@@ -809,7 +830,12 @@ export default function RolesPage() {
                                   </TableCell>
 
                                   <TableCell>
-                                    <Badge>{displayPermCount(r)}</Badge>
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-primary text-primary-foreground hover:bg-primary"
+                                    >
+                                      {displayPermCount(r)}
+                                    </Badge>
                                   </TableCell>
 
                                   <TableCell
@@ -865,13 +891,12 @@ export default function RolesPage() {
 
                     {/* Pagination – same responsive layout as JobFiles/Permissions */}
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {pagStart} to {pagEnd} of {pagTotal} roles
-                      </div>
+                      <div className="text-sm text-muted-foreground">Page {pagPage} of {pagTotalPages}</div>
 
                       <div className="flex flex-wrap items-center gap-2 justify-end">
                         <Button
-                          variant="outline"
+                          variant="pagination"
+                          clickVariant="default"
                           size="sm"
                           disabled={!pagHasPrev}
                           className="gap-1"
@@ -883,25 +908,9 @@ export default function RolesPage() {
                           <span className="hidden xs:inline">Previous</span>
                         </Button>
 
-                        <div className="flex items-center gap-1">
-                          {Array.from(
-                            { length: pagTotalPages },
-                            (_, i) => i + 1
-                          ).map((pg) => (
-                            <Button
-                              key={pg}
-                              variant={pg === pagPage ? "default" : "outline"}
-                              size="sm"
-                              className="w-8 h-8 p-0 text-xs"
-                              onClick={() => setPage(pg)}
-                            >
-                              {pg}
-                            </Button>
-                          ))}
-                        </div>
-
                         <Button
-                          variant="outline"
+                          variant="pagination"
+                          clickVariant="default"
                           size="sm"
                           disabled={!pagHasNext}
                           className="gap-1"
