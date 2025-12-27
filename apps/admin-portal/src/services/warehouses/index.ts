@@ -3,24 +3,40 @@ import api from "../lib/api";
 type WarehouseItem = {
   id: string;
   name: string;
-  code?: string | null;
-  address?: string | null;
+  code: string;
+  address: string;
   is_active: boolean;
-  created_by?: string | null;
-  updated_by?: string | null;
+  created_by: string;
+  updated_by: string;
   created_at: string;
   updated_at: string;
 };
 
 type WarehousesListResponse = {
-  status: boolean;
   statusCode: number;
-  data: { warehouses: WarehouseItem[]; pagination?: any };
+  status: boolean;
+  message: string;
+  heading: string;
+  data: {
+    warehouses: WarehouseItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+      nextPage?: number;
+      prevPage?: number;
+    };
+  };
 };
 
 type WarehouseItemResponse = {
-  status: boolean;
   statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
   data: WarehouseItem;
 };
 
@@ -91,9 +107,17 @@ export async function listWarehouses(
       signal: opts?.signal,
     })
   );
-  return {
-    rows: data?.data?.warehouses ?? [],
-    pagination: data?.data?.pagination,
+  
+  return { 
+    rows: data?.data?.warehouses ?? [], 
+    pagination: data?.data?.pagination ?? {
+      page: page,
+      limit: limit,
+      total: 0,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false
+    }
   };
 }
 
@@ -106,12 +130,22 @@ export async function getWarehouseById(id: string) {
 
 export async function createWarehouse(payload: {
   name: string;
-  code?: string;
-  address?: string;
+  code: string;
+  address: string;
   is_active?: boolean;
 }) {
+  const body = sanitize(
+    {
+      name: payload.name?.trim(),
+      code: payload.code?.trim(),
+      address: payload.address?.trim(),
+      is_active: payload.is_active,
+    },
+    ["name", "code", "address", "is_active"]
+  );
+
   const { data } = await with429Retry(() =>
-    api.post<WarehouseItemResponse>("/warehouses/create", payload)
+    api.post<WarehouseItemResponse>("/warehouses/create", body)
   );
   return data.data;
 }
@@ -123,22 +157,41 @@ export async function updateWarehouse(payload: {
   address?: string;
   is_active?: boolean;
 }) {
+  const body = sanitize(
+    {
+      id: payload.id,
+      name: payload.name?.trim(),
+      code: payload.code?.trim(),
+      address: payload.address?.trim(),
+      is_active: payload.is_active,
+    },
+    ["id", "name", "code", "address", "is_active"]
+  );
+
   try {
     const { data } = await with429Retry(() =>
-      api.put<WarehouseItemResponse>("/warehouses/update", payload)
+      api.put<WarehouseItemResponse>("/warehouses/update", body)
     );
     return data.data;
   } catch {
     const { data } = await with429Retry(() =>
-      api.post<WarehouseItemResponse>("/warehouses/update", payload)
+      api.post<WarehouseItemResponse>("/warehouses/update", body)
     );
     return data.data;
   }
 }
 
+type DeleteResponse = {
+  statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
+  data: null;
+};
+
 export async function deleteWarehouse(id: string) {
   const { data } = await with429Retry(() =>
-    api.delete<WarehouseItemResponse>("/warehouses/delete", { data: { id } })
+    api.delete<DeleteResponse>("/warehouses/delete", { data: { id } })
   );
-  return data.data;
+  return data;
 }

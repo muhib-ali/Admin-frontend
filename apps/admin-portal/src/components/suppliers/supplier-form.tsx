@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export type SupplierFormValues = {
   id: string;
-  name: string;
+  supplier_name: string;
   address: string;
   email: string;
   phone: string;
@@ -39,14 +39,14 @@ export default function SupplierFormDialog({
   initial,
   onSubmit,
 }: SupplierFormProps) {
-  const [name, setName] = React.useState(initial?.name ?? "");
+  const [supplier_name, setSupplierName] = React.useState(initial?.supplier_name ?? "");
   const [address, setAddress] = React.useState(initial?.address ?? "");
   const [email, setEmail] = React.useState(initial?.email ?? "");
   const [phone, setPhone] = React.useState(initial?.phone ?? "");
   const [active, setActive] = React.useState(initial?.active ?? true);
 
   React.useEffect(() => {
-    setName(initial?.name ?? "");
+    setSupplierName(initial?.supplier_name ?? "");
     setAddress(initial?.address ?? "");
     setEmail(initial?.email ?? "");
     setPhone(initial?.phone ?? "");
@@ -71,7 +71,7 @@ export default function SupplierFormDialog({
 
   const cta = mode === "create" ? "Create" : "Update";
 
-  const disabled = !name.trim();
+  const disabled = !supplier_name.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,8 +87,8 @@ export default function SupplierFormDialog({
             <Input
               id="supplier-name"
               placeholder="e.g., ABC Trading"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={supplier_name}
+              onChange={(e) => setSupplierName(e.target.value)}
               disabled={isReadOnly}
             />
           </div>
@@ -147,7 +147,7 @@ export default function SupplierFormDialog({
               onClick={() => {
                 const payload: SupplierFormValues = {
                   id: initial?.id ?? "",
-                  name: name.trim(),
+                  supplier_name: supplier_name.trim(),
                   address: address.trim(),
                   email: email.trim(),
                   phone: phone.trim(),

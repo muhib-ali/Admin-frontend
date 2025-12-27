@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 export type TaxFormValues = {
   id: string;
   title: string;
-  vat: number;
+  rate: number;
   active: boolean;
 };
 
@@ -29,7 +29,7 @@ export type TaxFormProps = {
   onSubmit: (data: TaxFormValues) => void;
 };
 
-function safeParseVat(v: string): number {
+function safeParseRate(v: string): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
@@ -42,14 +42,14 @@ export default function TaxFormDialog({
   onSubmit,
 }: TaxFormProps) {
   const [title, setTitle] = React.useState(initial?.title ?? "");
-  const [vat, setVat] = React.useState<string>(
-    initial?.vat != null ? String(initial.vat) : ""
+  const [rate, setRate] = React.useState<string>(
+    initial?.rate != null ? String(initial.rate) : ""
   );
   const [active, setActive] = React.useState(initial?.active ?? true);
 
   React.useEffect(() => {
     setTitle(initial?.title ?? "");
-    setVat(initial?.vat != null ? String(initial.vat) : "");
+    setRate(initial?.rate != null ? String(initial.rate) : "");
     setActive(initial?.active ?? true);
   }, [initial, open]);
 
@@ -67,7 +67,7 @@ export default function TaxFormDialog({
 
   const cta = mode === "create" ? "Create" : "Update";
 
-  const disabled = !title.trim() || vat.trim() === "";
+  const disabled = !title.trim() || rate.trim() === "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,17 +90,17 @@ export default function TaxFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tax-vat">VAT *</Label>
+            <Label htmlFor="tax-rate">Rate *</Label>
             <Input
-              id="tax-vat"
+              id="tax-rate"
               placeholder="e.g., 15"
-              value={vat}
-              onChange={(e) => setVat(e.target.value)}
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
               disabled={isReadOnly}
               inputMode="decimal"
             />
             <p className="text-[11px] text-muted-foreground">
-              Enter a numeric VAT percentage (e.g. 15)
+              Enter a numeric tax rate percentage (e.g. 15)
             </p>
           </div>
 
@@ -123,7 +123,7 @@ export default function TaxFormDialog({
                 const payload: TaxFormValues = {
                   id: initial?.id ?? "",
                   title: title.trim(),
-                  vat: safeParseVat(vat.trim()),
+                  rate: safeParseRate(rate.trim()),
                   active,
                 };
                 onSubmit(payload);

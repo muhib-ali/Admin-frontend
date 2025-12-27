@@ -49,7 +49,7 @@ import {
 type TaxRow = {
   id: string;
   title: string;
-  vat: number;
+  rate: number;
   active: boolean;
   createdAt: string;
 };
@@ -102,14 +102,16 @@ export default function TaxPage() {
   const canDelete = useHasPermission(ENTITY_PERMS.taxes.delete);
 
   const normalizeRows = React.useCallback(
-    (taxes: any[]): TaxRow[] =>
-      taxes.map((t) => ({
+    (taxes: any[]): TaxRow[] => {
+      if (!Array.isArray(taxes)) return [];
+      return taxes.map((t) => ({
         id: t.id,
         title: t.title,
-        vat: typeof t.vat === "number" ? t.vat : Number(t.vat ?? 0),
+        rate: typeof t.rate === "number" ? t.rate : Number(t.rate ?? 0),
         active: t.is_active ?? false,
         createdAt: t.created_at,
-      })),
+      }));
+    },
     []
   );
 
@@ -187,7 +189,7 @@ export default function TaxPage() {
       setCurrent({
         id: res.id,
         title: res.title,
-        vat: res.vat,
+        rate: res.rate,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -205,7 +207,7 @@ export default function TaxPage() {
       setCurrent({
         id: res.id,
         title: res.title,
-        vat: res.vat,
+        rate: res.rate,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -219,20 +221,26 @@ export default function TaxPage() {
     try {
       if (formMode === "create") {
         if (!canCreate) return;
-        await createTax({
+        const payload = {
           title: data.title,
-          vat: data.vat,
+          rate: data.rate,
           is_active: data.active,
-        });
+        };
+        console.log("Creating tax with payload:", payload);
+        console.log("Payload type:", typeof payload);
+        console.log("Rate type:", typeof payload.rate);
+        await createTax(payload);
         toast.success("Tax created");
       } else {
         if (!canUpdate) return;
-        await updateTax({
+        const payload = {
           id: data.id,
           title: data.title,
-          vat: data.vat,
+          rate: data.rate,
           is_active: data.active,
-        });
+        };
+        console.log("Updating tax with payload:", payload);
+        await updateTax(payload);
         toast.success("Tax updated");
       }
 
@@ -240,8 +248,47 @@ export default function TaxPage() {
       setOpenForm(false);
       setCurrent(undefined);
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      console.error("Tax upsert error:", e);
+      console.error("Error response:", e?.response?.data);
+      console.error("Error status:", e?.response?.status);
+      console.error("Error headers:", e?.response?.headers);
+      console.error("Full error object:", e);
+      
+      let errorMessage = "Save failed";
+      
+      // Check for validation errors (which might come as arrays)
+      if (e?.response?.data?.message && Array.isArray(e.response.data.message)) {
+        const validationErrors = e.response.data.message.join(", ");
+        if (validationErrors.includes("already exists") || validationErrors.includes("duplicate")) {
+          errorMessage = "Tax with this title already exists";
+        } else {
+          errorMessage = validationErrors;
+        }
+      } else {
+        // Check for different possible error message locations
+        let errorMsg = e?.response?.data?.message || 
+                      e?.response?.message || 
+                      e?.message ||
+                      "Unknown error occurred";
+        
+        // Handle case where message might be an array
+        if (Array.isArray(errorMsg)) {
+          errorMsg = errorMsg.join(", ");
+        }
+        
+        // Special case: if status is 400 and no message, assume it's validation error
+        if (e?.response?.status === 400 && (!errorMsg || errorMsg === "Unknown error occurred")) {
+          errorMessage = "Tax with this title already exists";
+        } else if (errorMsg.includes("already exists")) {
+          errorMessage = "Tax with this title already exists";
+        } else if (e?.response?.status === 400) {
+          errorMessage = errorMsg || "Invalid request data";
+        } else {
+          errorMessage = errorMsg;
+        }
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -315,7 +362,7 @@ export default function TaxPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Taxes</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+              <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-9 pl-9 w-full"
@@ -329,11 +376,11 @@ export default function TaxPage() {
 
           <CardContent className="px-3 sm:px-6">
             <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-              <Table className="min-w-[760px]">
+              <Table className="min-w-190">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Title</TableHead>
-                    <TableHead>VAT</TableHead>
+                    <TableHead>Rate</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                     <TableHead className="text-right rounded-tr-xl">
@@ -394,7 +441,7 @@ export default function TaxPage() {
                           </TableCell>
 
                           <TableCell className="text-sm">
-                            {Number.isFinite(t.vat) ? `${t.vat}%` : "—"}
+                            {Number.isFinite(t.rate) ? `${t.rate}%` : "—"}
                           </TableCell>
 
                           <TableCell>
