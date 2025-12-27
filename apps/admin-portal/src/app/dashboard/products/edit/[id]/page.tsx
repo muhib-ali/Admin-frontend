@@ -3,16 +3,27 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllVariantTypesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
+import Image from "next/image";
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 const STORAGE_KEY = "admin_portal_static_products_v1";
+
+type Option = { id: string; name: string };
 
 type BulkPricingRow = { id: string; quantity: string; price: string };
 
@@ -37,24 +48,26 @@ type StoredProduct = {
   sku?: string | null;
   is_active: boolean;
   supplier_id?: string;
+  tax_id?: string;
+  warehouse_id?: string;
   visibility_wholesale?: boolean;
   visibility_retail?: boolean;
 
   selling_price?: string;
   cost?: string;
   freight?: string;
-  tax?: string;
-  discount_percent?: string;
-  discount_start?: string;
-  discount_end?: string;
+  discount?: string;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  total_price?: string;
   bulk_pricing?: BulkPricingRow[];
 
-  warehouse_id?: string;
   weight?: string;
   length?: string;
   width?: string;
   height?: string;
 
+  customer_groups?: { cvg_ids: string[] };
   variants?: {
     options: string[];
     selected: Record<string, boolean>;
@@ -103,19 +116,32 @@ export default function ProductEditPage() {
   const [loading, setLoading] = React.useState(true);
   const [product, setProduct] = React.useState<StoredProduct | null>(null);
 
+  const [categories, setCategories] = React.useState<Option[]>([]);
+  const [brands, setBrands] = React.useState<Option[]>([]);
+  const [taxes, setTaxes] = React.useState<Option[]>([]);
+  const [suppliers, setSuppliers] = React.useState<Option[]>([]);
+  const [warehouses, setWarehouses] = React.useState<Option[]>([]);
+  const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
+  const [customerVisibilityGroups, setCustomerVisibilityGroups] = React.useState<Option[]>([]);
+
   const [values, setValues] = React.useState(() => ({
     title: "",
     description: "",
+    category_id: "",
+    brand_id: "",
+    supplier_id: "",
+    tax_id: "",
+    warehouse_id: "",
+    customer_groups: [] as string[],
     currency: "USD",
     selling_price: "",
     cost: "",
     freight: "",
-    tax: "0",
-    discount_percent: "",
-    discount_start: "",
-    discount_end: "",
+    discount: "",
+    start_discount_date: "",
+    end_discount_date: "",
+    total_price: "",
     stock_quantity: "",
-    warehouse_id: "",
     weight: "",
     length: "",
     width: "",
@@ -135,22 +161,57 @@ export default function ProductEditPage() {
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
+    const ac = new AbortController();
+
+    (async () => {
+      try {
+        const [cats, brs, tax, sup, wh, vt, cvg] = await Promise.all([
+          getAllCategoriesDropdown({ signal: ac.signal }),
+          getAllBrandsDropdown({ signal: ac.signal }),
+          getAllTaxesDropdown({ signal: ac.signal }),
+          getAllSuppliersDropdown({ signal: ac.signal }),
+          getAllWarehousesDropdown({ signal: ac.signal }),
+          getAllVariantTypesDropdown({ signal: ac.signal }),
+          getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
+        ]);
+
+        setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
+        setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
+        setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
+        setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
+        setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
+        setVariantTypes((vt ?? []).map((v: any) => ({ id: v.value, name: v.label })));
+        setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
+      } catch {
+        // ignore UI-only page for now
+      }
+    })();
+
+    return () => ac.abort();
+  }, []);
+
+  React.useEffect(() => {
     const p = readProducts().find((x) => x.id === id) ?? null;
     setProduct(p);
 
     setValues({
       title: p?.title ?? "",
       description: p?.description ?? "",
+      category_id: p?.category_id ?? "",
+      brand_id: p?.brand_id ?? "",
+      supplier_id: p?.supplier_id ?? "",
+      tax_id: p?.tax_id ?? "",
+      warehouse_id: p?.warehouse_id ?? "",
+      customer_groups: p?.customer_groups?.cvg_ids ?? [],
       currency: p?.currency ?? "USD",
       selling_price: p?.selling_price ?? String(p?.price ?? ""),
       cost: p?.cost ?? "",
       freight: p?.freight ?? "",
-      tax: p?.tax ?? "0",
-      discount_percent: p?.discount_percent ?? "",
-      discount_start: p?.discount_start ?? "",
-      discount_end: p?.discount_end ?? "",
+      discount: p?.discount ?? "",
+      start_discount_date: p?.start_discount_date ?? "",
+      end_discount_date: p?.end_discount_date ?? "",
+      total_price: p?.total_price ?? "",
       stock_quantity: String(p?.stock_quantity ?? ""),
-      warehouse_id: p?.warehouse_id ?? "",
       weight: p?.weight ?? "",
       length: p?.length ?? "",
       width: p?.width ?? "",
@@ -223,21 +284,12 @@ export default function ProductEditPage() {
         ...x,
         title: values.title,
         description: values.description,
-        currency: values.currency,
-        price: Number(values.selling_price) || 0,
-        selling_price: values.selling_price,
-        cost: values.cost,
-        freight: values.freight,
-        tax: values.tax,
-        discount_percent: values.discount_percent,
-        discount_start: values.discount_start,
-        discount_end: values.discount_end,
-        bulk_pricing: bulkPricing,
-        stock_quantity: Number(values.stock_quantity) || 0,
+        category_id: values.category_id,
+        brand_id: values.brand_id,
+        supplier_id: values.supplier_id,
+        tax_id: values.tax_id,
         warehouse_id: values.warehouse_id,
-        weight: values.weight,
-        length: values.length,
-        width: values.width,
+        currency: values.currency,
         height: values.height,
         visibility_wholesale: values.visibility_wholesale,
         visibility_retail: values.visibility_retail,
@@ -421,12 +473,12 @@ export default function ProductEditPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="tax">Tax (%)</Label>
+                    <Label htmlFor="tax_id">Tax ID</Label>
                     <Input
-                      id="tax"
+                      id="tax_id"
                       inputMode="decimal"
-                      value={values.tax}
-                      onChange={(e) => setValues((p) => ({ ...p, tax: e.target.value }))}
+                      value={values.tax_id}
+                      onChange={(e) => setValues((p) => ({ ...p, tax_id: e.target.value }))}
                     />
                   </div>
 
@@ -435,8 +487,8 @@ export default function ProductEditPage() {
                     <Input
                       id="discount"
                       inputMode="decimal"
-                      value={values.discount_percent}
-                      onChange={(e) => setValues((p) => ({ ...p, discount_percent: e.target.value }))}
+                      value={values.discount}
+                      onChange={(e) => setValues((p) => ({ ...p, discount: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -446,13 +498,13 @@ export default function ProductEditPage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Input
                       type="date"
-                      value={values.discount_start}
-                      onChange={(e) => setValues((p) => ({ ...p, discount_start: e.target.value }))}
+                      value={values.start_discount_date}
+                      onChange={(e) => setValues((p) => ({ ...p, start_discount_date: e.target.value }))}
                     />
                     <Input
                       type="date"
-                      value={values.discount_end}
-                      onChange={(e) => setValues((p) => ({ ...p, discount_end: e.target.value }))}
+                      value={values.end_discount_date}
+                      onChange={(e) => setValues((p) => ({ ...p, end_discount_date: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -565,7 +617,13 @@ export default function ProductEditPage() {
                       {media.map((m) => (
                         <div key={m.id} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted">
                           {m.kind === "image" ? (
-                            <img src={m.url} alt={m.name} className="h-full w-full object-cover" />
+                            <Image
+                              src={m.url}
+                              alt={m.name}
+                              className="h-full w-full object-cover"
+                              width={128}
+                              height={96}
+                            />
                           ) : (
                             <video src={m.url} className="h-full w-full object-cover" controls />
                           )}
@@ -581,7 +639,7 @@ export default function ProductEditPage() {
 
                       {pendingMedia.map((m) => (
                         <div key={m.id} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                          <div className="p-2 text-xs text-muted-foreground break-words">
+                          <div className="p-2 text-xs text-muted-foreground wrap-break-word">
                             {m.file.name}
                             <div className="mt-1">(will upload on save)</div>
                           </div>

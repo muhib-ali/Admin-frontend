@@ -103,15 +103,17 @@ export default function WarehousesPage() {
   const canDelete = useHasPermission(ENTITY_PERMS.warehouses.delete);
 
   const normalizeRows = React.useCallback(
-    (warehouses: any[]): WarehouseRow[] =>
-      warehouses.map((w) => ({
+    (warehouses: any[]): WarehouseRow[] => {
+      if (!Array.isArray(warehouses)) return [];
+      return warehouses.map((w) => ({
         id: w.id,
         name: w.name,
-        code: w.code ?? "",
-        address: w.address ?? "",
+        code: w.code || "",
+        address: w.address || "",
         active: w.is_active ?? false,
         createdAt: w.created_at,
-      })),
+      }));
+    },
     []
   );
 
@@ -189,8 +191,8 @@ export default function WarehousesPage() {
       setCurrent({
         id: res.id,
         name: res.name,
-        code: res.code ?? "",
-        address: res.address ?? "",
+        code: res.code,
+        address: res.address,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -208,8 +210,8 @@ export default function WarehousesPage() {
       setCurrent({
         id: res.id,
         name: res.name,
-        code: res.code ?? "",
-        address: res.address ?? "",
+        code: res.code,
+        address: res.address,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -223,22 +225,26 @@ export default function WarehousesPage() {
     try {
       if (formMode === "create") {
         if (!canCreate) return;
-        await createWarehouse({
+        const payload = {
           name: data.name,
           code: data.code,
           address: data.address,
           is_active: data.active,
-        });
+        };
+        console.log("Creating warehouse with payload:", payload);
+        await createWarehouse(payload);
         toast.success("Warehouse created");
       } else {
         if (!canUpdate) return;
-        await updateWarehouse({
+        const payload = {
           id: data.id,
           name: data.name,
           code: data.code,
           address: data.address,
           is_active: data.active,
-        });
+        };
+        console.log("Updating warehouse with payload:", payload);
+        await updateWarehouse(payload);
         toast.success("Warehouse updated");
       }
 
@@ -246,8 +252,47 @@ export default function WarehousesPage() {
       setOpenForm(false);
       setCurrent(undefined);
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      console.error("Warehouse upsert error:", e);
+      console.error("Error response:", e?.response?.data);
+      console.error("Error status:", e?.response?.status);
+      console.error("Error headers:", e?.response?.headers);
+      console.error("Full error object:", e);
+      
+      let errorMessage = "Save failed";
+      
+      // Check for validation errors (which might come as arrays)
+      if (e?.response?.data?.message && Array.isArray(e.response.data.message)) {
+        const validationErrors = e.response.data.message.join(", ");
+        if (validationErrors.includes("already exists") || validationErrors.includes("duplicate")) {
+          errorMessage = "Warehouse with this code already exists";
+        } else {
+          errorMessage = validationErrors;
+        }
+      } else {
+        // Check for different possible error message locations
+        let errorMsg = e?.response?.data?.message || 
+                      e?.response?.message || 
+                      e?.message ||
+                      "Unknown error occurred";
+        
+        // Handle case where message might be an array
+        if (Array.isArray(errorMsg)) {
+          errorMsg = errorMsg.join(", ");
+        }
+        
+        // Special case: if status is 400 and no message, assume it's validation error
+        if (e?.response?.status === 400 && (!errorMsg || errorMsg === "Unknown error occurred")) {
+          errorMessage = "Warehouse with this code already exists";
+        } else if (errorMsg.includes("already exists")) {
+          errorMessage = "Warehouse with this code already exists";
+        } else if (e?.response?.status === 400) {
+          errorMessage = errorMsg || "Invalid request data";
+        } else {
+          errorMessage = errorMsg;
+        }
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -322,7 +367,7 @@ export default function WarehousesPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Warehouses</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+              <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-9 pl-9 w-full"
@@ -336,7 +381,7 @@ export default function WarehousesPage() {
 
           <CardContent className="px-3 sm:px-6">
             <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-              <Table className="min-w-[860px]">
+              <Table className="min-w-215">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Warehouse</TableHead>

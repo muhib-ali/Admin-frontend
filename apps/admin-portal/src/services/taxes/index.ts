@@ -3,23 +3,37 @@ import api from "../lib/api";
 type TaxItem = {
   id: string;
   title: string;
-  vat: number;
+  rate: number;
   is_active: boolean;
-  created_by?: string | null;
-  updated_by?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 type TaxesListResponse = {
-  status: boolean;
   statusCode: number;
-  data: { taxes: TaxItem[]; pagination?: any };
+  status: boolean;
+  message: string;
+  heading: string;
+  data: {
+    taxes: TaxItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+      nextPage?: number;
+      prevPage?: number;
+    };
+  };
 };
 
 type TaxItemResponse = {
-  status: boolean;
   statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
   data: TaxItem;
 };
 
@@ -90,7 +104,18 @@ export async function listTaxes(
       signal: opts?.signal,
     })
   );
-  return { rows: data?.data?.taxes ?? [], pagination: data?.data?.pagination };
+  
+  return { 
+    rows: data?.data?.taxes ?? [], 
+    pagination: data?.data?.pagination ?? {
+      page: page,
+      limit: limit,
+      total: 0,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false
+    }
+  };
 }
 
 export async function getTaxById(id: string) {
@@ -102,17 +127,23 @@ export async function getTaxById(id: string) {
 
 export async function createTax(payload: {
   title: string;
-  vat: number;
+  rate: number;
   is_active?: boolean;
 }) {
+  console.log("Service createTax payload:", payload);
+  console.log("Service payload rate type:", typeof payload.rate);
+  
   const body = sanitize(
     {
       title: payload.title?.trim(),
-      vat: payload.vat,
+      rate: payload.rate,
       is_active: payload.is_active,
     },
-    ["title", "vat", "is_active"]
+    ["title", "rate", "is_active"]
   );
+
+  console.log("Service sanitized body:", body);
+  console.log("Service body rate type:", typeof body.rate);
 
   const { data } = await with429Retry(() =>
     api.post<TaxItemResponse>("/taxes/create", body)
@@ -123,17 +154,17 @@ export async function createTax(payload: {
 export async function updateTax(payload: {
   id: string;
   title?: string;
-  vat?: number;
+  rate?: number;
   is_active?: boolean;
 }) {
   const body = sanitize(
     {
       id: payload.id,
       title: payload.title?.trim(),
-      vat: payload.vat,
+      rate: payload.rate,
       is_active: payload.is_active,
     },
-    ["id", "title", "vat", "is_active"]
+    ["id", "title", "rate", "is_active"]
   );
 
   try {
@@ -149,9 +180,17 @@ export async function updateTax(payload: {
   }
 }
 
+type DeleteResponse = {
+  statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
+  data: null;
+};
+
 export async function deleteTax(id: string) {
   const { data } = await with429Retry(() =>
-    api.delete<TaxItemResponse>("/taxes/delete", { data: { id } })
+    api.delete<DeleteResponse>("/taxes/delete", { data: { id } })
   );
-  return data.data;
+  return data;
 }
