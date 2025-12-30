@@ -148,7 +148,16 @@ api.interceptors.response.use(
         } else {
           throw new Error("Invalid refresh response structure");
         }
-      } catch (refreshError) {
+      } catch (refreshError: any) {
+        // Handle throttling errors (429) - don't clear auth, just reject
+        if (refreshError?.response?.status === 429) {
+          console.warn("Token refresh rate limited, will retry later");
+          processQueue(refreshError, null);
+          isRefreshing = false;
+          // Don't clear auth on throttling - just reject the request
+          return Promise.reject(refreshError);
+        }
+        // For other errors, clear auth and redirect
         processQueue(refreshError, null);
         isRefreshing = false;
         clearAuthAndRedirect();

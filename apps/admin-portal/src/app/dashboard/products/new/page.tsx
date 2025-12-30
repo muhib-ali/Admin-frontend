@@ -176,15 +176,17 @@ export default function NewProductPage() {
   });
   const [newVariantName, setNewVariantName] = React.useState("");
 
-  const [media, setMedia] = React.useState<MediaItem[]>([]);
+  const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null); // Single featured image
+  const [galleryImages, setGalleryImages] = React.useState<MediaItem[]>([]); // Gallery images (max 4)
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
-  const [uploadProgress, setUploadProgress] = React.useState<{ images: number; video: number }>({ images: 0, video: 0 });
+  const [uploadProgress, setUploadProgress] = React.useState<{ featured: number; gallery: number; video: number }>({ featured: 0, gallery: 0, video: 0 });
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
-  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
@@ -207,7 +209,14 @@ export default function NewProductPage() {
         setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
-        setVariantTypes((vt ?? []).map((v: any) => ({ id: v.value, name: v.label })));
+        // For create form: Only show default variant types (size, model, year) - custom variants are created per product
+        const defaultVariantTypes = ["size", "model", "year"];
+        const allVariantTypes = (vt ?? []).map((v: any) => ({ id: v.value, name: v.label }));
+        // Filter to only show default variant types
+        const filteredVariantTypes = allVariantTypes.filter((vt: any) => 
+          defaultVariantTypes.includes(vt.name.toLowerCase())
+        );
+        setVariantTypes(filteredVariantTypes);
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
       } catch {
         // ignore UI-only page for now
@@ -217,61 +226,84 @@ export default function NewProductPage() {
     return () => ac.abort();
   }, []);
 
+  // Cleanup blob URLs
   React.useEffect(() => {
     return () => {
-      media.forEach((m) => {
+      if (featuredImage?.url.startsWith("blob:")) {
+        URL.revokeObjectURL(featuredImage.url);
+      }
+      galleryImages.forEach((m) => {
         if (m.url.startsWith("blob:")) URL.revokeObjectURL(m.url);
       });
     };
-  }, [media]);
+  }, [featuredImage, galleryImages]);
 
-  const addMedia = (files: FileList | null, kind: MediaItem["kind"]) => {
+  // Handle featured image (single)
+  const handleFeaturedImage = (files: FileList | null) => {
+    if (!files?.length) return;
+    const file = files[0]; // Only take first file
+
+    const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+    const maxImageSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedImageTypes.includes(file.type)) {
+      setUploadErrors([`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`]);
+      return;
+    }
+    if (file.size > maxImageSize) {
+      setUploadErrors([`Image ${file.name} is too large. Maximum size is 5MB`]);
+      return;
+    }
+
+    // Cleanup previous featured image
+    if (featuredImage?.url.startsWith("blob:")) {
+      URL.revokeObjectURL(featuredImage.url);
+    }
+
+    setFeaturedImage({
+      id: crypto.randomUUID(),
+      kind: "image",
+      file,
+      url: URL.createObjectURL(file),
+    });
+    setUploadErrors([]);
+  };
+
+  const removeFeaturedImage = () => {
+    if (featuredImage?.url.startsWith("blob:")) {
+      URL.revokeObjectURL(featuredImage.url);
+    }
+    setFeaturedImage(null);
+  };
+
+  // Handle gallery images (multiple, max 4)
+  const handleGalleryImages = (files: FileList | null) => {
     if (!files?.length) return;
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-    const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
     const maxImageSize = 5 * 1024 * 1024; // 5MB
-    const maxVideoSize = 50 * 1024 * 1024; // 50MB
-    const maxImages = 5;
-
-    const currentImages = media.filter(m => m.kind === "image").length;
-    const currentVideos = media.filter(m => m.kind === "video").length;
+    const maxGalleryImages = 4;
 
     const next: MediaItem[] = [];
     const errors: string[] = [];
 
     for (const file of Array.from(files)) {
-      if (kind === "image") {
-        if (currentImages + next.length >= maxImages) {
-          errors.push(`Maximum ${maxImages} images allowed`);
-          break;
-        }
-        if (!allowedImageTypes.includes(file.type)) {
-          errors.push(`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`);
-          continue;
-        }
-        if (file.size > maxImageSize) {
-          errors.push(`Image ${file.name} is too large. Maximum size is 5MB`);
-          continue;
-        }
-      } else if (kind === "video") {
-        if (currentVideos > 0) {
-          errors.push("Only one video is allowed per product");
-          break;
-        }
-        if (!allowedVideoTypes.includes(file.type)) {
-          errors.push(`Invalid video type: ${file.name}. Only MP4, WebM, OGG, and QuickTime are allowed`);
-          continue;
-        }
-        if (file.size > maxVideoSize) {
-          errors.push(`Video ${file.name} is too large. Maximum size is 50MB`);
-          continue;
-        }
+      if (galleryImages.length + next.length >= maxGalleryImages) {
+        errors.push(`Maximum ${maxGalleryImages} gallery images allowed`);
+        break;
+      }
+      if (!allowedImageTypes.includes(file.type)) {
+        errors.push(`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`);
+        continue;
+      }
+      if (file.size > maxImageSize) {
+        errors.push(`Image ${file.name} is too large. Maximum size is 5MB`);
+        continue;
       }
 
       next.push({
         id: crypto.randomUUID(),
-        kind,
+        kind: "image",
         file,
         url: URL.createObjectURL(file),
       } as MediaItem);
@@ -282,17 +314,58 @@ export default function NewProductPage() {
     }
 
     if (next.length > 0) {
-      setMedia((p) => [...p, ...next]);
-      setUploadErrors([]); // Clear previous errors when valid files are added
+      setGalleryImages((p) => [...p, ...next]);
+      setUploadErrors([]);
     }
   };
 
-  const removeMedia = (id: string) => {
-    setMedia((p) => {
+  const removeGalleryImage = (id: string) => {
+    setGalleryImages((p) => {
       const target = p.find((x) => x.id === id);
-      if (target) URL.revokeObjectURL(target.url);
+      if (target?.url.startsWith("blob:")) {
+        URL.revokeObjectURL(target.url);
+      }
       return p.filter((x) => x.id !== id);
     });
+  };
+
+  // Handle video (single)
+  const [videoFile, setVideoFile] = React.useState<MediaItem | null>(null);
+
+  const handleVideo = (files: FileList | null) => {
+    if (!files?.length) return;
+    const file = files[0]; // Only take first file
+
+    const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+    const maxVideoSize = 50 * 1024 * 1024; // 50MB
+
+    if (videoFile) {
+      setUploadErrors(["Only one video is allowed per product"]);
+      return;
+    }
+    if (!allowedVideoTypes.includes(file.type)) {
+      setUploadErrors([`Invalid video type: ${file.name}. Only MP4, WebM, OGG, and QuickTime are allowed`]);
+      return;
+    }
+    if (file.size > maxVideoSize) {
+      setUploadErrors([`Video ${file.name} is too large. Maximum size is 50MB`]);
+      return;
+    }
+
+    setVideoFile({
+      id: crypto.randomUUID(),
+      kind: "video",
+      file,
+      url: URL.createObjectURL(file),
+    });
+    setUploadErrors([]);
+  };
+
+  const removeVideo = () => {
+    if (videoFile?.url.startsWith("blob:")) {
+      URL.revokeObjectURL(videoFile.url);
+    }
+    setVideoFile(null);
   };
 
   const deleteVariantOption = async (variantId: string, variantKey: string) => {
@@ -412,7 +485,7 @@ export default function NewProductPage() {
   const canSave = canCreate && productDetailsComplete;
 
   const saveProduct = async () => {
-    if (!canSave) return;
+    if (!canSave || isUploading) return; // Prevent double submission
 
     setIsUploading(true);
     setUploadErrors([]);
@@ -429,7 +502,28 @@ export default function NewProductPage() {
         ? totalCost - (totalCost * discountPercent) / 100 
         : totalCost;
 
-      // Prepare product data (without variants for now to avoid UUID issues)
+      // Prepare variants data
+      const variantsData = selectedVariantKeys
+        .filter(key => variantValues[key]?.trim()) // Only include variants with values
+        .map(key => {
+          // Find variant type ID by matching name (case-insensitive)
+          const variantType = variantTypes.find(
+            vt => vt.name.toLowerCase().trim() === key.toLowerCase().trim()
+          );
+          
+          if (!variantType) {
+            console.warn(`Variant type not found for key: ${key}`);
+            return null;
+          }
+          
+          return {
+            vtype_id: variantType.id,
+            value: variantValues[key].trim(),
+          };
+        })
+        .filter((v): v is { vtype_id: string; value: string } => v !== null);
+
+      // Prepare product data
       const productData = {
         title: values.title.trim(),
         description: values.description.trim(),
@@ -451,6 +545,7 @@ export default function NewProductPage() {
         width: values.width ? Number(values.width) : undefined,
         height: values.height ? Number(values.height) : undefined,
         customer_groups: values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
+        variants: variantsData.length > 0 ? variantsData : undefined,
         bulk_prices: bulkPricing
           .filter(row => row.quantity && row.price)
           .map(row => ({
@@ -464,97 +559,52 @@ export default function NewProductPage() {
       const productId = typeof createdProduct === 'string' ? createdProduct : createdProduct.id || String(createdProduct);
       setCreatedProductId(productId);
 
-      // Upload images if any
-      const imageFiles = media.filter(m => m.kind === "image").map(m => m.file);
-      if (imageFiles.length > 0) {
+      // Upload featured image if any
+      if (featuredImage) {
         try {
-          setUploadProgress(prev => ({ ...prev, images: 1 }));
-          await productsService.uploadProductImages(productId, imageFiles);
-          setUploadProgress(prev => ({ ...prev, images: 100 }));
+          setUploadProgress(prev => ({ ...prev, featured: 1 }));
+          const featuredResponse = await productsService.uploadFeaturedImage(productId, featuredImage.file);
+          setUploadProgress(prev => ({ ...prev, featured: 100 }));
+          // Backend already updates product_img_url automatically, no need for extra update
+          console.log("Featured image uploaded successfully:", featuredResponse);
         } catch (error: any) {
-          setUploadErrors(prev => [...prev, `Image upload failed: ${error.message}`]);
+          console.error("Featured image upload error:", error);
+          setUploadErrors(prev => [...prev, `Featured image upload failed: ${error.message}`]);
+        }
+      }
+
+      // Upload gallery images if any
+      if (galleryImages.length > 0) {
+        try {
+          setUploadProgress(prev => ({ ...prev, gallery: 1 }));
+          const galleryFiles = galleryImages.map(m => m.file);
+          await productsService.uploadProductImages(productId, galleryFiles);
+          setUploadProgress(prev => ({ ...prev, gallery: 100 }));
+        } catch (error: any) {
+          setUploadErrors(prev => [...prev, `Gallery images upload failed: ${error.message}`]);
         }
       }
 
       // Upload video if any
-      const videoFile = media.find(m => m.kind === "video")?.file;
       if (videoFile) {
         try {
           setUploadProgress(prev => ({ ...prev, video: 1 }));
-          await productsService.uploadProductVideo(productId, videoFile);
+          await productsService.uploadProductVideo(productId, videoFile.file);
+          // Backend already updates product_video_url in database
           setUploadProgress(prev => ({ ...prev, video: 100 }));
         } catch (error: any) {
           setUploadErrors(prev => [...prev, `Video upload failed: ${error.message}`]);
         }
       }
 
-      // Store product locally for UI consistency
-      const category = categories.find((c) => c.id === values.category_id);
-      const brand = brands.find((b) => b.id === values.brand_id);
-
-      const storedMedia: StoredMediaItem[] = [];
-      for (const m of media) {
-        const url = await fileToDataUrl(m.file);
-        storedMedia.push({
-          id: m.id,
-          kind: m.kind,
-          name: m.file.name,
-          type: m.file.type,
-          url,
-        });
-      }
-
-      const storedProduct: StoredProduct = {
-        id: productId,
-        title: values.title.trim(),
-        description: values.description.trim(),
-        price: Number(values.selling_price) || 0,
-        stock_quantity: Number(values.stock_quantity) || 0,
-        category_id: values.category_id,
-        brand_id: values.brand_id,
-        currency: values.currency,
-        product_img_url: null,
-        is_active: Boolean(values.is_active),
-        supplier_id: values.supplier_id,
-        visibility_wholesale: Boolean(values.visibility_wholesale),
-        visibility_retail: Boolean(values.visibility_retail),
-
-        selling_price: values.selling_price,
-        cost: values.cost,
-        freight: values.freight,
-        discount: values.discount,
-        start_discount_date: values.start_discount_date,
-        end_discount_date: values.end_discount_date,
-        total_price: values.total_price,
-        bulk_pricing: bulkPricing,
-
-        tax_id: values.tax_id,
-        warehouse_id: values.warehouse_id,
-        weight: values.weight,
-        length: values.length,
-        width: values.width,
-        height: values.height,
-
-        customer_groups: { cvg_ids: values.customer_groups },
-        variants: {
-          options: variantOptions,
-          selected: variantSelected,
-          values: variantValues,
-        },
-
-        media: storedMedia,
-        created_at: new Date().toISOString(),
-        category: category ? { id: category.id, name: category.name } : undefined,
-        brand: brand ? { id: brand.id, name: brand.name } : undefined,
-      };
-
-      const prev = readStoredProducts();
-      writeStoredProducts([storedProduct, ...prev]);
+      // Don't write to localStorage - product is already in backend
+      // The products page should fetch from backend API, not localStorage
+      // Writing to localStorage causes duplicate products in the UI
       
       // Show success message and redirect
-      if (uploadErrors.length === 0) {
-        router.push("/dashboard/products");
-      }
+      // Note: uploadErrors state will be checked after the function completes
+      // Errors are already added to state during the upload process
+      router.push("/dashboard/products");
     } catch (error: any) {
       setUploadErrors(prev => [...prev, `Product creation failed: ${error.message}`]);
     } finally {
@@ -1047,68 +1097,132 @@ export default function NewProductPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-6">
-                {/* Images Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">Product Images</h4>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => imageInputRef.current?.click()}
-                    >
-                      <Upload className="h-4 w-4" />
-                      Add Images
-                    </Button>
-                  </div>
-                  
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      addMedia(e.target.files, "image");
-                      if (imageInputRef.current) imageInputRef.current.value = "";
-                    }}
-                  />
-                  
-                  <div className="rounded-xl border p-3">
-                    {media.filter(m => m.kind === "image").length === 0 ? (
-                      <div className="p-8 text-center text-sm text-muted-foreground">
-                        No images uploaded yet. Add up to 5 images (JPEG, PNG, WebP).
+                  {/* Featured Image Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium">Featured Image</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Primary image for product listing (JPEG, PNG, WebP - max 5MB)
+                        </p>
                       </div>
-                    ) : (
-                      <div className="flex gap-3 overflow-x-auto scrollbar-stable">
-                        {media.filter(m => m.kind === "image").map((m) => (
-                          <div
-                            key={m.id}
-                            className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => featuredImageInputRef.current?.click()}
+                      >
+                        <Upload className="h-4 w-4" />
+                        {featuredImage ? "Change" : "Add Featured Image"}
+                      </Button>
+                    </div>
+                    
+                    <input
+                      ref={featuredImageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        handleFeaturedImage(e.target.files);
+                        if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
+                      }}
+                    />
+                    
+                    <div className="rounded-xl border p-3">
+                      {!featuredImage ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No featured image uploaded yet. This will be used as the primary product image.
+                        </div>
+                      ) : (
+                        <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
+                          <Image
+                            src={featuredImage.url}
+                            alt={featuredImage.file.name}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeFeaturedImage}
+                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                            aria-label="Remove featured image"
                           >
-                            <Image
-                              src={m.url}
-                              alt={m.file.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => removeMedia(m.id)}
-                              className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                              aria-label="Remove image"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Gallery Images Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium">Gallery Images</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Additional images for product detail page (max 4 images - JPEG, PNG, WebP)
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => galleryImagesInputRef.current?.click()}
+                        disabled={galleryImages.length >= 4}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Add Gallery Images
+                      </Button>
+                    </div>
+                    
+                    <input
+                      ref={galleryImagesInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        handleGalleryImages(e.target.files);
+                        if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
+                      }}
+                    />
+                    
+                    <div className="rounded-xl border p-3">
+                      {galleryImages.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No gallery images uploaded yet. Add up to 4 additional images.
+                        </div>
+                      ) : (
+                        <div className="flex gap-3 overflow-x-auto scrollbar-stable">
+                          {galleryImages.map((m) => (
+                            <div
+                              key={m.id}
+                              className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
+                            >
+                              <Image
+                                src={m.url}
+                                alt={m.file.name}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeGalleryImage(m.id)}
+                                className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
+                                aria-label="Remove gallery image"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                 {/* Video Section */}
                 <div className="space-y-3">
@@ -1132,39 +1246,33 @@ export default function NewProductPage() {
                     accept="video/mp4,video/webm,video/ogg,video/quicktime"
                     className="hidden"
                     onChange={(e) => {
-                      addMedia(e.target.files, "video");
+                      handleVideo(e.target.files);
                       if (videoInputRef.current) videoInputRef.current.value = "";
                     }}
                   />
                   
                   <div className="rounded-xl border p-3">
-                    {media.filter(m => m.kind === "video").length === 0 ? (
+                    {!videoFile ? (
                       <div className="p-8 text-center text-sm text-muted-foreground">
                         No video uploaded yet. Add one video (MP4, WebM, OGG, QuickTime - max 50MB).
                       </div>
                     ) : (
-                      <div className="flex gap-3 overflow-x-auto scrollbar-stable">
-                        {media.filter(m => m.kind === "video").map((m) => (
-                          <div
-                            key={m.id}
-                            className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
-                          >
-                            <video
-                              src={m.url}
-                              className="h-full w-full object-cover"
-                              muted
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => removeMedia(m.id)}
-                              className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                              aria-label="Remove video"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                      <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
+                        <video
+                          src={videoFile.url}
+                          className="h-full w-full object-cover"
+                          controls
+                          muted
+                          preload="metadata"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeVideo}
+                          className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                          aria-label="Remove video"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
                     )}
                   </div>
