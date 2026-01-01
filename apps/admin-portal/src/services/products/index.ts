@@ -312,7 +312,22 @@ export async function createProduct(payload: {
   brand_id: string;
   currency: string;
   product_img_url?: string | null;
+  product_video_url?: string | null;
   is_active?: boolean;
+  discount?: number;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  tax_id?: string;
+  supplier_id?: string;
+  warehouse_id?: string;
+  total_price?: number;
+  variants?: { vtype_id: string; value: string; product_id?: string }[];
+  customer_groups?: { cvg_ids: string[] };
+  bulk_prices?: { quantity: number; price_per_product: number }[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -320,8 +335,12 @@ export async function createProduct(payload: {
     );
     return data.data;
   } catch (e: any) {
+    // Only retry if it's a 400 error AND the message specifically mentions is_active field issue
+    const status = e?.response?.status;
     const msg = String(e?.response?.data?.message ?? "");
-    if (msg.toLowerCase().includes("is_active")) {
+    
+    // Only retry if it's a bad request (400) and specifically about is_active field
+    if (status === 400 && msg.toLowerCase().includes("is_active") && !msg.toLowerCase().includes("success")) {
       const { is_active, ...rest } = payload;
       const { data } = await with429Retry(() =>
         api.post<ProductItemResponse>("/products/create", rest)
@@ -342,7 +361,22 @@ export async function updateProduct(payload: {
   brand_id?: string;
   currency?: string;
   product_img_url?: string | null;
+  product_video_url?: string | null;
   is_active?: boolean;
+  discount?: number;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  tax_id?: string;
+  supplier_id?: string;
+  warehouse_id?: string;
+  total_price?: number;
+  variants?: { vtype_id: string; value: string; product_id?: string }[];
+  customer_groups?: { cvg_ids: string[] };
+  bulk_prices?: { quantity: number; price_per_product: number }[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -368,7 +402,7 @@ export async function updateProduct(payload: {
 
     try {
       const { data } = await with429Retry(() =>
-        api.post<ProductItemResponse>("/products/update", payload)
+        api.put<ProductItemResponse>("/products/update", payload)
       );
       return data.data;
     } catch {
@@ -420,6 +454,48 @@ export async function uploadProductImage(productId: string, file: File) {
   return { url: String(url), fileName: String(fileName) };
 }
 
+export async function uploadFeaturedImage(productId: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const res = await fetch(`/api/v1/products/featured-image/${productId}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Featured image upload failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  // Debug: Log the response structure
+  console.log("Featured image upload response:", json);
+  
+  const url = (json as any)?.data?.url || (json as any)?.url;
+  const fileName = (json as any)?.data?.fileName || (json as any)?.fileName;
+
+  console.log("Extracted URL:", url, "Extracted fileName:", fileName);
+
+  if (!url) {
+    console.error("Invalid featured image upload response - full JSON:", json);
+    throw new Error("Invalid featured image upload response");
+  }
+
+  return { url: String(url), fileName: fileName ? String(fileName) : file.name };
+}
+
 export async function deleteProductImage(fileName: string) {
   const token = await getAuthToken();
   const headers: HeadersInit | undefined = token
@@ -443,4 +519,148 @@ export async function deleteProductImage(fileName: string) {
   }
 
   return json as any;
+}
+
+export async function deleteProductImageById(productId: string, imageId: string) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const res = await fetch(
+    `${base}/products/images/${productId}/${imageId}`,
+    { method: "DELETE", headers }
+  );
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Image delete failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Image upload for multiple files (max 5)
+export async function uploadProductImages(productId: string, files: File[]) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  // Validate files
+  const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+  const maxFileSize = 5 * 1024 * 1024; // 5MB
+  const maxFiles = 5;
+
+  if (files.length > maxFiles) {
+    throw new Error(`Maximum ${maxFiles} images allowed`);
+  }
+
+  for (const file of files) {
+    if (!allowedImageTypes.includes(file.type)) {
+      throw new Error(`Invalid file type: ${file.type}. Only JPEG, PNG, and WebP images are allowed`);
+    }
+    if (file.size > maxFileSize) {
+      throw new Error(`File ${file.name} is too large. Maximum size is 5MB`);
+    }
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const form = new FormData();
+  files.forEach((file) => {
+    form.append("files", file);
+  });
+
+  const res = await fetch(`${base}/products/images/${productId}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Image upload failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Video upload for single file
+export async function uploadProductVideo(productId: string, file: File) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  // Validate video file
+  const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+  const maxVideoSize = 50 * 1024 * 1024; // 50MB
+
+  if (!allowedVideoTypes.includes(file.type)) {
+    throw new Error(`Invalid file type: ${file.type}. Only MP4, WebM, OGG, and QuickTime videos are allowed`);
+  }
+  if (file.size > maxVideoSize) {
+    throw new Error(`Video file is too large. Maximum size is 50MB`);
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${base}/products/video/${productId}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Video upload failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  // Debug: Log the response structure
+  console.log("Video upload response:", json);
+  
+  const url = (json as any)?.data?.url || (json as any)?.url;
+  const fileName = (json as any)?.data?.fileName || (json as any)?.fileName;
+
+  console.log("Extracted video URL:", url, "Extracted fileName:", fileName);
+
+  if (!url) {
+    console.error("Invalid video upload response - full JSON:", json);
+    throw new Error("Invalid video upload response");
+  }
+
+  return { url: String(url), fileName: fileName ? String(fileName) : file.name };
 }

@@ -2,26 +2,40 @@ import api from "../lib/api";
 
 type SupplierItem = {
   id: string;
-  name: string;
-  address?: string | null;
-  email?: string | null;
-  phone?: string | null;
+  supplier_name: string;
+  email: string;
+  phone: string;
+  address: string;
   is_active: boolean;
-  created_by?: string | null;
-  updated_by?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 type SuppliersListResponse = {
-  status: boolean;
   statusCode: number;
-  data: { suppliers: SupplierItem[]; pagination?: any };
+  status: boolean;
+  message: string;
+  heading: string;
+  data: {
+    suppliers: SupplierItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+      nextPage?: number;
+      prevPage?: number;
+    };
+  };
 };
 
 type SupplierItemResponse = {
-  status: boolean;
   statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
   data: SupplierItem;
 };
 
@@ -92,9 +106,17 @@ export async function listSuppliers(
       signal: opts?.signal,
     })
   );
-  return {
-    rows: data?.data?.suppliers ?? [],
-    pagination: data?.data?.pagination,
+  
+  return { 
+    rows: data?.data?.suppliers ?? [], 
+    pagination: data?.data?.pagination ?? {
+      page: page,
+      limit: limit,
+      total: 0,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false
+    }
   };
 }
 
@@ -106,21 +128,21 @@ export async function getSupplierById(id: string) {
 }
 
 export async function createSupplier(payload: {
-  name: string;
-  address?: string;
-  email?: string;
-  phone?: string;
+  supplier_name: string;
+  email: string;
+  phone: string;
+  address: string;
   is_active?: boolean;
 }) {
   const body = sanitize(
     {
-      name: payload.name?.trim(),
-      address: payload.address?.trim(),
+      supplier_name: payload.supplier_name?.trim(),
       email: payload.email?.trim(),
       phone: payload.phone?.trim(),
+      address: payload.address?.trim(),
       is_active: payload.is_active,
     },
-    ["name", "address", "email", "phone", "is_active"]
+    ["supplier_name", "email", "phone", "address", "is_active"]
   );
 
   const { data } = await with429Retry(() =>
@@ -131,22 +153,22 @@ export async function createSupplier(payload: {
 
 export async function updateSupplier(payload: {
   id: string;
-  name?: string;
-  address?: string;
+  supplier_name?: string;
   email?: string;
   phone?: string;
+  address?: string;
   is_active?: boolean;
 }) {
   const body = sanitize(
     {
       id: payload.id,
-      name: payload.name?.trim(),
-      address: payload.address?.trim(),
+      supplier_name: payload.supplier_name?.trim(),
       email: payload.email?.trim(),
       phone: payload.phone?.trim(),
+      address: payload.address?.trim(),
       is_active: payload.is_active,
     },
-    ["id", "name", "address", "email", "phone", "is_active"]
+    ["id", "supplier_name", "email", "phone", "address", "is_active"]
   );
 
   try {
@@ -162,9 +184,17 @@ export async function updateSupplier(payload: {
   }
 }
 
+type DeleteResponse = {
+  statusCode: number;
+  status: boolean;
+  message: string;
+  heading: string;
+  data: null;
+};
+
 export async function deleteSupplier(id: string) {
   const { data } = await with429Retry(() =>
-    api.delete<SupplierItemResponse>("/suppliers/delete", { data: { id } })
+    api.delete<DeleteResponse>("/suppliers/delete", { data: { id } })
   );
-  return data.data;
+  return data;
 }

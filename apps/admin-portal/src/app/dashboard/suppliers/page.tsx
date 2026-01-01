@@ -50,7 +50,7 @@ import {
 
 type SupplierRow = {
   id: string;
-  name: string;
+  supplier_name: string;
   address: string;
   email: string;
   phone: string;
@@ -106,16 +106,18 @@ export default function SuppliersPage() {
   const canDelete = useHasPermission(ENTITY_PERMS.suppliers.delete);
 
   const normalizeRows = React.useCallback(
-    (suppliers: any[]): SupplierRow[] =>
-      suppliers.map((s) => ({
+    (suppliers: any[]): SupplierRow[] => {
+      if (!Array.isArray(suppliers)) return [];
+      return suppliers.map((s) => ({
         id: s.id,
-        name: s.name,
-        address: s.address ?? "",
-        email: s.email ?? "",
-        phone: s.phone ?? "",
+        supplier_name: s.supplier_name,
+        address: s.address || "",
+        email: s.email || "",
+        phone: s.phone || "",
         active: s.is_active ?? false,
         createdAt: s.created_at,
-      })),
+      }));
+    },
     []
   );
 
@@ -192,10 +194,10 @@ export default function SuppliersPage() {
       setFormMode("view");
       setCurrent({
         id: res.id,
-        name: res.name,
-        address: res.address ?? "",
-        email: res.email ?? "",
-        phone: res.phone ?? "",
+        supplier_name: res.supplier_name,
+        address: res.address,
+        email: res.email,
+        phone: res.phone,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -212,10 +214,10 @@ export default function SuppliersPage() {
       setFormMode("edit");
       setCurrent({
         id: res.id,
-        name: res.name,
-        address: res.address ?? "",
-        email: res.email ?? "",
-        phone: res.phone ?? "",
+        supplier_name: res.supplier_name,
+        address: res.address,
+        email: res.email,
+        phone: res.phone,
         active: res.is_active ?? false,
       });
       setOpenForm(true);
@@ -229,24 +231,28 @@ export default function SuppliersPage() {
     try {
       if (formMode === "create") {
         if (!canCreate) return;
-        await createSupplier({
-          name: data.name,
-          address: data.address || "",
-          email: data.email || "",
-          phone: data.phone || "",
+        const payload = {
+          supplier_name: data.supplier_name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
           is_active: data.active,
-        });
+        };
+        console.log("Creating supplier with payload:", payload);
+        await createSupplier(payload);
         toast.success("Supplier created");
       } else {
         if (!canUpdate) return;
-        await updateSupplier({
+        const payload = {
           id: data.id,
-          name: data.name,
-          address: data.address || "",
-          email: data.email || "",
-          phone: data.phone || "",
+          supplier_name: data.supplier_name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
           is_active: data.active,
-        });
+        };
+        console.log("Updating supplier with payload:", payload);
+        await updateSupplier(payload);
         toast.success("Supplier updated");
       }
 
@@ -254,8 +260,47 @@ export default function SuppliersPage() {
       setOpenForm(false);
       setCurrent(undefined);
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      console.error("Supplier upsert error:", e);
+      console.error("Error response:", e?.response?.data);
+      console.error("Error status:", e?.response?.status);
+      console.error("Error headers:", e?.response?.headers);
+      console.error("Full error object:", e);
+      
+      let errorMessage = "Save failed";
+      
+      // Check for validation errors (which might come as arrays)
+      if (e?.response?.data?.message && Array.isArray(e.response.data.message)) {
+        const validationErrors = e.response.data.message.join(", ");
+        if (validationErrors.includes("already exists") || validationErrors.includes("duplicate")) {
+          errorMessage = "Supplier with this name already exists";
+        } else {
+          errorMessage = validationErrors;
+        }
+      } else {
+        // Check for different possible error message locations
+        let errorMsg = e?.response?.data?.message || 
+                      e?.response?.message || 
+                      e?.message ||
+                      "Unknown error occurred";
+        
+        // Handle case where message might be an array
+        if (Array.isArray(errorMsg)) {
+          errorMsg = errorMsg.join(", ");
+        }
+        
+        // Special case: if status is 400 and no message, assume it's validation error
+        if (e?.response?.status === 400 && (!errorMsg || errorMsg === "Unknown error occurred")) {
+          errorMessage = "Supplier with this name already exists";
+        } else if (errorMsg.includes("already exists")) {
+          errorMessage = "Supplier with this name already exists";
+        } else if (e?.response?.status === 400) {
+          errorMessage = errorMsg || "Invalid request data";
+        } else {
+          errorMessage = errorMsg;
+        }
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -329,7 +374,7 @@ export default function SuppliersPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Suppliers</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+              <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="h-9 pl-9 w-full"
@@ -343,7 +388,7 @@ export default function SuppliersPage() {
 
           <CardContent className="px-3 sm:px-6">
             <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-              <Table className="min-w-[980px]">
+              <Table className="min-w-245">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Supplier</TableHead>
@@ -399,7 +444,7 @@ export default function SuppliersPage() {
                                 <Users className="h-4 w-4" />
                               </span>
                               <div className="min-w-0">
-                                <div className="font-medium truncate">{s.name}</div>
+                                <div className="font-medium truncate">{s.supplier_name}</div>
                                 <div className="text-xs text-muted-foreground">
                                   {s.id}
                                 </div>
@@ -534,7 +579,7 @@ export default function SuppliersPage() {
           title="Delete supplier"
           description={
             deleteTarget
-              ? `Are you sure you want to delete supplier “${deleteTarget.name}”? This action cannot be undone.`
+              ? `Are you sure you want to delete supplier "${deleteTarget.supplier_name}"? This action cannot be undone.`
               : "This action cannot be undone."
           }
           confirmText="Delete"
