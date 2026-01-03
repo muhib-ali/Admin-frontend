@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
+import Image from "next/image";
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,24 +33,26 @@ type StoredProduct = {
   sku?: string | null;
   is_active: boolean;
   supplier_id?: string;
+  tax_id?: string;
+  warehouse_id?: string;
   visibility_wholesale?: boolean;
   visibility_retail?: boolean;
 
   selling_price?: string;
   cost?: string;
   freight?: string;
-  tax?: string;
-  discount_percent?: string;
-  discount_start?: string;
-  discount_end?: string;
+  discount?: string;
+  start_discount_date?: string;
+  end_discount_date?: string;
+  total_price?: string;
   bulk_pricing?: BulkPricingRow[];
 
-  warehouse_id?: string;
   weight?: string;
   length?: string;
   width?: string;
   height?: string;
 
+  customer_groups?: { cvg_ids: string[] };
   variants?: {
     options: string[];
     selected: Record<string, boolean>;
@@ -99,10 +102,9 @@ export default function ProductViewPage() {
     const selling = safeNumber(product?.selling_price ?? product?.price ?? 0);
     const cost = safeNumber(product?.cost);
     const freight = safeNumber(product?.freight);
-    const taxPercent = safeNumber(product?.tax);
-    const discountPercent = safeNumber(product?.discount_percent);
+    const discountPercent = safeNumber(product?.discount);
 
-    const totalCost = selling + cost + freight + (selling * taxPercent) / 100;
+    const totalCost = selling + cost + freight;
     const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
 
     return {
@@ -165,6 +167,18 @@ export default function ProductViewPage() {
                   <div className="rounded-lg border p-3">
                     <div className="text-xs text-muted-foreground">Brand</div>
                     <div className="font-medium">{product.brand?.name ?? "—"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">Supplier</div>
+                    <div className="font-medium">{product.supplier_id || "—"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">Tax</div>
+                    <div className="font-medium">{product.tax_id || "—"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">Warehouse</div>
+                    <div className="font-medium">{product.warehouse_id || "—"}</div>
                   </div>
                   <div className="rounded-lg border p-3">
                     <div className="text-xs text-muted-foreground">Stock</div>
@@ -234,12 +248,24 @@ export default function ProductViewPage() {
                     <div className="font-medium">{safeNumber(product.freight).toFixed(2)}</div>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">Tax (%)</div>
-                    <div className="font-medium">{product.tax ?? "0"}</div>
+                    <div className="text-xs text-muted-foreground">Tax ID</div>
+                    <div className="font-medium">{product.tax_id || "—"}</div>
                   </div>
                   <div className="rounded-lg border p-3">
                     <div className="text-xs text-muted-foreground">Discount (%)</div>
-                    <div className="font-medium">{product.discount_percent || "0"}</div>
+                    <div className="font-medium">{product.discount || "0"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">Start Date</div>
+                    <div className="font-medium">{product.start_discount_date || "—"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">End Date</div>
+                    <div className="font-medium">{product.end_discount_date || "—"}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground">Total Price</div>
+                    <div className="font-medium">{product.total_price || "—"}</div>
                   </div>
                 </div>
 
@@ -303,17 +329,19 @@ export default function ProductViewPage() {
                           className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
                         >
                           {m.kind === "image" ? (
-                            <img
+                            <Image
                               src={m.url}
                               alt={m.name}
                               className="h-full w-full object-cover"
-                              loading="lazy"
+                              width={128}
+                              height={96}
                             />
                           ) : (
                             <video
                               src={m.url}
                               className="h-full w-full object-cover"
                               controls
+                              muted
                             />
                           )}
                         </div>
