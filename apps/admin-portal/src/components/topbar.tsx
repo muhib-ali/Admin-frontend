@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,9 +32,85 @@ type TopbarProps = {
 
 export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, className }: TopbarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const { data: session } = useSession();
-  const user = session?.user;
+  const { data: session, update } = useSession();
+  const [localUser, setLocalUser] = React.useState<any>(null);
   const router = useRouter();
+
+  // Get user from localStorage as fallback
+  React.useEffect(() => {
+    const getUserFromStorage = () => {
+      try {
+        const s = localStorage.getItem("user");
+        return s ? JSON.parse(s) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const storedUser = getUserFromStorage();
+    setLocalUser(storedUser);
+  }, []);
+
+  // Use localUser first (updated by events), fallback to session user
+  const user = localUser || session?.user;
+
+  // Debug: Log session data changes
+  useEffect(() => {
+    console.log("Topbar session updated:", session);
+    console.log("Topbar localUser:", localUser);
+    console.log("Topbar final user:", user);
+  }, [session, localUser, user]);
+
+  // Listen for profile updates
+  useEffect(() => {
+    console.log("Setting up profile update event listener");
+    
+    const handleProfileUpdate = (event: CustomEvent) => {
+      console.log('🔥 Profile update event received!', event.detail);
+      
+      // Update localStorage immediately
+      const updatedUser = event.detail.user;
+      console.log('🔥 Updating localStorage with:', updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setLocalUser(updatedUser);
+      
+      // Also try to update NextAuth session
+      console.log('🔥 Attempting NextAuth session update...');
+      update().then((newSession) => {
+        console.log("🔥 Session after update:", newSession);
+      }).catch((err) => {
+        console.log("🔥 Session update failed, but localStorage updated:", err);
+      });
+    };
+
+    // Add event listener with logging
+    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    console.log("🔥 Event listener added for profileUpdated");
+    
+    return () => {
+      console.log("🔥 Cleaning up profile update event listener");
+      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    };
+  }, [update]);
+
+  // Also listen for storage changes as backup
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user') {
+        console.log('🔥 Storage change detected for user key');
+        try {
+          const newUser = JSON.parse(e.newValue || '{}');
+          setLocalUser(newUser);
+          console.log('🔥 Updated localUser from storage change:', newUser);
+        } catch (err) {
+          console.error('🔥 Error parsing storage change:', err);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const handleLogout = async () => {
     try {
