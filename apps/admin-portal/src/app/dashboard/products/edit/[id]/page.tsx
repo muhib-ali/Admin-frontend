@@ -565,7 +565,7 @@ export default function ProductEditPage() {
             value: variantValues[key].trim(),
           };
         })
-        .filter((v): v is { vtype_id: string; value: string } => v !== null && Boolean(v.vtype_id) && v.vtype_id.trim() !== "");
+        .filter((v): v is { vtype_id: string; value: string } => v !== null && v.vtype_id !== null && v.vtype_id !== undefined && v.vtype_id.trim() !== "");
       
       // Update product to remove the variant
       try {
