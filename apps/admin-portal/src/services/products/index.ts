@@ -298,7 +298,7 @@ export async function listProducts(
 
 export async function getProductById(id: string) {
   const { data } = await with429Retry(() =>
-    api.get<ProductItemResponse>(`/products/getById/${id}`)
+    api.get<any>(`/products/getById/${id}`)
   );
   return data.data;
 }
