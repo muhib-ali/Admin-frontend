@@ -129,12 +129,19 @@ export default function SupplierFormDialog({
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div>
-              <Label className="mb-0">Status</Label>
-              <p className="text-xs text-muted-foreground">Is Active</p>
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Is Active</p>
+              </div>
+              <Switch
+                checked={active}
+                onCheckedChange={setActive}
+                disabled={isReadOnly}
+                className="data-[state=checked]:bg-green-600"
+              />
             </div>
-            <Switch checked={active} onCheckedChange={setActive} disabled={isReadOnly} />
           </div>
         </div>
 

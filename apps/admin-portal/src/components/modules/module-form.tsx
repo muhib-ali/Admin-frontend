@@ -139,7 +139,11 @@ export default function ModuleFormDialog({
                 Enable this module for use
               </p>
             </div>
-            <Switch checked={active} onCheckedChange={setActive} />
+            <Switch
+              checked={active}
+              onCheckedChange={setActive}
+              className="data-[state=checked]:bg-green-600"
+            />
           </div>
         </div>
 
