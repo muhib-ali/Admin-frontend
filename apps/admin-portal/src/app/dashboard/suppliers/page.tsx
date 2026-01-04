@@ -392,7 +392,6 @@ export default function SuppliersPage() {
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Supplier</TableHead>
-                    <TableHead>Address</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Status</TableHead>
@@ -406,7 +405,7 @@ export default function SuppliersPage() {
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="p-8 text-center text-muted-foreground"
                       >
                         Loading suppliers…
@@ -415,7 +414,7 @@ export default function SuppliersPage() {
                   ) : !canList ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="p-8 text-center text-muted-foreground"
                       >
                         You don't have permission to view suppliers.
@@ -424,7 +423,7 @@ export default function SuppliersPage() {
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="p-8 text-center text-muted-foreground"
                       >
                         No suppliers found.
@@ -445,15 +444,8 @@ export default function SuppliersPage() {
                               </span>
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{s.supplier_name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {s.id}
-                                </div>
                               </div>
                             </div>
-                          </TableCell>
-
-                          <TableCell className="text-sm text-muted-foreground">
-                            {s.address || "—"}
                           </TableCell>
 
                           <TableCell className="text-sm text-muted-foreground">

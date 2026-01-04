@@ -7,31 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSession } from "next-auth/react";
 
-type Errors = Partial<Record<"name" | "email" | "phone", string>>;
+type Errors = Partial<Record<"name" | "password" | "newPassword", string>>;
 
 export default function ProfileSettingsPage() {
   const { data: session } = useSession();
   const user = session?.user as any;
 
   const [name, setName] = React.useState<string>(user?.name ?? "");
-  const [email, setEmail] = React.useState<string>(user?.email ?? "");
-  const [phone, setPhone] = React.useState<string>(user?.phone ?? "");
+  const [password, setPassword] = React.useState("");
+  const [newPassword, setNewPassword] = React.useState("");
 
   const [saving, setSaving] = React.useState(false);
   const [errors, setErrors] = React.useState<Errors>({});
 
   React.useEffect(() => {
     setName(user?.name ?? "");
-    setEmail(user?.email ?? "");
-    setPhone(user?.phone ?? "");
-  }, [user?.name, user?.email, user?.phone]);
+  }, [user?.name]);
 
   const validate = (): Errors => {
     const e: Errors = {};
     if (!name.trim()) e.name = "Name is required";
-    if (!email.trim()) e.email = "Email is required";
-    else if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = "Enter a valid email";
-    if (phone.trim() && !/^[+\d\s()-]{7,}$/.test(phone.trim())) e.phone = "Enter a valid phone number";
+    if (!password) e.password = "Password is required";
+    if (!newPassword) e.newPassword = "New password is required";
+    else if (newPassword.length < 8) e.newPassword = "Password must be at least 8 characters";
     return e;
   };
 
@@ -69,15 +67,27 @@ export default function ProfileSettingsPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="ps-email">Email</Label>
-              <Input id="ps-email" type="email" className="h-10" value={email} onChange={(e) => setEmail(e.target.value)} />
-              {errors.email ? <p className="text-xs text-red-600">{errors.email}</p> : null}
+              <Label htmlFor="ps-password">Password</Label>
+              <Input
+                id="ps-password"
+                type="password"
+                className="h-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {errors.password ? <p className="text-xs text-red-600">{errors.password}</p> : null}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="ps-phone">Phone</Label>
-              <Input id="ps-phone" className="h-10" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
-              {errors.phone ? <p className="text-xs text-red-600">{errors.phone}</p> : null}
+              <Label htmlFor="ps-new-password">New Password</Label>
+              <Input
+                id="ps-new-password"
+                type="password"
+                className="h-10"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              {errors.newPassword ? <p className="text-xs text-red-600">{errors.newPassword}</p> : null}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

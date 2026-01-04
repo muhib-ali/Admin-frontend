@@ -182,6 +182,7 @@ export default function NewProductPage() {
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
   const [uploadProgress, setUploadProgress] = React.useState<{ featured: number; gallery: number; video: number }>({ featured: 0, gallery: 0, video: 0 });
+  const imageProgress = Math.max(uploadProgress.featured, uploadProgress.gallery);
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
@@ -1282,16 +1283,16 @@ export default function NewProductPage() {
               {/* Upload Progress */}
               {isUploading && (
                 <div className="mt-4 space-y-2">
-                  {uploadProgress.images > 0 && (
+                  {imageProgress > 0 && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span>Uploading images...</span>
-                        <span>{uploadProgress.images}%</span>
+                        <span>{imageProgress}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress.images}%` }}
+                          style={{ width: `${imageProgress}%` }}
                         />
                       </div>
                     </div>

@@ -10,6 +10,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Eye,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -386,7 +387,6 @@ export default function WarehousesPage() {
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Warehouse</TableHead>
                     <TableHead>Code</TableHead>
-                    <TableHead>Address</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                     <TableHead className="text-right rounded-tr-xl">Actions</TableHead>
@@ -396,7 +396,7 @@ export default function WarehousesPage() {
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="p-8 text-center text-muted-foreground"
                       >
                         Loading warehouses…
@@ -405,7 +405,7 @@ export default function WarehousesPage() {
                   ) : !canList ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="p-8 text-center text-muted-foreground"
                       >
                         You don't have permission to view warehouses.
@@ -414,7 +414,7 @@ export default function WarehousesPage() {
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="p-8 text-center text-muted-foreground"
                       >
                         No warehouses found.
@@ -435,24 +435,12 @@ export default function WarehousesPage() {
                               </span>
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{w.name}</div>
-                                <button
-                                  type="button"
-                                  onClick={() => openView(w)}
-                                  className="text-xs text-muted-foreground text-left"
-                                  disabled={!canRead}
-                                >
-                                  {w.id}
-                                </button>
                               </div>
                             </div>
                           </TableCell>
 
                           <TableCell className="text-sm text-muted-foreground">
-                            {w.code || "—"}
-                          </TableCell>
-
-                          <TableCell className="text-sm text-muted-foreground">
-                            {w.address || "—"}
+                            {w.code || "—" }
                           </TableCell>
 
                           <TableCell>
@@ -478,6 +466,15 @@ export default function WarehousesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
+                                {canRead && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openView(w)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdate && (
                                   <DropdownMenuItem
                                     className="gap-2"

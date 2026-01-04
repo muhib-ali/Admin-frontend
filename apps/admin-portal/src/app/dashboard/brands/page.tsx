@@ -332,11 +332,11 @@ export default function BrandsPage() {
               <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
-                    <TableHead className="rounded-tl-xl">Brand</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead className="text-right rounded-tr-xl">Actions</TableHead>
+                    <TableHead className="rounded-tl-xl px-4 py-3">Brand</TableHead>
+                    <TableHead className="px-4 py-3">Description</TableHead>
+                    <TableHead className="px-4 py-3">Status</TableHead>
+                    <TableHead className="px-4 py-3">Created At</TableHead>
+                    <TableHead className="text-right rounded-tr-xl px-4 py-3">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -363,29 +363,30 @@ export default function BrandsPage() {
                       const isLast = idx === rows.length - 1;
                       return (
                         <TableRow key={b.id} className="odd:bg-muted/30 even:bg-white hover:bg-transparent">
-                          <TableCell className={isLast ? "rounded-bl-xl" : ""}>
+                          <TableCell className={`${isLast ? "rounded-bl-xl" : ""} px-4 py-3`}>
                             <div className="flex items-center gap-3">
                               <span className="grid h-9 w-9 place-items-center rounded-md bg-muted">
                                 <Tags className="h-4 w-4" />
                               </span>
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{b.name}</div>
-                                <div className="text-xs text-muted-foreground">{b.id}</div>
                               </div>
                             </div>
                           </TableCell>
 
-                          <TableCell className="text-sm text-muted-foreground">
+                          <TableCell className="text-sm text-muted-foreground px-4 py-3">
                             {b.description || "—"}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className="px-4 py-3">
                             <StatusBadge active={b.active} />
                           </TableCell>
 
-                          <TableCell className="text-sm text-muted-foreground">{renderCreatedAt(b.createdAt)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground px-4 py-3">
+                            {renderCreatedAt(b.createdAt)}
+                          </TableCell>
 
-                          <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""}`}>
+                          <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""} px-4 py-3`}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions">

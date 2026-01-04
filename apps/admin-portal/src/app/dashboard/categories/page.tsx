@@ -332,28 +332,29 @@ export default function CategoriesPage() {
               <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
-                    <TableHead className="rounded-tl-xl">Category</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead className="text-right rounded-tr-xl">Actions</TableHead>
+                    <TableHead className="rounded-tl-xl px-4 py-3">Category</TableHead>
+                    <TableHead className="px-4 py-3">Description</TableHead>
+                    <TableHead className="px-4 py-3">Status</TableHead>
+                    <TableHead className="px-4 py-3">Created At</TableHead>
+                    <TableHead className="text-right rounded-tr-xl px-4 py-3">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
                         Loading categories…
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
                         You don't have permission to view categories.
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="p-8 text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
                         No categories found.
                       </TableCell>
                     </TableRow>
@@ -365,27 +366,32 @@ export default function CategoriesPage() {
                           key={c.id}
                           className="odd:bg-muted/30 even:bg-white hover:bg-transparent"
                         >
-                          <TableCell className={isLast ? "rounded-bl-xl" : ""}>
+                          <TableCell className={`${isLast ? "rounded-bl-xl" : ""} px-4 py-3`}>
                             <div className="flex items-center gap-3">
                               <span className="grid h-9 w-9 place-items-center rounded-md bg-muted">
                                 <FolderTree className="h-4 w-4" />
                               </span>
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{c.name}</div>
-                                <div className="text-xs text-muted-foreground">{c.id}</div>
                               </div>
                             </div>
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className="px-4 py-3">
+                            <div className="text-sm text-muted-foreground truncate max-w-[200px]">
+                              {c.description || "—"}
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="px-4 py-3">
                             <StatusBadge active={c.active} />
                           </TableCell>
 
-                          <TableCell className="text-sm text-muted-foreground">
+                          <TableCell className="text-sm text-muted-foreground px-4 py-3">
                             {renderCreatedAt(c.createdAt)}
                           </TableCell>
 
-                          <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""}`}>
+                          <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""} px-4 py-3`}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions">
