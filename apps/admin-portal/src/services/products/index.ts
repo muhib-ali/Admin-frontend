@@ -20,6 +20,8 @@ type ProductItem = {
   updated_at: string;
   category?: any;
   brand?: any;
+  freight?: number;
+  cost?: number;
 };
 
 type ProductsListResponse = {
@@ -328,6 +330,8 @@ export async function createProduct(payload: {
   variants?: { vtype_id: string; value: string; product_id?: string }[];
   customer_groups?: { cvg_ids: string[] };
   bulk_prices?: { quantity: number; price_per_product: number }[];
+  freight?: number;
+  cost?: number;
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -377,6 +381,8 @@ export async function updateProduct(payload: {
   variants?: { vtype_id: string; value: string; product_id?: string }[];
   customer_groups?: { cvg_ids: string[] };
   bulk_prices?: { quantity: number; price_per_product: number }[];
+  freight?: number;
+  cost?: number;
 }) {
   try {
     const { data } = await with429Retry(() =>
