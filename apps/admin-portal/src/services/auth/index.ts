@@ -91,6 +91,45 @@ export const authService = {
     );
   },
 
+  async updateProfile(profileData: {
+    name?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) {
+    console.log("Auth service updateProfile called with:", profileData);
+    
+    // Validate that at least one field is provided
+    if (!profileData.name && !profileData.newPassword) {
+      throw new Error("At least one field (name or password) must be provided for update");
+    }
+
+    // Only include provided fields in the request
+    const requestData: any = {};
+    if (profileData.name) requestData.name = profileData.name;
+    if (profileData.currentPassword) requestData.currentPassword = profileData.currentPassword;
+    if (profileData.newPassword) requestData.newPassword = profileData.newPassword;
+
+    console.log("Sending request data:", requestData);
+
+    const { data } = await api.put("/auth/profile", requestData);
+    
+    console.log("API response received:", data);
+    
+    // Update user data in localStorage if profile was updated successfully
+    if (data.status && data.data) {
+      const currentUser = this.getUser();
+      console.log("Current user from localStorage:", currentUser);
+      
+      if (currentUser) {
+        const updatedUser = { ...currentUser, ...data.data };
+        console.log("Updated user to save:", updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+    }
+    
+    return data;
+  },
+
   getMenuPermissions() {
     const permissions = this.getPermissions();
     const menuItems: any[] = [];
