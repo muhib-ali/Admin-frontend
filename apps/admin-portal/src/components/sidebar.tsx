@@ -20,6 +20,7 @@ import {
   BadgePercent,
   Boxes,
   Box,
+  TicketPercent,
   ShieldCheck,
   Shield,
   LogOut,
@@ -42,6 +43,7 @@ const ICONS = {
   Coins,
   Boxes,
   Box,
+  TicketPercent,
   ShieldCheck,
   Shield,
   LogOut,
@@ -57,6 +59,7 @@ export const nav = [
   { href: "/dashboard/customers", label: "Customers", icon: "Users" as IconName },
   { href: "/dashboard/products", label: "Products", icon: "Package" as IconName },
   { href: "/dashboard/warehouses", label: "Warehouses", icon: "Box" as IconName },
+  { href: "/dashboard/promo-codes", label: "Promo Codes", icon: "TicketPercent" as IconName },
 ];
 
 export const nav_admin = [

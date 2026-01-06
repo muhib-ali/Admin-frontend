@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -32,7 +39,7 @@ import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-type OrderStatus = "Pending" | "Processing" | "Shipped" | "Delivered";
+type OrderStatus = "Pending" | "Accepted" | "Rejected";
 
 type OrderRow = {
   id: string;
@@ -57,7 +64,7 @@ const DUMMY_ORDERS: OrderRow[] = [
     customer: "Customer A",
     items: 1,
     total: 39.5,
-    status: "Processing",
+    status: "Accepted",
     createdAt: "2025-12-16T12:05:00Z",
   },
   {
@@ -65,7 +72,7 @@ const DUMMY_ORDERS: OrderRow[] = [
     customer: "Customer B",
     items: 5,
     total: 389,
-    status: "Shipped",
+    status: "Rejected",
     createdAt: "2025-12-16T15:42:00Z",
   },
   {
@@ -73,7 +80,7 @@ const DUMMY_ORDERS: OrderRow[] = [
     customer: "Customer C",
     items: 2,
     total: 89.99,
-    status: "Delivered",
+    status: "Accepted",
     createdAt: "2025-12-15T09:20:00Z",
   },
   {
@@ -81,7 +88,7 @@ const DUMMY_ORDERS: OrderRow[] = [
     customer: "Customer D",
     items: 4,
     total: 219.0,
-    status: "Processing",
+    status: "Pending",
     createdAt: "2025-12-14T18:11:00Z",
   },
   {
@@ -97,7 +104,7 @@ const DUMMY_ORDERS: OrderRow[] = [
     customer: "Customer F",
     items: 2,
     total: 74.75,
-    status: "Shipped",
+    status: "Rejected",
     createdAt: "2025-12-12T14:09:00Z",
   },
 ];
@@ -121,9 +128,8 @@ function nextOrderId(existing: OrderRow[]) {
 function StatusBadge({ status }: { status: OrderStatus }) {
   const map: Record<OrderStatus, string> = {
     Pending: "bg-amber-500/10 text-amber-700",
-    Processing: "bg-sky-500/10 text-sky-700",
-    Shipped: "bg-indigo-500/10 text-indigo-700",
-    Delivered: "bg-emerald-500/10 text-emerald-700",
+    Accepted: "bg-emerald-500/10 text-emerald-700",
+    Rejected: "bg-rose-500/10 text-rose-700",
   };
   return (
     <Badge variant="secondary" className={map[status]}>
@@ -139,6 +145,9 @@ export default function OrdersPage() {
   const [orders, setOrders] = React.useState<OrderRow[]>(DUMMY_ORDERS);
 
   const [query, setQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<"All" | OrderStatus>(
+    "All"
+  );
   const [page, setPage] = React.useState(1);
   const limit = 5;
 
@@ -161,17 +170,35 @@ export default function OrdersPage() {
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter((o) =>
-      [o.id, o.customer, o.status].some((v) =>
-        String(v).toLowerCase().includes(q)
-      )
-    );
-  }, [query, orders]);
+    const byQuery = !q
+      ? orders
+      : orders.filter((o) =>
+          [o.id, o.customer, o.status].some((v) =>
+            String(v).toLowerCase().includes(q)
+          )
+        );
+
+    if (statusFilter === "All") return byQuery;
+    return byQuery.filter((o) => o.status === statusFilter);
+  }, [query, orders, statusFilter]);
 
   React.useEffect(() => {
     setPage(1);
-  }, [query]);
+  }, [query, statusFilter]);
+
+  const setOrderStatus = (id: string, next: OrderStatus) => {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: next } : o)));
+  };
+
+  const acceptOrder = (id: string) => {
+    setOrderStatus(id, "Accepted");
+    toast.success("Order accepted");
+  };
+
+  const rejectOrder = (id: string) => {
+    setOrderStatus(id, "Rejected");
+    toast.success("Order rejected");
+  };
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -286,14 +313,31 @@ export default function OrdersPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Orders</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="h-9 pl-9 w-full"
-                  placeholder="Search orders..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:items-center">
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as any)}
+                >
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Accepted">Accepted</SelectItem>
+                    <SelectItem value="Rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="h-9 pl-9 w-full"
+                    placeholder="Search orders..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -360,39 +404,57 @@ export default function OrdersPage() {
                           <TableCell
                             className={`text-right ${isLast ? "rounded-br-xl" : ""}`}
                           >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  aria-label="More actions"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openView(o)}
-                                >
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => openEdit(o)}
-                                >
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="gap-2 text-destructive"
-                                  onClick={() => requestDelete(o)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => rejectOrder(o.id)}
+                                disabled={o.status !== "Pending"}
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => acceptOrder(o.id)}
+                                disabled={o.status !== "Pending"}
+                              >
+                                Accept
+                              </Button>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label="More actions"
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => openView(o)}
+                                  >
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => openEdit(o)}
+                                  >
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="gap-2 text-destructive"
+                                    onClick={() => requestDelete(o)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -465,10 +527,10 @@ export default function OrdersPage() {
                           status: e.target.value as OrderStatus,
                         }))
                       }
-                      placeholder="Pending / Processing / Shipped / Delivered"
+                      placeholder="Pending / Accepted / Rejected"
                     />
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Allowed: Pending, Processing, Shipped, Delivered
+                      Allowed: Pending, Accepted, Rejected
                     </div>
                   </div>
                 </div>
