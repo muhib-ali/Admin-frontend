@@ -56,6 +56,7 @@ export const nav = [
   { href: "/dashboard/clients", label: "Clients", icon: "Users" as IconName },
   { href: "/dashboard/customers", label: "Customers", icon: "Users" as IconName },
   { href: "/dashboard/products", label: "Products", icon: "Package" as IconName },
+  { href: "/dashboard/warehouses", label: "Warehouses", icon: "Box" as IconName },
 ];
 
 export const nav_admin = [
@@ -93,7 +94,6 @@ export default function Sidebar({ collapsed = false }: Props) {
       categories: ADMIN_LINK_PERM["/dashboard/categories"],
       brands: ADMIN_LINK_PERM["/dashboard/brands"],
       products: ADMIN_LINK_PERM["/dashboard/products"],
-      warehouses: ADMIN_LINK_PERM["/dashboard/warehouses"],
     }),
     []
   );
@@ -101,9 +101,8 @@ export default function Sidebar({ collapsed = false }: Props) {
   const canSeeCategories = useHasPermission(productMgmtPerms.categories);
   const canSeeBrands = useHasPermission(productMgmtPerms.brands);
   const canSeeProducts = useHasPermission(productMgmtPerms.products);
-  const canSeeWarehouses = useHasPermission(productMgmtPerms.warehouses);
   const canSeeProductMgmt =
-    canSeeCategories || canSeeBrands || canSeeProducts || canSeeWarehouses;
+    canSeeCategories || canSeeBrands || canSeeProducts;
 
   const [orderMgmtOpen, setOrderMgmtOpen] = React.useState(false);
   const [productMgmtOpen, setProductMgmtOpen] = React.useState(false);
@@ -141,8 +140,7 @@ export default function Sidebar({ collapsed = false }: Props) {
     if (
       pathname.startsWith("/dashboard/categories") ||
       pathname.startsWith("/dashboard/brands") ||
-      pathname.startsWith("/dashboard/products") ||
-      pathname.startsWith("/dashboard/warehouses")
+      pathname.startsWith("/dashboard/products")
     ) {
       setProductMgmtOpen(true);
     }
@@ -300,8 +298,7 @@ export default function Sidebar({ collapsed = false }: Props) {
                     "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     (pathname?.startsWith("/dashboard/categories") ||
                       pathname?.startsWith("/dashboard/brands") ||
-                      pathname?.startsWith("/dashboard/products") ||
-                      pathname?.startsWith("/dashboard/warehouses"))
+                      pathname?.startsWith("/dashboard/products"))
                       ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
                       : "text-gray-400 hover:bg-zinc-900 hover:text-white"
                   )}
@@ -312,8 +309,7 @@ export default function Sidebar({ collapsed = false }: Props) {
                         "h-5 w-5 shrink-0 transition-colors",
                         pathname?.startsWith("/dashboard/categories") ||
                           pathname?.startsWith("/dashboard/brands") ||
-                          pathname?.startsWith("/dashboard/products") ||
-                          pathname?.startsWith("/dashboard/warehouses")
+                          pathname?.startsWith("/dashboard/products")
                           ? "text-red-600"
                           : "text-gray-400 group-hover:text-red-600"
                       )}
@@ -396,31 +392,6 @@ export default function Sidebar({ collapsed = false }: Props) {
                           )}
                         />
                         <span className="truncate">Products</span>
-                      </Link>
-                    </PermissionGate>
-
-                    <PermissionGate route={productMgmtPerms.warehouses} fallback={null}>
-                      <Link
-                        href="/dashboard/warehouses"
-                        onClick={(e) =>
-                          handleNavigation(e, "/dashboard/warehouses")
-                        }
-                        className={cn(
-                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
-                          pathname?.startsWith("/dashboard/warehouses")
-                            ? "bg-zinc-900 text-white"
-                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
-                        )}
-                      >
-                        <Box
-                          className={cn(
-                            "h-4 w-4 shrink-0 transition-colors",
-                            pathname?.startsWith("/dashboard/warehouses")
-                              ? "text-red-600"
-                              : "text-gray-500 group-hover:text-red-600"
-                          )}
-                        />
-                        <span className="truncate">Warehouses</span>
                       </Link>
                     </PermissionGate>
                   </div>

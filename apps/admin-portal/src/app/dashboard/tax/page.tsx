@@ -433,15 +433,12 @@ export default function TaxPage() {
                                 <div className="font-medium truncate">
                                   {t.title}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {t.id}
-                                </div>
                               </div>
                             </div>
                           </TableCell>
 
                           <TableCell className="text-sm">
-                            {Number.isFinite(t.rate) ? `${t.rate}%` : "—"}
+                            {Number.isFinite(t.rate) ? `${t.rate}%` : "—" }
                           </TableCell>
 
                           <TableCell>

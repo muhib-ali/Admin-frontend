@@ -182,6 +182,7 @@ export default function NewProductPage() {
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
   const [uploadProgress, setUploadProgress] = React.useState<{ featured: number; gallery: number; video: number }>({ featured: 0, gallery: 0, video: 0 });
+  const imageProgress = Math.max(uploadProgress.featured, uploadProgress.gallery);
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
