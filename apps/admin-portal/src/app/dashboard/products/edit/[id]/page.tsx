@@ -894,6 +894,8 @@ export default function ProductEditPage() {
         length: values.length ? Number(values.length) : undefined,
         width: values.width ? Number(values.width) : undefined,
         height: values.height ? Number(values.height) : undefined,
+        cost: cost > 0 ? cost : undefined,
+        freight: freight > 0 ? freight : undefined,
         customer_groups: values.customer_groups && values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: selectedVariantKeys
           .filter((key: string) => variantValues[key]?.trim()) // Only include variants with values

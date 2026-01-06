@@ -544,6 +544,8 @@ export default function NewProductPage() {
         length: values.length ? Number(values.length) : undefined,
         width: values.width ? Number(values.width) : undefined,
         height: values.height ? Number(values.height) : undefined,
+        cost: cost > 0 ? cost : undefined,
+        freight: freight > 0 ? freight : undefined,
         customer_groups: values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: variantsData.length > 0 ? variantsData : undefined,
         bulk_prices: bulkPricing
@@ -1282,16 +1284,16 @@ export default function NewProductPage() {
               {/* Upload Progress */}
               {isUploading && (
                 <div className="mt-4 space-y-2">
-                  {uploadProgress.images > 0 && (
+                  {uploadProgress.gallery > 0 && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span>Uploading images...</span>
-                        <span>{uploadProgress.images}%</span>
+                        <span>{uploadProgress.gallery}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress.images}%` }}
+                          style={{ width: `${uploadProgress.gallery}%` }}
                         />
                       </div>
                     </div>
