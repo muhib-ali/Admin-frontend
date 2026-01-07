@@ -104,6 +104,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             refresh_token: apiRefresh,
             expires_at: apiExpires,
             permissionsCompact: compactModules,
+            // Store user data and permissions in localStorage for components that rely on it
+            userData: apiUser,
+            permissionsData: apiModules,
           };
         } catch (error: any) {
           console.error("Auth error:", error);
@@ -127,6 +130,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         extendedToken.expiresAt = (user as any).expires_at;
         extendedToken.permissionsCompact =
           (user as any).permissionsCompact || [];
+        
+        // Update localStorage with new user data when logging in
+        if (typeof window !== 'undefined' && (user as any).userData) {
+          console.log('🔄 Updating localStorage with new user data on login');
+          localStorage.setItem("user", JSON.stringify((user as any).userData));
+          localStorage.setItem("permissions", JSON.stringify((user as any).permissionsData || []));
+          
+          // Dispatch event to notify components of user data change
+          window.dispatchEvent(new CustomEvent('userLoggedIn', {
+            detail: { user: (user as any).userData, permissions: (user as any).permissionsData || [] }
+          }));
+        }
+        
         return extendedToken;
       }
 

@@ -25,6 +25,7 @@ import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, ge
 import { createVariantType, deleteVariantType } from "@/services/variant-types";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
+import { useCurrency, Country } from "@/contexts/currency-context";
 
 type Option = { id: string; name: string };
 
@@ -116,6 +117,10 @@ function fileToDataUrl(file: File): Promise<string> {
 export default function NewProductPage() {
   const router = useRouter();
   const canCreate = useHasPermission(ENTITY_PERMS.products.create);
+  const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
+
+  // Ref to track previous country to prevent infinite loops
+  const previousCountryRef = React.useRef<Country | null>(null);
 
   const [categories, setCategories] = React.useState<Option[]>([]);
   const [brands, setBrands] = React.useState<Option[]>([]);
@@ -140,7 +145,7 @@ export default function NewProductPage() {
     is_active: true,
 
     selling_price: "",
-    currency: "USD",
+    currency: getCurrencyCode(),
     cost: "",
     freight: "",
     discount: "",
@@ -226,6 +231,56 @@ export default function NewProductPage() {
 
     return () => ac.abort();
   }, []);
+
+  // Update form values when selected country changes
+  React.useEffect(() => {
+    if (!selectedCountry) return;
+
+    const targetCurrency = Object.keys(selectedCountry.currencies)[0];
+    const sourceCurrency = values.currency;
+    
+    // Only update if currency is different from current
+    if (sourceCurrency === targetCurrency) return;
+
+    console.log('🔄 Converting prices from', sourceCurrency, 'to', targetCurrency);
+
+    const convertField = async (value: string): Promise<string> => {
+      const numValue = Number(value) || 0;
+      if (numValue === 0) return value;
+      
+      try {
+        const converted = await convertAmount(numValue, sourceCurrency, targetCurrency);
+        return String(converted);
+      } catch (error) {
+        console.error('Error converting field value:', error);
+        return value;
+      }
+    };
+
+    const updatePrices = async () => {
+      const updatedValues = {
+        ...values,
+        currency: targetCurrency,
+        selling_price: await convertField(values.selling_price),
+        cost: await convertField(values.cost),
+        freight: await convertField(values.freight),
+        total_price: await convertField(values.total_price),
+      };
+
+      setValues(updatedValues);
+
+      // Update bulk pricing
+      const updatedBulkPricing = await Promise.all(
+        bulkPricing.map(async (row) => ({
+          ...row,
+          price: await convertField(row.price),
+        }))
+      );
+      setBulkPricing(updatedBulkPricing);
+    };
+
+    updatePrices();
+  }, [selectedCountry?.cca2]);
 
   // Cleanup blob URLs
   React.useEffect(() => {
@@ -503,6 +558,30 @@ export default function NewProductPage() {
         ? totalCost - (totalCost * discountPercent) / 100 
         : totalCost;
 
+      // Convert prices to USD for backend storage
+      const sourceCurrency = getCurrencyCode();
+      const targetCurrency = 'USD';
+      
+      let convertedPrice = basePrice;
+      let convertedCost = cost;
+      let convertedFreight = freight;
+      let convertedTotalPrice = priceAfterDiscount;
+
+      if (sourceCurrency !== targetCurrency) {
+        try {
+          [convertedPrice, convertedCost, convertedFreight, convertedTotalPrice] = await Promise.all([
+            convertAmount(basePrice, sourceCurrency, targetCurrency),
+            convertAmount(cost, sourceCurrency, targetCurrency),
+            convertAmount(freight, sourceCurrency, targetCurrency),
+            convertAmount(priceAfterDiscount, sourceCurrency, targetCurrency),
+          ]);
+        } catch (error) {
+          console.error('Currency conversion failed:', error);
+          setUploadErrors(prev => [...prev, 'Currency conversion failed. Please try again.']);
+          return;
+        }
+      }
+
       // Prepare variants data
       const variantsData = selectedVariantKeys
         .filter(key => variantValues[key]?.trim()) // Only include variants with values
@@ -528,11 +607,11 @@ export default function NewProductPage() {
       const productData = {
         title: values.title.trim(),
         description: values.description.trim(),
-        price: basePrice,
+        price: convertedPrice,
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
         brand_id: values.brand_id,
-        currency: values.currency,
+        currency: targetCurrency, // Always store as USD
         is_active: Boolean(values.is_active),
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
@@ -540,21 +619,30 @@ export default function NewProductPage() {
         discount: discountPercent > 0 ? discountPercent : undefined,
         start_discount_date: values.start_discount_date || undefined,
         end_discount_date: values.end_discount_date || undefined,
-        total_price: priceAfterDiscount,
+        total_price: convertedTotalPrice,
         weight: values.weight ? Number(values.weight) : undefined,
         length: values.length ? Number(values.length) : undefined,
         width: values.width ? Number(values.width) : undefined,
         height: values.height ? Number(values.height) : undefined,
-        cost: cost > 0 ? cost : undefined,
-        freight: freight > 0 ? freight : undefined,
+        cost: convertedCost > 0 ? convertedCost : undefined,
+        freight: convertedFreight > 0 ? convertedFreight : undefined,
         customer_groups: values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: variantsData.length > 0 ? variantsData : undefined,
-        bulk_prices: bulkPricing
-          .filter(row => row.quantity && row.price)
-          .map(row => ({
-            quantity: Number(row.quantity),
-            price_per_product: Number(row.price),
-          })),
+        bulk_prices: await Promise.all(
+          bulkPricing
+            .filter(row => row.quantity && row.price)
+            .map(async (row) => {
+              const bulkPrice = Number(row.price);
+              const convertedBulkPrice = sourceCurrency !== targetCurrency 
+                ? await convertAmount(bulkPrice, sourceCurrency, targetCurrency)
+                : bulkPrice;
+              
+              return {
+                quantity: Number(row.quantity),
+                price_per_product: convertedBulkPrice,
+              };
+            })
+          ),
       };
 
       // Create product first
@@ -616,7 +704,7 @@ export default function NewProductPage() {
   };
 
   return (
-    <PermissionBoundary screen="/dashboard/products" mode="block">
+    <PermissionBoundary screen="/dashboard/products/new" mode="block">
       <div className="space-y-6 scrollbar-stable">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -903,21 +991,21 @@ export default function NewProductPage() {
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label>Currency</Label>
-                    <Select
-                      value={values.currency}
-                      onValueChange={(v) => setValues((p) => ({ ...p, currency: v }))}
-                    >
-                      <SelectTrigger className="h-10 w-full">
-                        <SelectValue placeholder="Choose currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="PKR">PKR</SelectItem>
-                        <SelectItem value="AED">AED</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency" className="text-sm font-medium text-gray-700">
+                      Currency
+                    </Label>
+                    <Input
+                      id="currency"
+                      name="currency"
+                      value={getCurrencyCode()}
+                      readOnly
+                      className="bg-gray-100 cursor-not-allowed"
+                      placeholder="Currency will be set based on your selection"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Currency is automatically set based on your global selection
+                    </p>
                   </div>
 
                   <div className="grid gap-2">

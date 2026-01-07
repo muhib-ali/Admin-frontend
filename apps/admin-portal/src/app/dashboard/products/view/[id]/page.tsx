@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as productsService from "@/services/products";
 import { toast } from "react-toastify";
 import { getAllWarehousesDropdown, getAllSuppliersDropdown, getAllVariantTypesDropdown, getAllTaxesDropdown } from "@/services/dropdowns";
+import { useCurrency } from "@/contexts/currency-context";
 
 type StoredProduct = {
   id: string;
@@ -70,6 +71,7 @@ export default function ProductViewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = String(params?.id ?? "");
+  const { selectedCountry, convertAmount, getCurrencySymbol } = useCurrency();
 
   const [product, setProduct] = React.useState<StoredProduct | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -77,6 +79,72 @@ export default function ProductViewPage() {
   const [suppliers, setSuppliers] = React.useState<Array<{ value: string; label: string }>>([]);
   const [variantTypes, setVariantTypes] = React.useState<Array<{ value: string; label: string }>>([]);
   const [taxes, setTaxes] = React.useState<Array<{ value: string; label: string }>>([]);
+
+  // Helper function to convert and display prices
+  const displayPrice = React.useCallback(async (price: number, fromCurrency: string = 'USD') => {
+    if (!selectedCountry) return { amount: price, symbol: '$' };
+    
+    const targetCurrency = Object.keys(selectedCountry.currencies)[0];
+    const targetSymbol = Object.values(selectedCountry.currencies)[0]?.symbol || '$';
+    
+    if (fromCurrency === targetCurrency) {
+      return { amount: price, symbol: targetSymbol };
+    }
+    
+    try {
+      const convertedAmount = await convertAmount(price, fromCurrency, targetCurrency);
+      return { amount: convertedAmount, symbol: targetSymbol };
+    } catch (error) {
+      console.error('Error converting price:', error);
+      return { amount: price, symbol: '$' };
+    }
+  }, [selectedCountry, convertAmount]);
+
+  // State for converted prices
+  const [convertedPrices, setConvertedPrices] = React.useState<{
+    sellingPrice: { amount: number; symbol: string };
+    cost: { amount: number; symbol: string };
+    freight: { amount: number; symbol: string };
+    totalCost: { amount: number; symbol: string };
+    priceAfterDiscount: { amount: number; symbol: string };
+  } | null>(null);
+
+  // Convert prices when product or selected country changes
+  React.useEffect(() => {
+    if (!product) return;
+
+    const convertAllPrices = async () => {
+      try {
+        const selling = safeNumber(product?.selling_price ?? product?.price ?? 0);
+        const cost = safeNumber(product?.cost);
+        const freight = safeNumber(product?.freight);
+        const discountPercent = safeNumber(product?.discount);
+
+        const totalCost = selling + cost + freight;
+        const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
+
+        const [sellingPrice, costPrice, freightPrice, totalCostPrice, priceAfterDiscountPrice] = await Promise.all([
+          displayPrice(selling, product.currency || 'USD'),
+          displayPrice(cost, product.currency || 'USD'),
+          displayPrice(freight, product.currency || 'USD'),
+          displayPrice(totalCost, product.currency || 'USD'),
+          displayPrice(priceAfterDiscount, product.currency || 'USD'),
+        ]);
+
+        setConvertedPrices({
+          sellingPrice,
+          cost: costPrice,
+          freight: freightPrice,
+          totalCost: totalCostPrice,
+          priceAfterDiscount: priceAfterDiscountPrice,
+        });
+      } catch (error) {
+        console.error('Error converting prices:', error);
+      }
+    };
+
+    convertAllPrices();
+  }, [product, selectedCountry, displayPrice]);
 
   React.useEffect(() => {
     // Fetch warehouses, suppliers, variant types and taxes dropdowns
@@ -194,7 +262,7 @@ export default function ProductViewPage() {
   }, [product]);
 
   return (
-    <PermissionBoundary screen="/dashboard/products" mode="block">
+    <PermissionBoundary screen="/dashboard/products/view[id]" mode="block">
       <div className="space-y-6 scrollbar-stable">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -356,7 +424,10 @@ export default function ProductViewPage() {
                   <div className="group rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all hover:border-green-300">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</div>
                     <div className="mt-1 text-lg font-bold text-green-600">
-                      {product.currency} {safeNumber(product.selling_price ?? product.price).toFixed(2)}
+                      {convertedPrices ? 
+                        `${convertedPrices.sellingPrice.symbol} ${convertedPrices.sellingPrice.amount.toFixed(2)}` :
+                        `${product.currency} ${safeNumber(product.selling_price ?? product.price).toFixed(2)}`
+                      }
                     </div>
                   </div>
                   <div className="group rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all hover:border-green-300">
@@ -365,11 +436,21 @@ export default function ProductViewPage() {
                   </div>
                   <div className="group rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all hover:border-green-300">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</div>
-                    <div className="mt-1 text-base font-semibold text-gray-900">{safeNumber(product.cost).toFixed(2)}</div>
+                    <div className="mt-1 text-base font-semibold text-gray-900">
+                      {convertedPrices ? 
+                        `${convertedPrices.cost.symbol} ${convertedPrices.cost.amount.toFixed(2)}` :
+                        safeNumber(product.cost).toFixed(2)
+                      }
+                    </div>
                   </div>
                   <div className="group rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all hover:border-green-300">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Freight</div>
-                    <div className="mt-1 text-base font-semibold text-gray-900">{safeNumber(product.freight).toFixed(2)}</div>
+                    <div className="mt-1 text-base font-semibold text-gray-900">
+                      {convertedPrices ? 
+                        `${convertedPrices.freight.symbol} ${convertedPrices.freight.amount.toFixed(2)}` :
+                        safeNumber(product.freight).toFixed(2)
+                      }
+                    </div>
                   </div>
                   <div className="group rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-all hover:border-green-300">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Rate</div>
@@ -399,7 +480,10 @@ export default function ProductViewPage() {
                       <div>
                         <div className="text-sm font-medium text-emerald-700 uppercase tracking-wider">Total Cost</div>
                         <div className="text-2xl font-bold text-emerald-800 mt-1">
-                          {product.currency} {pricing.totalCost.toFixed(2)}
+                          {convertedPrices ? 
+                            `${convertedPrices.totalCost.symbol} ${convertedPrices.totalCost.amount.toFixed(2)}` :
+                            `${product.currency} ${pricing.totalCost.toFixed(2)}`
+                          }
                         </div>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
@@ -415,7 +499,10 @@ export default function ProductViewPage() {
                       <div>
                         <div className="text-sm font-medium text-blue-700 uppercase tracking-wider">Price After Discount</div>
                         <div className="text-2xl font-bold text-blue-800 mt-1">
-                          {product.currency} {pricing.priceAfterDiscount.toFixed(2)}
+                          {convertedPrices ? 
+                            `${convertedPrices.priceAfterDiscount.symbol} ${convertedPrices.priceAfterDiscount.amount.toFixed(2)}` :
+                            `${product.currency} ${pricing.priceAfterDiscount.toFixed(2)}`
+                          }
                         </div>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">

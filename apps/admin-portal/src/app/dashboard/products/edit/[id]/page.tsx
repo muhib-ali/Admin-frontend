@@ -7,6 +7,7 @@ import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, ge
 import { createVariantType, deleteVariantType } from "@/services/variant-types";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
+import { useCurrency, Country } from "@/contexts/currency-context";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { toast } from "react-toastify";
 import { Upload, X, Video } from "lucide-react";
@@ -118,6 +119,7 @@ export default function ProductEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = String(params?.id ?? "");
+  const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
   const canUpdate = useHasPermission(ENTITY_PERMS.products.update);
 
@@ -126,6 +128,9 @@ export default function ProductEditPage() {
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = React.useState({ images: 0, video: 0 });
+
+  // Ref to track previous country to prevent infinite loops
+  const previousCountryRef = React.useRef<Country | null>(null);
 
   const [categories, setCategories] = React.useState<Option[]>([]);
   const [brands, setBrands] = React.useState<Option[]>([]);
@@ -144,7 +149,7 @@ export default function ProductEditPage() {
     tax_id: "",
     warehouse_id: "",
     customer_groups: [] as string[],
-    currency: "USD",
+    currency: getCurrencyCode(),
     selling_price: "",
     cost: "",
     freight: "",
@@ -306,6 +311,44 @@ export default function ProductEditPage() {
         console.log("Extracted CVG IDs:", customerGroupIds);
         console.log("customer_groups:", productData?.customer_groups);
 
+        // Load bulk pricing
+        // Backend entity uses bulkPrices (camelCase), DTO uses bulk_prices (snake_case)
+        const bulkPrices = productData?.bulk_prices || productData?.bulkPrices || [];
+        console.log("Product data - bulk_prices:", productData?.bulk_prices, "bulkPrices:", productData?.bulkPrices); // Debug log
+        console.log("Bulk prices array:", bulkPrices); // Debug log
+
+        // Convert prices from USD to selected currency for display
+        const convertPriceForDisplay = async (price: number): Promise<string> => {
+          if (!selectedCountry || price === 0) return String(price);
+          
+          try {
+            const targetCurrency = Object.keys(selectedCountry.currencies)[0];
+            if (targetCurrency === 'USD') return String(price);
+            
+            const converted = await convertAmount(price, 'USD', targetCurrency);
+            return String(converted);
+          } catch (error) {
+            console.error('Error converting price for display:', error);
+            return String(price);
+          }
+        };
+
+        // Convert prices for display
+        const displaySellingPrice = await convertPriceForDisplay(Number(productData?.price ?? 0));
+        const displayCost = await convertPriceForDisplay(Number(productData?.cost ?? 0));
+        const displayFreight = await convertPriceForDisplay(Number(productData?.freight ?? 0));
+        const displayTotalPrice = await convertPriceForDisplay(Number(productData?.total_price ?? 0));
+
+        // Convert bulk pricing for display
+        const convertedBulkPricing = bulkPrices.length > 0 ? 
+          await Promise.all(
+            bulkPrices.map(async (bp: any) => ({
+              id: crypto.randomUUID(),
+              quantity: String(bp.quantity ?? ""),
+              price: await convertPriceForDisplay(Number(bp.price_per_product ?? 0)),
+            }))
+          ) : [];
+
         setValues({
           title: productData?.title ?? "",
           description: productData?.description ?? "",
@@ -315,14 +358,14 @@ export default function ProductEditPage() {
           tax_id: productData?.tax_id ?? "",
           warehouse_id: productData?.warehouse_id ?? "",
           customer_groups: customerGroupIds,
-          currency: productData?.currency ?? "USD",
-          selling_price: String(productData?.price ?? ""),
-          cost: productData?.cost ?? "",
-          freight: productData?.freight ?? "",
+          currency: getCurrencyCode(),
+          selling_price: displaySellingPrice,
+          cost: displayCost,
+          freight: displayFreight,
           discount: productData?.discount ? String(productData.discount) : "",
           start_discount_date: formatDateForInput(productData?.start_discount_date),
           end_discount_date: formatDateForInput(productData?.end_discount_date),
-          total_price: productData?.total_price ? String(productData.total_price) : "",
+          total_price: displayTotalPrice,
           stock_quantity: String(productData?.stock_quantity ?? ""),
           weight: productData?.weight ? String(productData.weight) : "",
           length: productData?.length ? String(productData.length) : "",
@@ -333,22 +376,9 @@ export default function ProductEditPage() {
         });
 
         // Load bulk pricing
-        // Backend entity uses bulkPrices (camelCase), DTO uses bulk_prices (snake_case)
-        const bulkPrices = productData?.bulk_prices || productData?.bulkPrices || [];
-        console.log("Product data - bulk_prices:", productData?.bulk_prices, "bulkPrices:", productData?.bulkPrices); // Debug log
-        console.log("Bulk prices array:", bulkPrices); // Debug log
-        
-        if (bulkPrices.length > 0) {
-          const mappedBulkPricing = bulkPrices.map((bp: any) => {
-            console.log("Bulk price item:", bp); // Debug log
-            return {
-              id: crypto.randomUUID(),
-              quantity: String(bp.quantity ?? ""),
-              price: String(bp.price_per_product ?? ""),
-            };
-          });
-          console.log("Mapped bulk pricing:", mappedBulkPricing); // Debug log
-          setBulkPricing(mappedBulkPricing);
+        if (convertedBulkPricing.length > 0) {
+          console.log("Setting converted bulk pricing:", convertedBulkPricing); // Debug log
+          setBulkPricing(convertedBulkPricing);
         } else {
           console.log("No bulk prices found in product data"); // Debug log
           setBulkPricing([]);
@@ -487,6 +517,76 @@ export default function ProductEditPage() {
 
     return () => ac.abort();
   }, [id]);
+
+  // Update form values when selected country changes
+  React.useEffect(() => {
+    console.log('🔥 useEffect triggered!', { 
+      selectedCountry: selectedCountry?.name, 
+      selectedCountryCode: selectedCountry?.cca2,
+      product: !!product,
+      currentCurrency: values.currency
+    });
+
+    if (!product || !selectedCountry) {
+      console.log('❌ Missing product or selectedCountry');
+      return;
+    }
+
+    const targetCurrency = Object.keys(selectedCountry.currencies)[0];
+    const sourceCurrency = values.currency;
+    
+    console.log('🎯 Converting from', sourceCurrency, 'to', targetCurrency);
+    
+    // Only update if currency is different from current
+    if (sourceCurrency === targetCurrency) {
+      console.log('⏭️ Currency already same, skipping');
+      return;
+    }
+
+    console.log('🔄 Converting prices from', sourceCurrency, 'to', targetCurrency);
+
+    const convertField = async (value: string): Promise<string> => {
+      const numValue = Number(value) || 0;
+      if (numValue === 0) return value;
+      
+      try {
+        const converted = await convertAmount(numValue, sourceCurrency, targetCurrency);
+        console.log('✅ Converted', numValue, sourceCurrency, 'to', converted, targetCurrency);
+        return String(converted);
+      } catch (error) {
+        console.error('❌ Error converting field value:', error);
+        return value;
+      }
+    };
+
+    const updatePrices = async () => {
+      console.log('🚀 Starting price update...');
+      
+      const updatedValues = {
+        ...values,
+        currency: targetCurrency,
+        selling_price: await convertField(values.selling_price),
+        cost: await convertField(values.cost),
+        freight: await convertField(values.freight),
+        total_price: await convertField(values.total_price),
+      };
+
+      console.log('📝 Updated values:', updatedValues);
+      setValues(updatedValues);
+
+      // Update bulk pricing
+      const updatedBulkPricing = await Promise.all(
+        bulkPricing.map(async (row) => ({
+          ...row,
+          price: await convertField(row.price),
+        }))
+      );
+      setBulkPricing(updatedBulkPricing);
+      console.log('✅ Price update completed!');
+    };
+
+    updatePrices();
+  }, [selectedCountry?.cca2, product]);
 
   // Create memoized blob URLs for pending media
   const pendingFeaturedImageUrl = React.useMemo(() => {
@@ -872,16 +972,40 @@ export default function ProductEditPage() {
         ? totalCost - (totalCost * discountPercent) / 100 
         : totalCost;
 
+      // Convert prices to USD for backend storage
+      const sourceCurrency = getCurrencyCode();
+      const targetCurrency = 'USD';
+      
+      let convertedPrice = basePrice;
+      let convertedCost = cost;
+      let convertedFreight = freight;
+      let convertedTotalPrice = priceAfterDiscount;
+
+      if (sourceCurrency !== targetCurrency) {
+        try {
+          [convertedPrice, convertedCost, convertedFreight, convertedTotalPrice] = await Promise.all([
+            convertAmount(basePrice, sourceCurrency, targetCurrency),
+            convertAmount(cost, sourceCurrency, targetCurrency),
+            convertAmount(freight, sourceCurrency, targetCurrency),
+            convertAmount(priceAfterDiscount, sourceCurrency, targetCurrency),
+          ]);
+        } catch (error) {
+          console.error('Currency conversion failed:', error);
+          setUploadErrors(prev => [...prev, 'Currency conversion failed. Please try again.']);
+          return;
+        }
+      }
+
       // Prepare product update data
       const productUpdateData: any = {
         id: id,
         title: values.title.trim(),
         description: values.description.trim(),
-        price: basePrice,
+        price: convertedPrice,
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
         brand_id: values.brand_id,
-        currency: values.currency,
+        currency: targetCurrency, // Always store as USD
         is_active: (product as any)?.is_active ?? true,
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
@@ -889,13 +1013,13 @@ export default function ProductEditPage() {
         discount: discountPercent > 0 ? discountPercent : undefined,
         start_discount_date: values.start_discount_date || undefined,
         end_discount_date: values.end_discount_date || undefined,
-        total_price: priceAfterDiscount,
+        total_price: convertedTotalPrice,
         weight: values.weight ? Number(values.weight) : undefined,
         length: values.length ? Number(values.length) : undefined,
         width: values.width ? Number(values.width) : undefined,
         height: values.height ? Number(values.height) : undefined,
-        cost: cost > 0 ? cost : undefined,
-        freight: freight > 0 ? freight : undefined,
+        cost: convertedCost > 0 ? convertedCost : undefined,
+        freight: convertedFreight > 0 ? convertedFreight : undefined,
         customer_groups: values.customer_groups && values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: selectedVariantKeys
           .filter((key: string) => variantValues[key]?.trim()) // Only include variants with values
@@ -918,12 +1042,21 @@ export default function ProductEditPage() {
           .filter((v): v is { vtype_id: string; value: string } => {
             return v !== null && typeof v.vtype_id === "string" && v.vtype_id.trim() !== "";
           }),
-        bulk_prices: bulkPricing
-          .filter(row => row.quantity && row.price)
-          .map(row => ({
-            quantity: Number(row.quantity),
-            price_per_product: Number(row.price),
-          })),
+        bulk_prices: await Promise.all(
+          bulkPricing
+            .filter(row => row.quantity && row.price)
+            .map(async (row) => {
+              const bulkPrice = Number(row.price);
+              const convertedBulkPrice = sourceCurrency !== targetCurrency 
+                ? await convertAmount(bulkPrice, sourceCurrency, targetCurrency)
+                : bulkPrice;
+              
+              return {
+                quantity: Number(row.quantity),
+                price_per_product: convertedBulkPrice,
+              };
+            })
+          ),
       };
 
       // Preserve existing video URL if no new video is being uploaded
@@ -1247,7 +1380,7 @@ export default function ProductEditPage() {
   };
 
   return (
-    <PermissionBoundary screen="/dashboard/products" mode="block">
+    <PermissionBoundary screen="/dashboard/products/edit/[id]" mode="block">
       <div className="space-y-6 scrollbar-stable">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -1462,12 +1595,19 @@ export default function ProductEditPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="currency">Currency</Label>
+                    <Label htmlFor="currency" className="text-sm font-medium text-gray-700">
+                      Currency
+                    </Label>
                     <Input
                       id="currency"
-                      value={values.currency}
-                      onChange={(e) => setValues((p) => ({ ...p, currency: e.target.value }))}
+                      value={getCurrencyCode()}
+                      readOnly
+                      className="bg-gray-100 cursor-not-allowed"
+                      placeholder="Currency will be set based on your selection"
                     />
+                    <p className="text-xs text-gray-500">
+                      Currency is automatically set based on your global selection
+                    </p>
                   </div>
 
                   <div className="grid gap-2">
