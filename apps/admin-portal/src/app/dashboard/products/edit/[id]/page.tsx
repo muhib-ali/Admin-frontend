@@ -159,6 +159,7 @@ export default function ProductEditPage() {
     height: "",
     visibility_wholesale: true,
     visibility_retail: true,
+    is_active: true,
   }));
 
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([]);
@@ -330,6 +331,7 @@ export default function ProductEditPage() {
           height: productData?.height ? String(productData.height) : "",
           visibility_wholesale: productData?.visibility_wholesale ?? true,
           visibility_retail: productData?.visibility_retail ?? true,
+          is_active: productData?.is_active ?? true,
         });
 
         // Load bulk pricing
@@ -882,7 +884,7 @@ export default function ProductEditPage() {
         category_id: values.category_id,
         brand_id: values.brand_id,
         currency: values.currency,
-        is_active: (product as any)?.is_active ?? true,
+        is_active: values.is_active,
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
         warehouse_id: values.warehouse_id || undefined,
@@ -1438,9 +1440,13 @@ export default function ProductEditPage() {
 
                 <div className="flex items-center justify-between rounded-lg border px-3 bg-muted/30 h-10">
                   <p className="text-xs text-muted-foreground">
-                    {product.is_active ? "Active" : "Inactive"}
+                    {values.is_active ? "Active" : "Inactive"}
                   </p>
-                  <Switch checked={product.is_active} disabled className="data-[state=checked]:bg-green-600" />
+                  <Switch 
+                    checked={values.is_active} 
+                    onCheckedChange={(checked) => setValues((p) => ({ ...p, is_active: checked }))}
+                    className="data-[state=checked]:bg-green-600" 
+                  />
                 </div>
               </CardContent>
             </Card>
