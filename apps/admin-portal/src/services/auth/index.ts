@@ -45,14 +45,19 @@ export const authService = {
 
   async logout() {
     try {
-      
+      // Dispatch event to notify components of logout
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userLoggedOut', {
+          detail: { message: 'User logged out' }
+        }));
+      }
     } catch (e) {
       console.error("Logout error:", e);
     } finally {
       Cookies.remove("access_token", { path: "/" });
       Cookies.remove("refresh_token", { path: "/" });
       Cookies.remove("access_expires_at", { path: "/" });
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         localStorage.removeItem("user");
         localStorage.removeItem("permissions");
         window.location.href = "/login";

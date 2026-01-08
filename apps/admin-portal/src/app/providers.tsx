@@ -7,15 +7,18 @@ import "react-toastify/dist/ReactToastify.css";
 import NextAuthProvider from "@/components/providers/NextAuthProvider";
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider";
 import { UnsavedChangesProvider } from "@/contexts/UnsavedChangesContext";
+import { CurrencyProvider } from "@/contexts/currency-context";
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ReactQueryProvider>
       <NextAuthProvider>
         <UnsavedChangesProvider>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-            {children}
-          </ThemeProvider>
+          <CurrencyProvider>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+              {children}
+            </ThemeProvider>
+          </CurrencyProvider>
           <ToastContainer
             position="top-right"
             autoClose={5000}

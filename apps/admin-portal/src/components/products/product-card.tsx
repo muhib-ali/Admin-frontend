@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ProductRow } from "./product-form";
+import { useCurrency } from "@/contexts/currency-context";
 
 type Props = {
   product: ProductRow;
@@ -35,9 +36,40 @@ export function ProductCard({
   canUpdate = true,
   canDelete = true,
 }: Props) {
+  const { selectedCountry, convertAmount, getCurrencySymbol } = useCurrency();
+  const [convertedPrice, setConvertedPrice] = React.useState<{ amount: number; symbol: string } | null>(null);
+  
   const imgSeed = (product.description || "").trim() || product.title;
   const imageSrc = product.product_img_url || svgCardImage(imgSeed);
   const statusLabel = product.is_active ? "Active" : "Inactive";
+
+  // Convert price when product or selected country changes
+  React.useEffect(() => {
+    const convertPrice = async () => {
+      if (!selectedCountry) {
+        setConvertedPrice({ amount: product.price, symbol: '$' });
+        return;
+      }
+
+      try {
+        const targetCurrency = Object.keys(selectedCountry.currencies)[0];
+        const targetSymbol = Object.values(selectedCountry.currencies)[0]?.symbol || '$';
+        
+        if (targetCurrency === 'USD') {
+          setConvertedPrice({ amount: product.price, symbol: targetSymbol });
+          return;
+        }
+
+        const converted = await convertAmount(product.price, 'USD', targetCurrency);
+        setConvertedPrice({ amount: converted, symbol: targetSymbol });
+      } catch (error) {
+        console.error('Error converting price in ProductCard:', error);
+        setConvertedPrice({ amount: product.price, symbol: '$' });
+      }
+    };
+
+    convertPrice();
+  }, [product.price, selectedCountry, convertAmount]);
 
   return (
     <div className="group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.12)] transition-all duration-300 hover:scale-[1.02]">
@@ -108,7 +140,9 @@ export function ProductCard({
             </p>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-base font-bold text-gray-900">${product.price.toFixed(2)}</div>
+            <div className="text-base font-bold text-gray-900">
+              {convertedPrice ? `${convertedPrice.symbol} ${convertedPrice.amount.toFixed(2)}` : `$${product.price.toFixed(2)}`}
+            </div>
             <div className="mt-1 text-xs text-gray-500">
               Stock: {product.stock_quantity}
             </div>

@@ -146,6 +146,9 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/jobFiles/[id]/edit":      ENTITY_PERMS.jobFiles.update,
 
   "/dashboard/products":                ENTITY_PERMS.products.list,
+  "/dashboard/products/new":            ENTITY_PERMS.products.create,
+  "/dashboard/products/view/[id]":           ENTITY_PERMS.products.read,
+  "/dashboard/products/edit/[id]":      ENTITY_PERMS.products.update,
 
   "/dashboard/clients":                 ENTITY_PERMS.clients.list,
   "/dashboard/clients/create":          ENTITY_PERMS.clients.create,

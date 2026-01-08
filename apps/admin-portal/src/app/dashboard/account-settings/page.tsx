@@ -66,10 +66,38 @@ export default function AccountSettingsPage() {
       setName(userName);
     };
 
+    // Listen for user login events (when switching accounts)
+    const handleUserLogin = (event: CustomEvent) => {
+      console.log('📝 Account settings: User login event received!', event.detail);
+      const newUser = event.detail.user;
+      
+      // Update form state with new user data
+      setUser(newUser);
+      const userName = newUser.name || newUser.email || "";
+      console.log('📝 Account settings: Updating form name to:', userName);
+      setName(userName);
+    };
+
+    // Listen for logout events
+    const handleUserLogout = (event: CustomEvent) => {
+      console.log('📝 Account settings: User logout event received!', event.detail);
+      
+      // Clear form state
+      setUser(null);
+      setName("");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    };
+
     window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    window.addEventListener('userLoggedIn', handleUserLogin as EventListener);
+    window.addEventListener('userLoggedOut', handleUserLogout as EventListener);
     
     return () => {
       window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+      window.removeEventListener('userLoggedIn', handleUserLogin as EventListener);
+      window.removeEventListener('userLoggedOut', handleUserLogout as EventListener);
     };
   }, []);
 

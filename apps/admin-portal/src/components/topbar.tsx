@@ -13,6 +13,7 @@ import {
   Settings,
   User2,
 } from "lucide-react";
+import CurrencySelector from "./currency-selector";
 
 import {
   DropdownMenu,
@@ -83,13 +84,35 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
       });
     };
 
-    // Add event listener with logging
+    // Listen for user login events (when switching accounts)
+    const handleUserLogin = (event: CustomEvent) => {
+      console.log('🔥 User login event received!', event.detail);
+      
+      // Update local state with new user data
+      const newUser = event.detail.user;
+      console.log('🔥 Updating localUser with new login:', newUser);
+      setLocalUser(newUser);
+    };
+
+    // Listen for logout events
+    const handleUserLogout = (event: CustomEvent) => {
+      console.log('🔥 User logout event received!', event.detail);
+      
+      // Clear local state
+      setLocalUser(null);
+    };
+
+    // Add event listeners
     window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
-    console.log("🔥 Event listener added for profileUpdated");
+    window.addEventListener('userLoggedIn', handleUserLogin as EventListener);
+    window.addEventListener('userLoggedOut', handleUserLogout as EventListener);
+    console.log("🔥 Event listeners added for profileUpdated, userLoggedIn, and userLoggedOut");
     
     return () => {
-      console.log("🔥 Cleaning up profile update event listener");
+      console.log("🔥 Cleaning up event listeners");
       window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+      window.removeEventListener('userLoggedIn', handleUserLogin as EventListener);
+      window.removeEventListener('userLoggedOut', handleUserLogout as EventListener);
     };
   }, [update]);
 
@@ -151,6 +174,8 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <CurrencySelector />
+
           <Button
             variant="outline"
             size="icon"
