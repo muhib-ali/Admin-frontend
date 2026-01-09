@@ -14,7 +14,7 @@ function TopLineLoader() {
 
   useEffect(() => {
     setLoading(true);
-    const t = setTimeout(() => setLoading(false), 650);
+    const t = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(t);
   }, [pathname, searchParams]);
 
@@ -22,7 +22,7 @@ function TopLineLoader() {
 
   return (
     <div className="fixed left-0 top-0 z-[60] h-[5px] w-full bg-emerald-600">
-      <div className="h-full w-full origin-left animate-[dashboardTopLoader_650ms_ease-in-out_infinite] bg-emerald-600" />
+      <div className="h-full w-full origin-left animate-[dashboardTopLoader_2000ms_ease-in-out_infinite] bg-emerald-600" />
     </div>
   );
 }

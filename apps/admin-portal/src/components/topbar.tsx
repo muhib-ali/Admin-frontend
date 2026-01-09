@@ -218,21 +218,11 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
                 className="gap-2"
                 onSelect={(e) => {
                   e.preventDefault();
-                  router.push("/dashboard/profile-settings");
-                }}
-              >
-                <User2 className="h-4 w-4" />
-                Profile Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                onSelect={(e) => {
-                  e.preventDefault();
                   router.push("/dashboard/account-settings");
                 }}
               >
-                <Settings className="h-4 w-4" />
-                Account Settings
+                <User2 className="h-4 w-4" />
+                Profile Setting
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
