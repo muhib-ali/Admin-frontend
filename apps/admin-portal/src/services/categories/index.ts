@@ -106,6 +106,7 @@ export async function getCategoryById(id: string) {
 export async function createCategory(payload: {
   name: string;
   description?: string;
+  isActive?: boolean;
 }) {
   const { data } = await with429Retry(() =>
     api.post<CategoryItemResponse>("/categories/create", payload)
@@ -117,6 +118,7 @@ export async function updateCategory(payload: {
   id: string;
   name?: string;
   description?: string;
+  isActive?: boolean;
 }) {
   try {
     const { data } = await with429Retry(() =>

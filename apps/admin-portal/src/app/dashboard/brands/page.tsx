@@ -188,6 +188,7 @@ export default function BrandsPage() {
         id: res.id,
         name: res.name,
         description: res.description ?? "",
+        isActive: res.is_active ?? true,
       });
       setOpenForm(true);
     } catch (e: any) {
@@ -205,6 +206,7 @@ export default function BrandsPage() {
         id: res.id,
         name: res.name,
         description: res.description ?? "",
+        isActive: res.is_active ?? true,
       });
       setOpenForm(true);
     } catch (e: any) {
@@ -220,6 +222,7 @@ export default function BrandsPage() {
         await createBrand({
           name: data.name,
           description: data.description || "",
+          isActive: data.isActive,
         });
         toast.success("Brand created");
       } else {
@@ -228,6 +231,7 @@ export default function BrandsPage() {
           id: data.id,
           name: data.name,
           description: data.description || "",
+          isActive: data.isActive,
         });
         toast.success("Brand updated");
       }

@@ -13,11 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 export type CategoryFormValues = {
   id: string;
   name: string;
   description: string;
+  active: boolean;
 };
 
 export type CategoryFormProps = {
@@ -37,10 +39,12 @@ export default function CategoryFormDialog({
 }: CategoryFormProps) {
   const [name, setName] = React.useState(initial?.name ?? "");
   const [desc, setDesc] = React.useState(initial?.description ?? "");
+  const [active, setActive] = React.useState(initial?.active ?? true);
 
   React.useEffect(() => {
     setName(initial?.name ?? "");
     setDesc(initial?.description ?? "");
+    setActive(initial?.active ?? true);
   }, [initial, open]);
 
   const title =
@@ -92,6 +96,23 @@ export default function CategoryFormDialog({
               disabled={isReadOnly}
             />
           </div>
+
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {active ? "Active" : "Inactive"}
+                </p>
+              </div>
+              <Switch
+                checked={active}
+                onCheckedChange={setActive}
+                disabled={isReadOnly}
+                className="data-[state=checked]:bg-green-600"
+              />
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="mt-2">
@@ -105,6 +126,7 @@ export default function CategoryFormDialog({
                   id: initial?.id ?? "",
                   name: name.trim(),
                   description: desc.trim(),
+                  active,
                 };
                 onSubmit(payload);
                 onOpenChange(false);

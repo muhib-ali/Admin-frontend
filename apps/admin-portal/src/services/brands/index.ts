@@ -103,6 +103,7 @@ export async function getBrandById(id: string) {
 export async function createBrand(payload: {
   name: string;
   description?: string;
+  isActive?: boolean;
 }) {
   const { data } = await with429Retry(() =>
     api.post<BrandItemResponse>("/brands/create", payload)
@@ -114,6 +115,7 @@ export async function updateBrand(payload: {
   id: string;
   name?: string;
   description?: string;
+  isActive?: boolean;
 }) {
   try {
     const { data } = await with429Retry(() =>

@@ -188,6 +188,7 @@ export default function CategoriesPage() {
         id: res.id,
         name: res.name,
         description: res.description ?? "",
+        active: res.is_active ?? true,
       });
       setOpenForm(true);
     } catch (e: any) {
@@ -205,6 +206,7 @@ export default function CategoriesPage() {
         id: res.id,
         name: res.name,
         description: res.description ?? "",
+        active: res.is_active ?? true,
       });
       setOpenForm(true);
     } catch (e: any) {
@@ -220,6 +222,7 @@ export default function CategoriesPage() {
         await createCategory({
           name: data.name,
           description: data.description || "",
+          isActive: data.active,
         });
         toast.success("Category created");
       } else {
@@ -228,6 +231,7 @@ export default function CategoriesPage() {
           id: data.id,
           name: data.name,
           description: data.description || "",
+          isActive: data.active,
         });
         toast.success("Category updated");
       }

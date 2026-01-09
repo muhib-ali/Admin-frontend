@@ -13,11 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 export type BrandFormValues = {
   id: string;
   name: string;
   description: string;
+  isActive: boolean;
 };
 
 export type BrandFormProps = {
@@ -37,10 +39,12 @@ export default function BrandFormDialog({
 }: BrandFormProps) {
   const [name, setName] = React.useState(initial?.name ?? "");
   const [desc, setDesc] = React.useState(initial?.description ?? "");
+  const [isActive, setIsActive] = React.useState(initial?.isActive ?? true);
 
   React.useEffect(() => {
     setName(initial?.name ?? "");
     setDesc(initial?.description ?? "");
+    setIsActive(initial?.isActive ?? true);
   }, [initial, open]);
 
   const title =
@@ -87,6 +91,23 @@ export default function BrandFormDialog({
               disabled={isReadOnly}
             />
           </div>
+
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {isActive ? "Active" : "Inactive"}
+                </p>
+              </div>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                disabled={isReadOnly}
+                className="data-[state=checked]:bg-green-600"
+              />
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="mt-2">
@@ -100,6 +121,7 @@ export default function BrandFormDialog({
                   id: initial?.id ?? "",
                   name: name.trim(),
                   description: desc.trim(),
+                  isActive,
                 };
                 onSubmit(payload);
                 onOpenChange(false);
