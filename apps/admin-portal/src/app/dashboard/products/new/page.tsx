@@ -5,6 +5,10 @@ import { Upload, X, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
+import featuredImageLogo from "../../../../../logos/featured image logo.png";
+import galleryImageLogo from "../../../../../logos/gallery image logo.png";
+import videoUploadLogo from "../../../../../logos/video upload logo.png";
+
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +28,12 @@ import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllVariantTypesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import { createVariantType, deleteVariantType } from "@/services/variant-types";
 import * as productsService from "@/services/products/index";
+import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
 
 type Option = { id: string; name: string };
+type TaxRecord = { id: string; title: string; rate: number };
 
 type BulkPricingRow = { id: string; quantity: string; price: string };
 
@@ -125,6 +131,7 @@ export default function NewProductPage() {
   const [categories, setCategories] = React.useState<Option[]>([]);
   const [brands, setBrands] = React.useState<Option[]>([]);
   const [taxes, setTaxes] = React.useState<Option[]>([]);
+  const [taxRows, setTaxRows] = React.useState<TaxRecord[]>([]);
   const [suppliers, setSuppliers] = React.useState<Option[]>([]);
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
@@ -200,7 +207,7 @@ export default function NewProductPage() {
 
     (async () => {
       try {
-        const [cats, brs, tax, sup, wh, vt, cvg] = await Promise.all([
+        const [cats, brs, tax, sup, wh, vt, cvg, taxData] = await Promise.all([
           getAllCategoriesDropdown({ signal: ac.signal }),
           getAllBrandsDropdown({ signal: ac.signal }),
           getAllTaxesDropdown({ signal: ac.signal }),
@@ -208,6 +215,7 @@ export default function NewProductPage() {
           getAllWarehousesDropdown({ signal: ac.signal }),
           getAllVariantTypesDropdown({ signal: ac.signal }),
           getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
+          listTaxes(1, 100, undefined, { signal: ac.signal }),
         ]);
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
@@ -215,17 +223,18 @@ export default function NewProductPage() {
         setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
+        setTaxRows(taxData?.rows ?? []);
         // For create form: Only show default variant types (size, model, year) - custom variants are created per product
         const defaultVariantTypes = ["size", "model", "year"];
         const allVariantTypes = (vt ?? []).map((v: any) => ({ id: v.value, name: v.label }));
         // Filter to only show default variant types
-        const filteredVariantTypes = allVariantTypes.filter((vt: any) => 
+        const filteredVariantTypes = allVariantTypes.filter((vt: any) =>
           defaultVariantTypes.includes(vt.name.toLowerCase())
         );
         setVariantTypes(filteredVariantTypes);
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
-      } catch {
-        // ignore UI-only page for now
+      } catch (error) {
+        console.error("Failed to load dropdowns or tax records:", error);
       }
     })();
 
@@ -238,16 +247,16 @@ export default function NewProductPage() {
 
     const targetCurrency = Object.keys(selectedCountry.currencies)[0];
     const sourceCurrency = values.currency;
-    
+
     // Only update if currency is different from current
     if (sourceCurrency === targetCurrency) return;
 
-    console.log('🔄 Converting prices from', sourceCurrency, 'to', targetCurrency);
+    console.log(' Converting prices from', sourceCurrency, 'to', targetCurrency);
 
     const convertField = async (value: string): Promise<string> => {
       const numValue = Number(value) || 0;
       if (numValue === 0) return value;
-      
+
       try {
         const converted = await convertAmount(numValue, sourceCurrency, targetCurrency);
         return String(converted);
@@ -434,10 +443,10 @@ export default function NewProductPage() {
           newSet.delete(variantId);
           return newSet;
         });
-        
+
         // Remove from variant types dropdown
         setVariantTypes((p) => p.filter((v) => v.id !== variantId));
-        
+
         // Remove from local state
         setVariantOptions((p) => p.filter((k) => k !== variantKey));
         setVariantSelected((p) => {
@@ -466,7 +475,7 @@ export default function NewProductPage() {
     if (!raw) return;
     const key = raw.toLowerCase().replace(/\s+/g, " ");
     if (!key) return;
-    
+
     // Check if variant type already exists in the list
     if (variantOptions.includes(key)) {
       setVariantSelected((p) => ({ ...p, [key]: true }));
@@ -474,24 +483,24 @@ export default function NewProductPage() {
       setNewVariantName("");
       return;
     }
-    
+
     try {
       // Create new variant type via API
       const response = await createVariantType(raw);
       if (response.status) {
         const newVariantId = response.data.id;
-        
+
         // Add to local state
         setVariantOptions((p) => [...p, key]);
         setVariantSelected((p) => ({ ...p, [key]: true }));
         setVariantValues((p) => ({ ...p, [key]: "" }));
-        
+
         // Add to recently added list for deletion option
         setRecentlyAddedVariantTypes((prev) => new Set([...prev, newVariantId]));
-        
+
         // Add to variant types dropdown
         setVariantTypes((p) => [...p, { id: newVariantId, name: raw }]);
-        
+
         setVariantsOpen(true);
         setNewVariantName("");
       }
@@ -504,31 +513,38 @@ export default function NewProductPage() {
   const productDetailsComplete = React.useMemo(() => {
     return Boolean(
       values.title.trim() &&
-        values.description.trim() &&
-        values.category_id &&
-        values.brand_id
+      values.description.trim() &&
+      values.category_id &&
+      values.brand_id
     );
   }, [values.title, values.description, values.category_id, values.brand_id]);
 
+  const selectedTaxRate = React.useMemo(() => {
+    const tax = taxRows.find((t) => t.id === values.tax_id);
+    return tax?.rate ?? 0;
+  }, [taxRows, values.tax_id]);
+
   const pricing = React.useMemo(() => {
-    const selling = Number(values.selling_price);
-    const cost = Number(values.cost);
-    const freight = Number(values.freight);
-    const discountPercent = Number(values.discount);
+    const selling = Number(values.selling_price) || 0;
+    const freight = Number(values.freight) || 0;
+    const discountPercent = Number(values.discount) || 0;
 
-    const sellingN = Number.isFinite(selling) ? selling : 0;
-    const costN = Number.isFinite(cost) ? cost : 0;
-    const freightN = Number.isFinite(freight) ? freight : 0;
-    const discountPercentN = Number.isFinite(discountPercent) ? discountPercent : 0;
-
-    const totalCost = sellingN + costN + freightN;
-    const priceAfterDiscount = totalCost - (totalCost * discountPercentN) / 100;
+    const baseForTax = selling + freight;
+    const taxAmount = baseForTax * (selectedTaxRate / 100);
+    const totalCost = baseForTax + taxAmount;
+    const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
 
     return {
+      taxAmount,
       totalCost,
       priceAfterDiscount,
     };
-  }, [values.selling_price, values.cost, values.freight, values.discount]);
+  }, [
+    values.selling_price,
+    values.freight,
+    values.discount,
+    selectedTaxRate,
+  ]);
 
   const addBulkRow = () => {
     setBulkPricing((p) => [...p, { id: crypto.randomUUID(), quantity: "", price: "" }]);
@@ -552,16 +568,18 @@ export default function NewProductPage() {
       const cost = Number(values.cost) || 0;
       const freight = Number(values.freight) || 0;
       const discountPercent = Number(values.discount) || 0;
-      
-      const totalCost = basePrice + cost + freight;
-      const priceAfterDiscount = discountPercent > 0 
-        ? totalCost - (totalCost * discountPercent) / 100 
+
+      const subtotal = basePrice + cost + freight;
+      const taxAmount = subtotal * (selectedTaxRate / 100);
+      const totalCost = subtotal + taxAmount;
+      const priceAfterDiscount = discountPercent > 0
+        ? totalCost - (totalCost * discountPercent) / 100
         : totalCost;
 
       // Convert prices to USD for backend storage
       const sourceCurrency = getCurrencyCode();
       const targetCurrency = 'USD';
-      
+
       let convertedPrice = basePrice;
       let convertedCost = cost;
       let convertedFreight = freight;
@@ -590,12 +608,12 @@ export default function NewProductPage() {
           const variantType = variantTypes.find(
             vt => vt.name.toLowerCase().trim() === key.toLowerCase().trim()
           );
-          
+
           if (!variantType) {
             console.warn(`Variant type not found for key: ${key}`);
             return null;
           }
-          
+
           return {
             vtype_id: variantType.id,
             value: variantValues[key].trim(),
@@ -633,16 +651,16 @@ export default function NewProductPage() {
             .filter(row => row.quantity && row.price)
             .map(async (row) => {
               const bulkPrice = Number(row.price);
-              const convertedBulkPrice = sourceCurrency !== targetCurrency 
+              const convertedBulkPrice = sourceCurrency !== targetCurrency
                 ? await convertAmount(bulkPrice, sourceCurrency, targetCurrency)
                 : bulkPrice;
-              
+
               return {
                 quantity: Number(row.quantity),
                 price_per_product: convertedBulkPrice,
               };
             })
-          ),
+        ),
       };
 
       // Create product first
@@ -657,9 +675,7 @@ export default function NewProductPage() {
           const featuredResponse = await productsService.uploadFeaturedImage(productId, featuredImage.file);
           setUploadProgress(prev => ({ ...prev, featured: 100 }));
           // Backend already updates product_img_url automatically, no need for extra update
-          console.log("Featured image uploaded successfully:", featuredResponse);
         } catch (error: any) {
-          console.error("Featured image upload error:", error);
           setUploadErrors(prev => [...prev, `Featured image upload failed: ${error.message}`]);
         }
       }
@@ -691,7 +707,7 @@ export default function NewProductPage() {
       // Don't write to localStorage - product is already in backend
       // The products page should fetch from backend API, not localStorage
       // Writing to localStorage causes duplicate products in the UI
-      
+
       // Show success message and redirect
       // Note: uploadErrors state will be checked after the function completes
       // Errors are already added to state during the upload process
@@ -712,18 +728,18 @@ export default function NewProductPage() {
             <p className="mt-1 text-sm text-muted-foreground">Create a new product</p>
           </div>
 
-          <Button disabled={!canSave || isUploading} onClick={saveProduct}>
+          <Button disabled={!canSave || isUploading} onClick={saveProduct} className="bg-neutral-900 text-white hover:bg-neutral-800">
             {isUploading ? "Saving..." : "Save Product"}
           </Button>
         </div>
 
-        <Card className="shadow-sm">
-          <CardHeader>
+        <Card className="shadow-sm bg-gray-100">
+          <CardHeader className="bg-gray-100">
             <CardTitle className="text-lg">Product details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 bg-gray-100">
             <div className="grid gap-2">
-              <Label htmlFor="productName">Name</Label>
+              <Label htmlFor="productName" className="font-semibold">Name <span className="text-red-500">*</span></Label>
               <Input
                 id="productName"
                 value={values.title}
@@ -733,7 +749,7 @@ export default function NewProductPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="productDescription">Description</Label>
+              <Label htmlFor="productDescription" className="font-semibold">Description <span className="text-red-500">*</span></Label>
               <Textarea
                 id="productDescription"
                 value={values.description}
@@ -745,9 +761,9 @@ export default function NewProductPage() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Category</Label>
+                <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.category_id}
                   onValueChange={(v) => setValues((p) => ({ ...p, category_id: v }))}
@@ -766,7 +782,7 @@ export default function NewProductPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Brand</Label>
+                <Label className="font-semibold">Brand <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.brand_id}
                   onValueChange={(v) => setValues((p) => ({ ...p, brand_id: v }))}
@@ -784,8 +800,12 @@ export default function NewProductPage() {
                 </Select>
               </div>
 
+
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Supplier</Label>
+                <Label className="font-semibold">Supplier <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.supplier_id}
                   onValueChange={(v) => setValues((p) => ({ ...p, supplier_id: v }))}
@@ -802,30 +822,9 @@ export default function NewProductPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Tax</Label>
-                <Select
-                  value={values.tax_id}
-                  onValueChange={(v) => setValues((p) => ({ ...p, tax_id: v }))}
-                >
-                  <SelectTrigger className="h-10 w-full">
-                    <SelectValue placeholder="Select tax" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {taxes.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="grid gap-2">
-                <Label>Warehouse</Label>
+                <Label className="font-semibold">Warehouse <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.warehouse_id}
                   onValueChange={(v) => setValues((p) => ({ ...p, warehouse_id: v }))}
@@ -845,7 +844,7 @@ export default function NewProductPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Variants</Label>
+              <Label className="font-semibold">Variants</Label>
               <button
                 type="button"
                 className="h-10 w-full rounded-md border bg-background px-3 text-left text-sm"
@@ -853,8 +852,8 @@ export default function NewProductPage() {
               >
                 {selectedVariantKeys.length
                   ? selectedVariantKeys
-                      .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-                      .join(", ")
+                    .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+                    .join(", ")
                   : "Select variants"}
               </button>
 
@@ -865,7 +864,7 @@ export default function NewProductPage() {
                       const label = k.charAt(0).toUpperCase() + k.slice(1);
                       const variantType = variantTypes.find(v => v.name.toLowerCase() === k);
                       const isRecentlyAdded = variantType ? recentlyAddedVariantTypes.has(variantType.id) : false;
-                      
+
                       return (
                         <div key={k} className="flex items-center justify-between">
                           <label className="flex items-center gap-2 text-sm flex-1">
@@ -874,6 +873,7 @@ export default function NewProductPage() {
                               onCheckedChange={() =>
                                 setVariantSelected((p) => ({ ...p, [k]: !p[k] }))
                               }
+                              className="data-[state=checked]:bg-neutral-700 data-[state=checked]:border-neutral-700"
                             />
                             <span>{label}</span>
                           </label>
@@ -913,7 +913,7 @@ export default function NewProductPage() {
                   const label = k.charAt(0).toUpperCase() + k.slice(1);
                   return (
                     <div key={k} className="grid gap-2">
-                      <Label htmlFor={`variant-${k}`}>{label}</Label>
+                      <Label htmlFor={`variant-${k}`} className="font-semibold">{label}</Label>
                       <Input
                         id={`variant-${k}`}
                         value={variantValues[k] ?? ""}
@@ -930,10 +930,10 @@ export default function NewProductPage() {
             ) : null}
 
             <div className="grid gap-2">
-              <Label>Customer visibility groups</Label>
-              <div className="space-y-2">
+              <Label className="font-semibold">Customer visibility groups</Label>
+              <div className="flex flex-wrap gap-6">
                 {customerVisibilityGroups.map((group) => (
-                  <label key={group.id} className="flex items-center gap-2 text-sm">
+                  <label key={group.id} className="flex items-center gap-2 text-sm text-neutral-700">
                     <Checkbox
                       checked={values.customer_groups.includes(group.id)}
                       onCheckedChange={() => {
@@ -944,6 +944,7 @@ export default function NewProductPage() {
                           return { ...p, customer_groups: groups };
                         });
                       }}
+                      className="data-[state=checked]:bg-neutral-700 data-[state=checked]:border-neutral-700"
                     />
                     <span>{group.name}</span>
                   </label>
@@ -951,7 +952,7 @@ export default function NewProductPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border px-3 bg-muted/30 h-10">
+            <div className="flex items-center justify-between rounded-lg border px-3 bg-white h-10">
               <p className="text-xs text-muted-foreground">
                 {values.is_active ? "Active" : "Inactive"}
               </p>
@@ -972,14 +973,14 @@ export default function NewProductPage() {
 
         {productDetailsComplete ? (
           <>
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Pricing</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 bg-gray-100">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="sellingPrice">Selling price</Label>
+                    <Label htmlFor="sellingPrice" className="font-semibold">Selling price <span className="text-red-500">*</span></Label>
                     <Input
                       id="sellingPrice"
                       inputMode="decimal"
@@ -992,7 +993,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="currency" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">
                       Currency
                     </Label>
                     <Input
@@ -1009,7 +1010,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="cost">Cost</Label>
+                    <Label htmlFor="cost" className="font-semibold">Cost <span className="text-red-500">*</span></Label>
                     <Input
                       id="cost"
                       inputMode="decimal"
@@ -1020,7 +1021,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="freight">Freight</Label>
+                    <Label htmlFor="freight" className="font-semibold">Freight</Label>
                     <Input
                       id="freight"
                       inputMode="decimal"
@@ -1034,7 +1035,7 @@ export default function NewProductPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label>Tax Rate</Label>
+                  <Label className="font-semibold">Tax</Label>
                   <Select
                     value={values.tax_id}
                     onValueChange={(v) => setValues((p) => ({ ...p, tax_id: v }))}
@@ -1053,9 +1054,9 @@ export default function NewProductPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <div className="rounded-lg border bg-emerald-50 px-4 py-3 text-right">
+                  <div className="px-4 py-3 text-right">
                     <div className="text-xs text-emerald-700">Total cost</div>
-                    <div className="text-lg font-bold text-emerald-800">
+                    <div className="text-xl font-bold text-neutral-900">
                       {values.currency} {pricing.totalCost.toFixed(2)}
                     </div>
                   </div>
@@ -1063,7 +1064,7 @@ export default function NewProductPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="discount">Discount (%)</Label>
+                    <Label htmlFor="discount" className="font-semibold">Discount (%)</Label>
                     <Input
                       id="discount"
                       inputMode="decimal"
@@ -1079,7 +1080,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Start & end date</Label>
+                    <Label className="font-semibold">Start & end date</Label>
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Input
                         type="date"
@@ -1105,33 +1106,25 @@ export default function NewProductPage() {
                   </div>
                 </div>
 
-                {/* Total Price - Auto Calculated */}
-                <div className="grid gap-2">
-                  <Label>Final Price (After Discount)</Label>
-                  <div className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    {pricing.priceAfterDiscount.toFixed(2)} {values.currency}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically calculated: (Selling Price + Cost + Freight) - Discount
-                  </p>
-                </div>
+               
 
+               
                 <div className="flex justify-end">
-                  <div className="rounded-lg border bg-emerald-50 px-4 py-3 text-right">
+                  <div className=" px-4 py-3 text-right">
                     <div className="text-xs text-emerald-700">Price after discount</div>
-                    <div className="text-lg font-bold text-emerald-800">
+                    <div className="text-xl font-bold text-neutral-900">
                       {values.currency} {pricing.priceAfterDiscount.toFixed(2)}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="text-sm font-medium">Bulk pricing</div>
+                  <div className="text-base font-semibold">Bulk pricing</div>
                   <div className="space-y-2">
                     {bulkPricing.map((row, idx) => (
                       <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
                         <div className="grid gap-2 sm:col-span-2">
-                          <Label htmlFor={`bulkQty-${row.id}`}>Quantity</Label>
+                          <Label htmlFor={`bulkQty-${row.id}`} className="font-semibold">Quantity</Label>
                           <Input
                             id={`bulkQty-${row.id}`}
                             inputMode="numeric"
@@ -1147,7 +1140,7 @@ export default function NewProductPage() {
                         </div>
 
                         <div className="grid gap-2 sm:col-span-2">
-                          <Label htmlFor={`bulkPrice-${row.id}`}>Price per product</Label>
+                          <Label htmlFor={`bulkPrice-${row.id}`} className="font-semibold">Price per product</Label>
                           <Input
                             id={`bulkPrice-${row.id}`}
                             inputMode="decimal"
@@ -1182,21 +1175,21 @@ export default function NewProductPage() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Media</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-6">
-                  {/* Featured Image Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+              <CardContent className="space-y-4 bg-gray-100">
+                <div className="grid gap-5 lg:grid-cols-3">
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h4 className="text-sm font-medium">Featured Image</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Primary image for product listing (JPEG, PNG, WebP - max 5MB)
-                        </p>
+                        <div className="text-sm font-semibold text-neutral-900">Featured Image</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Primary image for product listing (JPEG/PNG/WebP, max 5MB)
+                        </div>
                       </div>
+
                       <Button
                         type="button"
                         variant="outline"
@@ -1205,10 +1198,10 @@ export default function NewProductPage() {
                         onClick={() => featuredImageInputRef.current?.click()}
                       >
                         <Upload className="h-4 w-4" />
-                        {featuredImage ? "Change" : "Add Featured Image"}
+                        {featuredImage ? "Change" : "Upload"}
                       </Button>
                     </div>
-                    
+
                     <input
                       ref={featuredImageInputRef}
                       type="file"
@@ -1219,24 +1212,42 @@ export default function NewProductPage() {
                         if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
                       }}
                     />
-                    
-                    <div className="rounded-xl border p-3">
+
+                    <div
+                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                      onClick={() => featuredImageInputRef.current?.click()}
+                    >
                       {!featuredImage ? (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                          No featured image uploaded yet. This will be used as the primary product image.
+                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                          <Image
+                            src={featuredImageLogo}
+                            alt="Featured upload"
+                            width={90}
+                            height={90}
+                            className="opacity-90"
+                          />
+                          <div className="text-sm font-medium text-neutral-800">
+                            Click to upload featured image
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            Recommended: square image, high quality
+                          </div>
                         </div>
                       ) : (
-                        <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
+                        <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
                           <Image
                             src={featuredImage.url}
                             alt={featuredImage.file.name}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 768px) 100vw, 50vw"
+                            sizes="(max-width: 768px) 100vw, 33vw"
                           />
                           <button
                             type="button"
-                            onClick={removeFeaturedImage}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFeaturedImage();
+                            }}
                             className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
                             aria-label="Remove featured image"
                           >
@@ -1247,15 +1258,15 @@ export default function NewProductPage() {
                     </div>
                   </div>
 
-                  {/* Gallery Images Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h4 className="text-sm font-medium">Gallery Images</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Additional images for product detail page (max 4 images - JPEG, PNG, WebP)
-                        </p>
+                        <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Up to 4 images for the product detail page
+                        </div>
                       </div>
+
                       <Button
                         type="button"
                         variant="outline"
@@ -1265,10 +1276,10 @@ export default function NewProductPage() {
                         disabled={galleryImages.length >= 4}
                       >
                         <Upload className="h-4 w-4" />
-                        Add Gallery Images
+                        Add ({galleryImages.length}/4)
                       </Button>
                     </div>
-                    
+
                     <input
                       ref={galleryImagesInputRef}
                       type="file"
@@ -1280,29 +1291,47 @@ export default function NewProductPage() {
                         if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
                       }}
                     />
-                    
-                    <div className="rounded-xl border p-3">
+
+                    <div
+                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                      onClick={() => galleryImagesInputRef.current?.click()}
+                    >
                       {galleryImages.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                          No gallery images uploaded yet. Add up to 4 additional images.
+                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                          <Image
+                            src={galleryImageLogo}
+                            alt="Gallery upload"
+                            width={90}
+                            height={90}
+                            className="opacity-90"
+                          />
+                          <div className="text-sm font-medium text-neutral-800">
+                            Click to upload gallery images
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            You can select multiple files at once
+                          </div>
                         </div>
                       ) : (
-                        <div className="flex gap-3 overflow-x-auto scrollbar-stable">
+                        <div className="grid grid-cols-2 gap-3">
                           {galleryImages.map((m) => (
                             <div
                               key={m.id}
-                              className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
+                              className="relative h-28 overflow-hidden rounded-xl border bg-muted"
                             >
                               <Image
                                 src={m.url}
                                 alt={m.file.name}
                                 fill
                                 className="object-cover"
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                sizes="(max-width: 768px) 50vw, 16vw"
                               />
                               <button
                                 type="button"
-                                onClick={() => removeGalleryImage(m.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeGalleryImage(m.id);
+                                }}
                                 className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
                                 aria-label="Remove gallery image"
                               >
@@ -1315,111 +1344,134 @@ export default function NewProductPage() {
                     </div>
                   </div>
 
-                {/* Video Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">Product Video</h4>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-neutral-900">Video</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          One video (MP4/WebM/OGG/QuickTime, max 50MB)
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => videoInputRef.current?.click()}
+                      >
+                        <Video className="h-4 w-4" />
+                        {videoFile ? "Change" : "Upload"}
+                      </Button>
+                    </div>
+
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                      className="hidden"
+                      onChange={(e) => {
+                        handleVideo(e.target.files);
+                        if (videoInputRef.current) videoInputRef.current.value = "";
+                      }}
+                    />
+
+                    <div
+                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
                       onClick={() => videoInputRef.current?.click()}
                     >
-                      <Video className="h-4 w-4" />
-                      Add Video
-                    </Button>
+                      {!videoFile ? (
+                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                          <Image
+                            src={videoUploadLogo}
+                            alt="Video upload"
+                            width={120}
+                            height={120}
+                            className="opacity-90"
+                          />
+                          <div className="text-sm font-medium text-neutral-800">
+                            Click to upload product video
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            Keep it short and clear (recommended)
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
+                          <video
+                            src={videoFile.url}
+                            className="h-full w-full object-cover"
+                            controls
+                            muted
+                            preload="metadata"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeVideo();
+                            }}
+                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                            aria-label="Remove video"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    accept="video/mp4,video/webm,video/ogg,video/quicktime"
-                    className="hidden"
-                    onChange={(e) => {
-                      handleVideo(e.target.files);
-                      if (videoInputRef.current) videoInputRef.current.value = "";
-                    }}
-                  />
-                  
-                  <div className="rounded-xl border p-3">
-                    {!videoFile ? (
-                      <div className="p-8 text-center text-sm text-muted-foreground">
-                        No video uploaded yet. Add one video (MP4, WebM, OGG, QuickTime - max 50MB).
+                </div>
+
+                {/* Upload Progress */}
+                {isUploading && (
+                  <div className="mt-4 space-y-2">
+                    {uploadProgress.gallery > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>Uploading images...</span>
+                          <span>{uploadProgress.gallery}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress.gallery}%` }}
+                          />
+                        </div>
                       </div>
-                    ) : (
-                      <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
-                        <video
-                          src={videoFile.url}
-                          className="h-full w-full object-cover"
-                          controls
-                          muted
-                          preload="metadata"
-                        />
-                        <button
-                          type="button"
-                          onClick={removeVideo}
-                          className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
-                          aria-label="Remove video"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                    )}
+                    {uploadProgress.video > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>Uploading video...</span>
+                          <span>{uploadProgress.video}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress.video}%` }}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Upload Progress */}
-              {isUploading && (
-                <div className="mt-4 space-y-2">
-                  {uploadProgress.gallery > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span>Uploading images...</span>
-                        <span>{uploadProgress.gallery}%</span>
+                {/* Upload Errors */}
+                {uploadErrors.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-sm font-medium text-red-600">Upload Errors:</div>
+                    {uploadErrors.map((error, index) => (
+                      <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                        {error}
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress.gallery}%` }}
-                        />
+                    ))}
+                    {createdProductId && (
+                      <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                        Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
                       </div>
-                    </div>
-                  )}
-                  {uploadProgress.video > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span>Uploading video...</span>
-                        <span>{uploadProgress.video}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress.video}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Upload Errors */}
-              {uploadErrors.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium text-red-600">Upload Errors:</div>
-                  {uploadErrors.map((error, index) => (
-                    <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                      {error}
-                    </div>
-                  ))}
-                  {createdProductId && (
-                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                      Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1430,7 +1482,7 @@ export default function NewProductPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="stockQty">Stock quantity</Label>
+                    <Label htmlFor="stockQty" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
                     <Input
                       id="stockQty"
                       inputMode="numeric"
@@ -1448,7 +1500,7 @@ export default function NewProductPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="weight">Weight</Label>
+                    <Label htmlFor="weight" className="font-semibold">Weight</Label>
                     <Input
                       id="weight"
                       value={values.weight}
@@ -1460,7 +1512,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="length">Length</Label>
+                    <Label htmlFor="length" className="font-semibold">Length</Label>
                     <Input
                       id="length"
                       value={values.length}
@@ -1472,7 +1524,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="width">Width</Label>
+                    <Label htmlFor="width" className="font-semibold">Width</Label>
                     <Input
                       id="width"
                       value={values.width}
@@ -1484,7 +1536,7 @@ export default function NewProductPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="height">Height</Label>
+                    <Label htmlFor="height" className="font-semibold">Height</Label>
                     <Input
                       id="height"
                       value={values.height}

@@ -164,6 +164,7 @@ export default function ProductEditPage() {
     height: "",
     visibility_wholesale: true,
     visibility_retail: true,
+    is_active: true,
   }));
 
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([]);
@@ -236,13 +237,6 @@ export default function ProductEditPage() {
         // Handle both product_img_url and product_img_url (in case of different naming)
         const productImgUrl = productData?.product_img_url || (productData as any)?.product_img_url || null;
         
-        console.log("=== Loading Product Data ===");
-        console.log("Product ID:", id);
-        console.log("Full productData:", productData);
-        console.log("product_img_url:", productImgUrl);
-        console.log("productData.product_img_url:", productData?.product_img_url);
-        console.log("(productData as any).product_img_url:", (productData as any)?.product_img_url);
-        
         const featuredImageItem: StoredMediaItem | null = productImgUrl && String(productImgUrl).trim() !== "" && String(productImgUrl).trim() !== "null" ? {
           id: crypto.randomUUID(),
           kind: "image" as const,
@@ -251,7 +245,6 @@ export default function ProductEditPage() {
           url: String(productImgUrl).trim(),
         } : null;
         
-        console.log("Featured image item:", featuredImageItem);
 
         // Extract gallery images from images array
         const productImages = productData?.images || [];
@@ -265,7 +258,6 @@ export default function ProductEditPage() {
 
         // Extract video from product
         const videoUrl = productData?.product_video_url || (productData as any)?.product_video_url || null;
-        console.log("Loading product - product_video_url:", videoUrl);
         const videoItem: StoredMediaItem | null = videoUrl && String(videoUrl).trim() !== "" && String(videoUrl).trim() !== "null" ? {
           id: crypto.randomUUID(),
           kind: "video" as const,
@@ -273,7 +265,6 @@ export default function ProductEditPage() {
           type: "video/mp4",
           url: String(videoUrl).trim(),
         } : null;
-        console.log("Video item:", videoItem);
 
         // Format dates for date inputs (YYYY-MM-DD)
         const formatDateForInput = (date: any): string => {
@@ -306,16 +297,10 @@ export default function ProductEditPage() {
           ? cvgIds 
           : (productData?.customer_groups?.cvg_ids ?? []);
         
-        console.log("=== Customer Visibility Groups ===");
-        console.log("cvgProducts:", productData?.cvgProducts);
-        console.log("Extracted CVG IDs:", customerGroupIds);
-        console.log("customer_groups:", productData?.customer_groups);
 
         // Load bulk pricing
         // Backend entity uses bulkPrices (camelCase), DTO uses bulk_prices (snake_case)
         const bulkPrices = productData?.bulk_prices || productData?.bulkPrices || [];
-        console.log("Product data - bulk_prices:", productData?.bulk_prices, "bulkPrices:", productData?.bulkPrices); // Debug log
-        console.log("Bulk prices array:", bulkPrices); // Debug log
 
         // Convert prices from USD to selected currency for display
         const convertPriceForDisplay = async (price: number): Promise<string> => {
@@ -328,7 +313,6 @@ export default function ProductEditPage() {
             const converted = await convertAmount(price, 'USD', targetCurrency);
             return String(converted);
           } catch (error) {
-            console.error('Error converting price for display:', error);
             return String(price);
           }
         };
@@ -373,20 +357,18 @@ export default function ProductEditPage() {
           height: productData?.height ? String(productData.height) : "",
           visibility_wholesale: productData?.visibility_wholesale ?? true,
           visibility_retail: productData?.visibility_retail ?? true,
+          is_active: productData?.is_active ?? true,
         });
 
         // Load bulk pricing
         if (convertedBulkPricing.length > 0) {
-          console.log("Setting converted bulk pricing:", convertedBulkPricing); // Debug log
           setBulkPricing(convertedBulkPricing);
         } else {
-          console.log("No bulk prices found in product data"); // Debug log
           setBulkPricing([]);
         }
 
         // Load variants - merge all variant types with product-specific variants
         const variants = productData?.variants || [];
-        console.log("Loading variants:", variants); // Debug log
         
         // Default variant types that should always be available
         const defaultVariantNames = ["size", "model", "year"];
@@ -496,9 +478,6 @@ export default function ProductEditPage() {
         // Set custom variant IDs so they can be deleted
         setRecentlyAddedVariantTypes(customVariantIds);
         
-        console.log("Variant selected:", selected); // Debug log
-        console.log("Variant values:", variantValuesMap); // Debug log
-        console.log("Custom variant IDs (deletable):", Array.from(customVariantIds)); // Debug log
         setVariantSelected(selected);
         setVariantValues(variantValuesMap);
         setFeaturedImage(featuredImageItem);
@@ -508,7 +487,6 @@ export default function ProductEditPage() {
         setPendingGalleryImages([]);
         setPendingVideo(null);
       } catch (error: any) {
-        console.error("Failed to load product:", error);
         toast.error(error?.message || "Failed to load product");
       } finally {
         setLoading(false);
@@ -520,30 +498,17 @@ export default function ProductEditPage() {
 
   // Update form values when selected country changes
   React.useEffect(() => {
-    console.log('🔥 useEffect triggered!', { 
-      selectedCountry: selectedCountry?.name, 
-      selectedCountryCode: selectedCountry?.cca2,
-      product: !!product,
-      currentCurrency: values.currency
-    });
-
     if (!product || !selectedCountry) {
-      console.log('❌ Missing product or selectedCountry');
       return;
     }
 
     const targetCurrency = Object.keys(selectedCountry.currencies)[0];
     const sourceCurrency = values.currency;
     
-    console.log('🎯 Converting from', sourceCurrency, 'to', targetCurrency);
-    
     // Only update if currency is different from current
     if (sourceCurrency === targetCurrency) {
-      console.log('⏭️ Currency already same, skipping');
       return;
     }
-
-    console.log('🔄 Converting prices from', sourceCurrency, 'to', targetCurrency);
 
     const convertField = async (value: string): Promise<string> => {
       const numValue = Number(value) || 0;
@@ -551,17 +516,13 @@ export default function ProductEditPage() {
       
       try {
         const converted = await convertAmount(numValue, sourceCurrency, targetCurrency);
-        console.log('✅ Converted', numValue, sourceCurrency, 'to', converted, targetCurrency);
         return String(converted);
       } catch (error) {
-        console.error('❌ Error converting field value:', error);
         return value;
       }
     };
 
     const updatePrices = async () => {
-      console.log('🚀 Starting price update...');
-      
       const updatedValues = {
         ...values,
         currency: targetCurrency,
@@ -571,7 +532,6 @@ export default function ProductEditPage() {
         total_price: await convertField(values.total_price),
       };
 
-      console.log('📝 Updated values:', updatedValues);
       setValues(updatedValues);
 
       // Update bulk pricing
@@ -582,7 +542,6 @@ export default function ProductEditPage() {
         }))
       );
       setBulkPricing(updatedBulkPricing);
-      console.log('✅ Price update completed!');
     };
 
     updatePrices();
@@ -638,10 +597,13 @@ export default function ProductEditPage() {
         
         setVariantsOpen(true);
         setNewVariantName("");
+        toast.success(`Variant type "${raw}" created successfully`);
+      } else {
+        toast.error(response.message || "Failed to create variant type");
       }
-    } catch (error) {
-      console.error("Failed to create variant type:", error);
-      toast.error("Failed to create variant type");
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create variant type";
+      toast.error(errorMessage);
     }
   };
 
@@ -692,7 +654,6 @@ export default function ProductEditPage() {
           variants: currentVariants.length > 0 ? currentVariants : [],
         });
       } catch (updateError) {
-        console.error("Failed to remove variant from product:", updateError);
         toast.error("Failed to remove variant from product");
         return;
       }
@@ -726,7 +687,6 @@ export default function ProductEditPage() {
         toast.success("Variant type deleted successfully");
       }
     } catch (error: any) {
-      console.error("Failed to delete variant type:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to delete variant type";
       toast.error(errorMessage);
     }
@@ -828,15 +788,12 @@ export default function ProductEditPage() {
             await productsService.deleteProductImage(fileName);
           }
         } catch (error) {
-          console.error("Failed to delete featured image from files backend:", error);
           // Continue even if file deletion fails
         }
       }
       
       setFeaturedImage(null);
-      toast.success("Featured image removed successfully");
     } catch (error: any) {
-      console.error("Failed to remove featured image:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
       toast.error(`Failed to remove featured image: ${errorMessage}`);
     }
@@ -900,7 +857,6 @@ export default function ProductEditPage() {
       if (isExistingImage) {
         // Delete from backend using image ID
         await productsService.deleteProductImageById(id, imageToRemove.id);
-        toast.success("Image removed successfully");
       }
       
       // Remove from state
@@ -1005,7 +961,7 @@ export default function ProductEditPage() {
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
         brand_id: values.brand_id,
-        currency: targetCurrency, // Always store as USD
+        currency: values.currency,
         is_active: (product as any)?.is_active ?? true,
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
@@ -1392,7 +1348,7 @@ export default function ProductEditPage() {
             <Button variant="outline" onClick={() => router.push(`/dashboard/products/view/${id}`)}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={!product || !values.title.trim() || isUpdating || !canUpdate}>
+            <Button onClick={save} disabled={!product || !values.title.trim() || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800">
               {isUpdating ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -1412,13 +1368,13 @@ export default function ProductEditPage() {
           </Card>
         ) : (
           <div className="space-y-6">
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Product details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 bg-gray-100">
                 <div className="grid gap-2">
-                  <Label htmlFor="title">Name</Label>
+                  <Label htmlFor="title" className="font-semibold">Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="title"
                     value={values.title}
@@ -1427,7 +1383,7 @@ export default function ProductEditPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description" className="font-semibold">Description <span className="text-red-500">*</span></Label>
                   <Textarea
                     id="description"
                     value={values.description}
@@ -1438,154 +1394,217 @@ export default function ProductEditPage() {
 
                 
 
-                <div className="grid gap-2">
-                  <Label>Customer visibility groups</Label>
-                  <div className="space-y-2">
-                    {customerVisibilityGroups.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No customer visibility groups available</div>
-                    ) : (
-                      customerVisibilityGroups.map((group) => (
-                        <label key={group.id} className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={values.customer_groups.includes(group.id)}
-                            onCheckedChange={(checked) => {
-                              console.log("Customer visibility group checkbox changed:", group.id, checked);
-                              setValues((p) => {
-                                const currentGroups = p.customer_groups || [];
-                                const groups = checked
-                                  ? [...currentGroups, group.id]
-                                  : currentGroups.filter((id) => id !== group.id);
-                                console.log("Updated customer_groups:", groups);
-                                return { ...p, customer_groups: groups };
-                              });
-                            }}
-                          />
-                          <span>{group.name}</span>
-                        </label>
-                      ))
-                    )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
+                    <Select
+                      value={values.category_id}
+                      onValueChange={(v) => setValues((p) => ({ ...p, category_id: v }))}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Brand <span className="text-red-500">*</span></Label>
+                    <Select
+                      value={values.brand_id}
+                      onValueChange={(v) => setValues((p) => ({ ...p, brand_id: v }))}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Supplier <span className="text-red-500">*</span></Label>
+                    <Select
+                      value={values.supplier_id}
+                      onValueChange={(v) => setValues((p) => ({ ...p, supplier_id: v }))}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Warehouse <span className="text-red-500">*</span></Label>
+                    <Select
+                      value={values.warehouse_id}
+                      onValueChange={(v) => setValues((p) => ({ ...p, warehouse_id: v }))}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
                 <div className="grid gap-2">
-                  <Label>Variants</Label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      className="h-10 w-full rounded-md border bg-background px-3 text-left text-sm"
-                      onClick={() => setVariantsOpen((v) => !v)}
-                    >
-                      {selectedVariantKeys.length
-                        ? selectedVariantKeys
-                            .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-                            .join(", ")
-                        : "Select variants"}
-                    </button>
+                  <Label className="font-semibold">Variants</Label>
+                  <button
+                    type="button"
+                    className="h-10 w-full rounded-md border bg-background px-3 text-left text-sm"
+                    onClick={() => setVariantsOpen((v) => !v)}
+                  >
+                    {selectedVariantKeys.length
+                      ? selectedVariantKeys
+                        .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+                        .join(", ")
+                      : "Select variants"}
+                  </button>
 
-                    {variantsOpen ? (
-                      <div className="rounded-lg border p-3 space-y-3 mt-1 bg-white z-10 relative">
-                        <div className="grid gap-2">
-                          {variantOptions.map((k) => {
-                            const label = k.charAt(0).toUpperCase() + k.slice(1);
-                            const variantType = variantTypes.find(v => v.name.toLowerCase() === k);
-                            
-                            // Check if this is a custom variant (not a default one) and can be deleted
-                            const defaultVariantNames = ["size", "model", "year"];
-                            const isDefaultVariant = defaultVariantNames.includes(k.toLowerCase());
-                            const isCustomVariant = variantType && !isDefaultVariant;
-                            const canDelete = isCustomVariant && variantType.id;
-                            
-                            return (
-                              <div key={k} className="flex items-center justify-between">
-                                <label className="flex items-center gap-2 text-sm flex-1">
-                                  <Checkbox
-                                    checked={Boolean(variantSelected[k])}
-                                    onCheckedChange={() =>
-                                      setVariantSelected((p) => ({ ...p, [k]: !p[k] }))
-                                    }
-                                  />
-                                  <span>{label}</span>
-                                </label>
-                                {canDelete && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                    onClick={() => {
-                                      if (variantType && variantType.id) {
-                                        deleteVariantOption(variantType.id, k);
-                                      }
-                                    }}
-                                  >
-                                    ×
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                  {variantsOpen ? (
+                    <div className="rounded-lg border p-3 space-y-3">
+                      <div className="grid gap-2">
+                        {variantOptions.map((k) => {
+                          const label = k.charAt(0).toUpperCase() + k.slice(1);
+                          const variantType = variantTypes.find(v => v.name.toLowerCase() === k);
+                          const isRecentlyAdded = variantType ? recentlyAddedVariantTypes.has(variantType.id) : false;
 
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            value={newVariantName}
-                            onChange={(e) => setNewVariantName(e.target.value)}
-                            placeholder="Add variant"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                addVariantOption();
-                              }
-                            }}
-                          />
-                          <Button type="button" variant="outline" onClick={addVariantOption}>
-                            Add
-                          </Button>
-                        </div>
+                          return (
+                            <div key={k} className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 text-sm flex-1">
+                                <Checkbox
+                                  checked={Boolean(variantSelected[k])}
+                                  onCheckedChange={() =>
+                                    setVariantSelected((p) => ({ ...p, [k]: !p[k] }))
+                                  }
+                                  className="data-[state=checked]:bg-neutral-700 data-[state=checked]:border-neutral-700"
+                                />
+                                <span>{label}</span>
+                              </label>
+                              {isRecentlyAdded && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                  onClick={() => deleteVariantOption(variantType!.id, k)}
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    ) : null}
-                  </div>
 
-                  {selectedVariantKeys.length ? (
-                    <div className="grid gap-4 sm:grid-cols-2 mt-4">
-                      {selectedVariantKeys.map((k) => {
-                        const label = k.charAt(0).toUpperCase() + k.slice(1);
-                        return (
-                          <div key={k} className="grid gap-2">
-                            <Label htmlFor={`variant-${k}`}>{label}</Label>
-                            <Input
-                              id={`variant-${k}`}
-                              value={variantValues[k] ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setVariantValues((p) => ({ ...p, [k]: v }));
-                              }}
-                              placeholder={label}
-                            />
-                          </div>
-                        );
-                      })}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          value={newVariantName}
+                          onChange={(e) => setNewVariantName(e.target.value)}
+                          placeholder="Add variant"
+                        />
+                        <Button type="button" variant="outline" onClick={addVariantOption}>
+                          Add
+                        </Button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border px-3 bg-muted/30 h-10">
+                {selectedVariantKeys.length ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {selectedVariantKeys.map((k) => {
+                      const label = k.charAt(0).toUpperCase() + k.slice(1);
+                      return (
+                        <div key={k} className="grid gap-2">
+                          <Label htmlFor={`variant-${k}`} className="font-semibold">{label}</Label>
+                          <Input
+                            id={`variant-${k}`}
+                            value={variantValues[k] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setVariantValues((p) => ({ ...p, [k]: v }));
+                            }}
+                            placeholder={label}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2">
+                  <Label className="font-semibold">Customer visibility groups</Label>
+                  <div className="flex flex-wrap gap-6">
+                    {customerVisibilityGroups.map((group) => (
+                      <label key={group.id} className="flex items-center gap-2 text-sm text-neutral-700">
+                        <Checkbox
+                          checked={values.customer_groups.includes(group.id)}
+                          onCheckedChange={(checked) => {
+                            setValues((p) => {
+                              const currentGroups = p.customer_groups || [];
+                              const groups = checked
+                                ? [...currentGroups, group.id]
+                                : currentGroups.filter((id) => id !== group.id);
+                              return { ...p, customer_groups: groups };
+                            });
+                          }}
+                          className="data-[state=checked]:bg-neutral-700 data-[state=checked]:border-neutral-700"
+                        />
+                        <span>{group.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border px-3 bg-white h-10">
                   <p className="text-xs text-muted-foreground">
-                    {product.is_active ? "Active" : "Inactive"}
+                    {values.is_active ? "Active" : "Inactive"}
                   </p>
-                  <Switch checked={product.is_active} disabled className="data-[state=checked]:bg-green-600" />
+                  <Switch
+                    checked={values.is_active}
+                    onCheckedChange={(checked) => setValues((p) => ({ ...p, is_active: checked }))}
+                    className="data-[state=checked]:bg-green-600"
+                  />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Pricing</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 bg-gray-100">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="sellingPrice">Selling price</Label>
+                    <Label htmlFor="sellingPrice" className="font-semibold">Selling price <span className="text-red-500">*</span></Label>
                     <Input
                       id="sellingPrice"
                       inputMode="decimal"
@@ -1595,23 +1614,7 @@ export default function ProductEditPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="currency" className="text-sm font-medium text-gray-700">
-                      Currency
-                    </Label>
-                    <Input
-                      id="currency"
-                      value={getCurrencyCode()}
-                      readOnly
-                      className="bg-gray-100 cursor-not-allowed"
-                      placeholder="Currency will be set based on your selection"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Currency is automatically set based on your global selection
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="cost">Cost</Label>
+                    <Label htmlFor="cost" className="font-semibold">Cost <span className="text-red-500">*</span></Label>
                     <Input
                       id="cost"
                       inputMode="decimal"
@@ -1621,7 +1624,7 @@ export default function ProductEditPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="freight">Freight</Label>
+                    <Label htmlFor="freight" className="font-semibold">Freight</Label>
                     <Input
                       id="freight"
                       inputMode="decimal"
@@ -1629,11 +1632,9 @@ export default function ProductEditPage() {
                       onChange={(e) => setValues((p) => ({ ...p, freight: e.target.value }))}
                     />
                   </div>
-                </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label>Tax</Label>
+                    <Label className="font-semibold">Tax</Label>
                     <Select
                       value={values.tax_id}
                       onValueChange={(v) => setValues((p) => ({ ...p, tax_id: v }))}
@@ -1650,9 +1651,11 @@ export default function ProductEditPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="discount">Discount (%)</Label>
+                    <Label htmlFor="discount" className="font-semibold">Discount (%)</Label>
                     <Input
                       id="discount"
                       inputMode="decimal"
@@ -1660,90 +1663,84 @@ export default function ProductEditPage() {
                       onChange={(e) => setValues((p) => ({ ...p, discount: e.target.value }))}
                     />
                   </div>
-                </div>
 
-                <div className="grid gap-2">
-                  <Label>Start & end date</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      type="date"
-                      value={values.start_discount_date}
-                      onChange={(e) => setValues((p) => ({ ...p, start_discount_date: e.target.value }))}
-                    />
-                    <Input
-                      type="date"
-                      value={values.end_discount_date}
-                      onChange={(e) => setValues((p) => ({ ...p, end_discount_date: e.target.value }))}
-                    />
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Start & end date</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input
+                        type="date"
+                        value={values.start_discount_date}
+                        onChange={(e) => setValues((p) => ({ ...p, start_discount_date: e.target.value }))}
+                      />
+                      <Input
+                        type="date"
+                        value={values.end_discount_date}
+                        onChange={(e) => setValues((p) => ({ ...p, end_discount_date: e.target.value }))}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="text-sm font-medium">Bulk pricing</div>
-                  {bulkPricing.length === 0 ? (
-                    <Button type="button" variant="outline" onClick={addBulkRow}>
-                      Add bulk row
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      {bulkPricing.map((row, idx) => (
-                        <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
-                          <div className="grid gap-2 sm:col-span-2">
-                            <Label htmlFor={`bulkQty-${row.id}`}>Quantity</Label>
-                            <Input
-                              id={`bulkQty-${row.id}`}
-                              inputMode="numeric"
-                              value={row.quantity}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setBulkPricing((p) =>
-                                  p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
-                                );
-                              }}
-                            />
-                          </div>
-
-                          <div className="grid gap-2 sm:col-span-2">
-                            <Label htmlFor={`bulkPrice-${row.id}`}>Price per product</Label>
-                            <Input
-                              id={`bulkPrice-${row.id}`}
-                              inputMode="decimal"
-                              value={row.price}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setBulkPricing((p) =>
-                                  p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
-                                );
-                              }}
-                            />
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button type="button" variant="outline" onClick={addBulkRow}>
-                              +
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => removeBulkRow(row.id)}
-                              disabled={bulkPricing.length <= 1 || idx === 0}
-                            >
-                              -
-                            </Button>
-                          </div>
+                  <div className="text-base font-semibold">Bulk pricing</div>
+                  <div className="space-y-2">
+                    {bulkPricing.map((row, idx) => (
+                      <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label htmlFor={`bulkQty-${row.id}`} className="font-semibold">Quantity</Label>
+                          <Input
+                            id={`bulkQty-${row.id}`}
+                            inputMode="numeric"
+                            value={row.quantity}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBulkPricing((p) =>
+                                p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
+                              );
+                            }}
+                          />
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label htmlFor={`bulkPrice-${row.id}`} className="font-semibold">Price per product</Label>
+                          <Input
+                            id={`bulkPrice-${row.id}`}
+                            inputMode="decimal"
+                            value={row.price}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBulkPricing((p) =>
+                                p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" onClick={addBulkRow}>
+                            +
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeBulkRow(row.id)}
+                            disabled={bulkPricing.length <= 1 || idx === 0}
+                          >
+                            -
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Media</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 bg-gray-100">
                 <div className="space-y-6">
                   {/* Featured Image Section */}
                   <div className="space-y-3">
@@ -1973,7 +1970,6 @@ export default function ProductEditPage() {
                                   
                                   await productsService.updateProduct(updatePayload);
                                   setExistingVideo(null);
-                                  toast.success("Video removed successfully");
                                 } catch (error: any) {
                                   console.error("Failed to remove video:", error);
                                   const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
@@ -1996,33 +1992,14 @@ export default function ProductEditPage() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
-              <CardHeader>
+            <Card className="shadow-sm bg-gray-100">
+              <CardHeader className="bg-gray-100">
                 <CardTitle className="text-lg">Inventory and shipping</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 bg-gray-100">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label>Warehouse</Label>
-                    <Select
-                      value={values.warehouse_id}
-                      onValueChange={(v) => setValues((p) => ({ ...p, warehouse_id: v }))}
-                    >
-                      <SelectTrigger className="h-10 w-full">
-                        <SelectValue placeholder="Select warehouse" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="stock">Stock quantity</Label>
+                    <Label htmlFor="stock" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
                     <Input
                       id="stock"
                       inputMode="numeric"
@@ -2030,9 +2007,7 @@ export default function ProductEditPage() {
                       onChange={(e) => setValues((p) => ({ ...p, stock_quantity: e.target.value }))}
                     />
                   </div>
-                </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="weight">Weight</Label>
                     <Input
@@ -2041,7 +2016,9 @@ export default function ProductEditPage() {
                       onChange={(e) => setValues((p) => ({ ...p, weight: e.target.value }))}
                     />
                   </div>
+                </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="length">Length</Label>
                     <Input

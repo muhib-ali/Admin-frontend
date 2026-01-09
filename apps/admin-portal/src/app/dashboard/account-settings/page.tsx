@@ -217,33 +217,9 @@ export default function AccountSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold truncate">Account Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold truncate">Profile Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">Manage account information and security</p>
       </div>
-
-      {/* Debug Test Button */}
-      <Card className="shadow-sm border-yellow-200 bg-yellow-50">
-        <CardContent className="p-4">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-yellow-800">Debug Test</p>
-            <button
-              onClick={() => {
-                console.log("🧪 Test button clicked");
-                const testUser = { name: "Test User " + Date.now(), email: "test@example.com" };
-                const event = new CustomEvent('profileUpdated', { 
-                  detail: { user: testUser } 
-                });
-                window.dispatchEvent(event);
-                console.log("🧪 Test event dispatched");
-              }}
-              className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-            >
-              Test Event System
-            </button>
-            <p className="text-xs text-yellow-600">Click this to test if the event system works</p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Profile Information Section */}
       <Card className="shadow-sm">

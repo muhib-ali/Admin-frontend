@@ -136,7 +136,7 @@ export function ProductCard({
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold text-base text-gray-900 truncate">{product.title}</h3>
             <p className="mt-1 text-xs text-gray-500 truncate">
-              {product.id} • {product.brand?.name ?? "—"}
+              {product.description || "No description"} • {product.brand?.name ?? "—"}
             </p>
           </div>
           <div className="text-right shrink-0">
