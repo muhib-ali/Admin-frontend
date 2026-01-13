@@ -3,8 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllVariantTypesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
-import { createVariantType, deleteVariantType } from "@/services/variant-types";
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
@@ -190,14 +189,14 @@ export default function ProductEditPage() {
 
     (async () => {
       try {
-        const [cats, brs, tax, sup, wh, vt, cvg] = await Promise.all([
+        const [cats, brs, tax, sup, wh, cvg, defaultVTypes] = await Promise.all([
           getAllCategoriesDropdown({ signal: ac.signal }),
           getAllBrandsDropdown({ signal: ac.signal }),
           getAllTaxesDropdown({ signal: ac.signal }),
           getAllSuppliersDropdown({ signal: ac.signal }),
           getAllWarehousesDropdown({ signal: ac.signal }),
-          getAllVariantTypesDropdown({ signal: ac.signal }),
           getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
+          productsService.getDefaultVariantTypes(),
         ]);
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
@@ -205,11 +204,14 @@ export default function ProductEditPage() {
         setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
-        // Load all variant types (including default ones and custom ones)
-        // We'll merge with product-specific variants after loading product data
-        const allVariantTypes = (vt ?? []).map((v: any) => ({ id: v.value, name: v.label }));
-        // Store all variant types for later use (including defaults)
-        setVariantTypes(allVariantTypes);
+        // Load default variant types from API (size, model, year)
+        const defaultVariantTypesData = (defaultVTypes as any)?.data ?? [];
+        setVariantTypes(
+          (defaultVariantTypesData as any[]).map((vt: any) => ({
+            id: vt.id,
+            name: vt.name,
+          }))
+        );
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
       } catch {
         // ignore UI-only page for now
@@ -230,8 +232,17 @@ export default function ProductEditPage() {
 
       try {
         setLoading(true);
-        const productData: any = await productsService.getProductById(id);
+        const [productData, defaultVTypesResp] = await Promise.all([
+          productsService.getProductById(id),
+          productsService.getDefaultVariantTypes(),
+        ]);
         setProduct(productData);
+
+        const defaultVariantTypesFromApi: Array<{ id: string; name: string }> =
+          (defaultVTypesResp as any)?.data?.map((vt: any) => ({
+            id: String(vt?.id ?? ""),
+            name: String(vt?.name ?? ""),
+          })) ?? [];
 
         // Extract featured image from product_img_url
         // Handle both product_img_url and product_img_url (in case of different naming)
@@ -367,37 +378,26 @@ export default function ProductEditPage() {
           setBulkPricing([]);
         }
 
-        // Load variants - merge all variant types with product-specific variants
+        // Load variants - always include default variant types (size, model, year) + product-specific
         const variants = productData?.variants || [];
-        
+      
         // Default variant types that should always be available
         const defaultVariantNames = ["size", "model", "year"];
-        
-        // Get all variant types from dropdown (already loaded in first useEffect)
-        // Merge with product-specific variant types and default variants
+      
+        // Merge default variant types from API + product-specific variant types
         const allVariantTypesMap = new Map<string, { id: string; name: string }>();
-        
-        // First, add default variant types (they should be in the dropdown, but ensure they're included)
-        defaultVariantNames.forEach((defaultName) => {
-          const defaultVariant = variantTypes.find(
-            (vt) => vt.name.toLowerCase().trim() === defaultName.toLowerCase()
-          );
-          if (defaultVariant && defaultVariant.id) {
-            // Only add if we have a valid ID
-            const key = defaultName.toLowerCase();
-            allVariantTypesMap.set(key, { id: defaultVariant.id, name: defaultVariant.name });
-          }
-          // If default variant not found in dropdown, skip it (don't add with empty ID)
-        });
-        
-        // Add all variant types from dropdown (including defaults and custom ones)
-        variantTypes.forEach((vt) => {
-          const key = vt.name.toLowerCase().trim();
+
+        // First, add default variant types from API so we always have correct IDs.
+        defaultVariantTypesFromApi.forEach((vt) => {
+          const idVal = String(vt.id ?? "").trim();
+          const nameVal = String(vt.name ?? "").trim();
+          if (!idVal || !nameVal) return;
+          const key = nameVal.toLowerCase();
           if (!allVariantTypesMap.has(key)) {
-            allVariantTypesMap.set(key, { id: vt.id, name: vt.name });
+            allVariantTypesMap.set(key, { id: idVal, name: nameVal });
           }
         });
-        
+      
         // Add product-specific variant types (if not already in the map)
         variants.forEach((v: any) => {
           const variantType = v.variantType || v.variant_type;
@@ -412,7 +412,7 @@ export default function ProductEditPage() {
           }
         });
         
-        // Update variant types state with merged list
+        // Update variant types state with merged list (includes defaults from API)
         const mergedVariantTypes = Array.from(allVariantTypesMap.values());
         setVariantTypes(mergedVariantTypes);
         
@@ -578,11 +578,17 @@ export default function ProductEditPage() {
       return;
     }
     
+    if (!id) {
+      toast.error("Product ID is required to create custom variant types");
+      return;
+    }
+    
     try {
-      // Create new variant type via API
-      const response = await createVariantType(raw);
+      // Create product-scoped custom variant type via new API
+      const response = await productsService.createCustomVariantType(id, raw);
       if (response.status && response.data) {
         const newVariantId = (response.data as any).id;
+        const newVariantName = (response.data as any).name;
         
         // Add to local state
         setVariantOptions((p) => [...p, key]);
@@ -593,7 +599,7 @@ export default function ProductEditPage() {
         setRecentlyAddedVariantTypes((prev) => new Set([...prev, newVariantId]));
         
         // Add to variant types dropdown
-        setVariantTypes((p) => [...p, { id: newVariantId, name: raw }]);
+        setVariantTypes((p) => [...p, { id: newVariantId, name: newVariantName }]);
         
         setVariantsOpen(true);
         setNewVariantName("");
@@ -608,58 +614,14 @@ export default function ProductEditPage() {
   };
 
   const deleteVariantOption = async (variantId: string, variantKey: string) => {
+    if (!id) {
+      toast.error("Product ID is required to delete custom variant types");
+      return;
+    }
+    
     try {
-      // First, remove the variant from the current product
-      // Get current variants and filter out the one we're deleting
-      const currentVariants = selectedVariantKeys
-        .filter((key: string) => key !== variantKey && variantValues[key]?.trim())
-        .map((key: string) => {
-          const variantType = variantTypes.find(
-            (vt) => vt.name.toLowerCase().trim() === key.toLowerCase().trim()
-          );
-          
-          if (!variantType || !variantType.id || variantType.id.trim() === "") {
-            return null;
-          }
-          
-          return {
-            vtype_id: variantType.id,
-            value: variantValues[key].trim(),
-          };
-        })
-        .filter((v): v is { vtype_id: string; value: string } => v !== null && v.vtype_id !== null && v.vtype_id !== undefined && v.vtype_id.trim() !== "");
-      
-      // Update product to remove the variant
-      try {
-        const basePrice = Number(values.selling_price) || 0;
-        const cost = Number(values.cost) || 0;
-        const freight = Number(values.freight) || 0;
-        const discountPercent = Number(values.discount) || 0;
-        
-        const totalCost = basePrice + cost + freight;
-        const priceAfterDiscount = discountPercent > 0 
-          ? totalCost - (totalCost * discountPercent) / 100 
-          : totalCost;
-
-        await productsService.updateProduct({
-          id: id,
-          title: values.title.trim(),
-          description: values.description.trim(),
-          price: basePrice,
-          stock_quantity: Number(values.stock_quantity) || 0,
-          category_id: values.category_id,
-          brand_id: values.brand_id,
-          currency: values.currency,
-          total_price: priceAfterDiscount,
-          variants: currentVariants.length > 0 ? currentVariants : [],
-        });
-      } catch (updateError) {
-        toast.error("Failed to remove variant from product");
-        return;
-      }
-      
-      // Now delete the variant type
-      const response = await deleteVariantType(variantId);
+      // Use the new product-scoped unlink endpoint
+      const response = await productsService.unlinkCustomVariantType(id, variantId);
       if (response.status) {
         // Remove from recently added list
         setRecentlyAddedVariantTypes((prev) => {
@@ -684,10 +646,10 @@ export default function ProductEditPage() {
           return newValues;
         });
         
-        toast.success("Variant type deleted successfully");
+        toast.success("Variant type unlinked successfully");
       }
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to delete variant type";
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to unlink variant type";
       toast.error(errorMessage);
     }
   };
@@ -806,13 +768,13 @@ export default function ProductEditPage() {
     setPendingFeaturedImage(null);
   };
 
-  // Handle gallery images (multiple, max 4)
+  // Handle gallery images (multiple, max 10)
   const handleGalleryImages = (files: FileList | null) => {
     if (!files?.length) return;
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024; // 5MB
-    const maxGalleryImages = 4;
+    const maxGalleryImages = 10;
 
     const next: MediaUpload[] = [];
     const errors: string[] = [];
@@ -978,7 +940,6 @@ export default function ProductEditPage() {
         freight: convertedFreight > 0 ? convertedFreight : undefined,
         customer_groups: values.customer_groups && values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: selectedVariantKeys
-          .filter((key: string) => variantValues[key]?.trim()) // Only include variants with values
           .map((key: string) => {
             // Find variant type ID by matching name (case-insensitive)
             const variantType = variantTypes.find(
@@ -992,7 +953,7 @@ export default function ProductEditPage() {
             
             return {
               vtype_id: variantType.id,
-              value: variantValues[key].trim(),
+              value: (variantValues[key] ?? "").trim(),
             };
           })
           .filter((v): v is { vtype_id: string; value: string } => {
@@ -1807,7 +1768,7 @@ export default function ProductEditPage() {
                       <div>
                         <h4 className="text-sm font-medium">Gallery Images</h4>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Additional images for product detail page (max 4 images - JPEG, PNG, WebP)
+                          Additional images for product detail page (max 10 images - JPEG, PNG, WebP)
                         </p>
                       </div>
                       <Button
@@ -1816,7 +1777,7 @@ export default function ProductEditPage() {
                         size="sm"
                         className="gap-2"
                         onClick={() => galleryImagesInputRef.current?.click()}
-                        disabled={galleryImages.length + pendingGalleryImages.length >= 4}
+                        disabled={galleryImages.length + pendingGalleryImages.length >= 10}
                       >
                         <Upload className="h-4 w-4" />
                         Add Gallery Images

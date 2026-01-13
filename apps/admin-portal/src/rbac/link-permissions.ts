@@ -16,4 +16,6 @@ export const ADMIN_LINK_PERM: Record<string, string> = {
   "/dashboard/permissions":  ENTITY_PERMS.permissions.list,
   "/dashboard/roles":        ENTITY_PERMS.roles.list,
   "/dashboard/users":        ENTITY_PERMS.users.list,
+  "/dashboard/promo-codes":  ENTITY_PERMS.promoCodes.list,
+  "/dashboard/orders":      ENTITY_PERMS.orders.list,
 };

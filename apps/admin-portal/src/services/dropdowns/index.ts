@@ -43,6 +43,15 @@ type CustomerVisibilityGroupsDropdownData = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function isCanceledError(e: any): boolean {
+  return (
+    e?.code === "ERR_CANCELED" ||
+    e?.message === "canceled" ||
+    e?.name === "CanceledError" ||
+    e?.__CANCEL__ === true
+  );
+}
+
 function parseRetryAfter(hdr?: string): number | null {
   if (!hdr) return null;
   const n = Number(hdr);
@@ -62,6 +71,10 @@ async function with429Retry<T>(
     try {
       return await fn();
     } catch (e: any) {
+      // If the request was aborted/canceled (AbortController / route change / React strict mode),
+      // do not retry.
+      if (isCanceledError(e)) throw e;
+
       const status = e?.response?.status;
       const retryAfterHdr = e?.response?.headers?.["retry-after"] as
         | string

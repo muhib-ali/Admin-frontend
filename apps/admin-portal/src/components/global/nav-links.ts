@@ -6,11 +6,13 @@ import {
   ShieldCheck,
   Shield,
   Box,
+  Truck,
 } from "lucide-react";
 
 export const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
+  { href: "/dashboard/orders", label: "Orders", icon: Truck },
   { href: "/dashboard/projects", label: "Projects", icon: Package },
   { href: "/dashboard/subscriptions", label: "Subscriptions", icon: CreditCard },
 ];

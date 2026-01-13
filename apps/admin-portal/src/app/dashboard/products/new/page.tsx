@@ -25,8 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
-import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllVariantTypesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
-import { createVariantType, deleteVariantType } from "@/services/variant-types";
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -125,6 +124,13 @@ export default function NewProductPage() {
   const canCreate = useHasPermission(ENTITY_PERMS.products.create);
   const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
+  const normalizeVariantKey = React.useCallback((name: string) => {
+    return String(name || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }, []);
+
   // Ref to track previous country to prevent infinite loops
   const previousCountryRef = React.useRef<Country | null>(null);
 
@@ -136,7 +142,6 @@ export default function NewProductPage() {
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
   const [customerVisibilityGroups, setCustomerVisibilityGroups] = React.useState<Option[]>([]);
-  const [recentlyAddedVariantTypes, setRecentlyAddedVariantTypes] = React.useState<Set<string>>(new Set());
 
   const [values, setValues] = React.useState(() => ({
     title: "",
@@ -189,7 +194,7 @@ export default function NewProductPage() {
   const [newVariantName, setNewVariantName] = React.useState("");
 
   const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null); // Single featured image
-  const [galleryImages, setGalleryImages] = React.useState<MediaItem[]>([]); // Gallery images (max 4)
+  const [galleryImages, setGalleryImages] = React.useState<MediaItem[]>([]); // Gallery images (max 10)
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
@@ -207,15 +212,15 @@ export default function NewProductPage() {
 
     (async () => {
       try {
-        const [cats, brs, tax, sup, wh, vt, cvg, taxData] = await Promise.all([
+        const [cats, brs, tax, sup, wh, cvg, taxData, defaultVTypes] = await Promise.all([
           getAllCategoriesDropdown({ signal: ac.signal }),
           getAllBrandsDropdown({ signal: ac.signal }),
           getAllTaxesDropdown({ signal: ac.signal }),
           getAllSuppliersDropdown({ signal: ac.signal }),
           getAllWarehousesDropdown({ signal: ac.signal }),
-          getAllVariantTypesDropdown({ signal: ac.signal }),
           getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
           listTaxes(1, 100, undefined, { signal: ac.signal }),
+          productsService.getDefaultVariantTypes(),
         ]);
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
@@ -224,16 +229,12 @@ export default function NewProductPage() {
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
         setTaxRows(taxData?.rows ?? []);
-        // For create form: Only show default variant types (size, model, year) - custom variants are created per product
-        const defaultVariantTypes = ["size", "model", "year"];
-        const allVariantTypes = (vt ?? []).map((v: any) => ({ id: v.value, name: v.label }));
-        // Filter to only show default variant types
-        const filteredVariantTypes = allVariantTypes.filter((vt: any) =>
-          defaultVariantTypes.includes(vt.name.toLowerCase())
-        );
-        setVariantTypes(filteredVariantTypes);
+        // Load default variant types from API (size, model, year)
+        const defaultVariantTypesData = defaultVTypes?.data ?? [];
+        setVariantTypes(defaultVariantTypesData.map((vt: any) => ({ id: vt.id, name: vt.name })));
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.code === "ERR_CANCELED" || error?.message === "canceled") return;
         console.error("Failed to load dropdowns or tax records:", error);
       }
     })();
@@ -341,13 +342,13 @@ export default function NewProductPage() {
     setFeaturedImage(null);
   };
 
-  // Handle gallery images (multiple, max 4)
+  // Handle gallery images (multiple, max 10)
   const handleGalleryImages = (files: FileList | null) => {
     if (!files?.length) return;
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024; // 5MB
-    const maxGalleryImages = 4;
+    const maxGalleryImages = 10;
 
     const next: MediaItem[] = [];
     const errors: string[] = [];
@@ -433,47 +434,23 @@ export default function NewProductPage() {
     setVideoFile(null);
   };
 
+  // Note: Custom variants cannot be deleted on new product page since product doesn't exist yet
+  // Custom variants are only added after product creation in edit page
   const deleteVariantOption = async (variantId: string, variantKey: string) => {
-    try {
-      const response = await deleteVariantType(variantId);
-      if (response.status) {
-        // Remove from recently added list
-        setRecentlyAddedVariantTypes((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(variantId);
-          return newSet;
-        });
-
-        // Remove from variant types dropdown
-        setVariantTypes((p) => p.filter((v) => v.id !== variantId));
-
-        // Remove from local state
-        setVariantOptions((p) => p.filter((k) => k !== variantKey));
-        setVariantSelected((p) => {
-          const newSelected = { ...p };
-          delete newSelected[variantKey];
-          return newSelected;
-        });
-        setVariantValues((p) => {
-          const newValues = { ...p };
-          delete newValues[variantKey];
-          return newValues;
-        });
-      }
-    } catch (error) {
-      console.error("Failed to delete variant type:", error);
-      // Could show toast notification here
-    }
+    // Do nothing - custom variants can only be managed after product is created
+    console.log("Custom variants can only be deleted after product is created");
   };
 
   const selectedVariantKeys = React.useMemo(() => {
     return variantOptions.filter((k) => Boolean(variantSelected[k]));
   }, [variantOptions, variantSelected]);
 
+  // Note: Custom variants cannot be added on new product page since product doesn't exist yet
+  // Custom variants are only added after product creation in edit page
   const addVariantOption = async () => {
     const raw = newVariantName.trim();
     if (!raw) return;
-    const key = raw.toLowerCase().replace(/\s+/g, " ");
+    const key = normalizeVariantKey(raw);
     if (!key) return;
 
     // Check if variant type already exists in the list
@@ -484,30 +461,12 @@ export default function NewProductPage() {
       return;
     }
 
-    try {
-      // Create new variant type via API
-      const response = await createVariantType(raw);
-      if (response.status) {
-        const newVariantId = response.data.id;
-
-        // Add to local state
-        setVariantOptions((p) => [...p, key]);
-        setVariantSelected((p) => ({ ...p, [key]: true }));
-        setVariantValues((p) => ({ ...p, [key]: "" }));
-
-        // Add to recently added list for deletion option
-        setRecentlyAddedVariantTypes((prev) => new Set([...prev, newVariantId]));
-
-        // Add to variant types dropdown
-        setVariantTypes((p) => [...p, { id: newVariantId, name: raw }]);
-
-        setVariantsOpen(true);
-        setNewVariantName("");
-      }
-    } catch (error) {
-      console.error("Failed to create variant type:", error);
-      // Could show toast notification here
-    }
+    // For new product page, just add to local state (not persisted until product is saved)
+    setVariantOptions((p) => [...p, key]);
+    setVariantSelected((p) => ({ ...p, [key]: true }));
+    setVariantValues((p) => ({ ...p, [key]: "" }));
+    setVariantsOpen(true);
+    setNewVariantName("");
   };
 
   const productDetailsComplete = React.useMemo(() => {
@@ -600,28 +559,29 @@ export default function NewProductPage() {
         }
       }
 
-      // Prepare variants data
-      const variantsData = selectedVariantKeys
-        .filter(key => variantValues[key]?.trim()) // Only include variants with values
-        .map(key => {
-          // Find variant type ID by matching name (case-insensitive)
-          const variantType = variantTypes.find(
-            vt => vt.name.toLowerCase().trim() === key.toLowerCase().trim()
-          );
+      // Separate default variants (have vtype_id) from custom variants (need to be created)
+      const defaultVariants: { vtype_id: string; value: string }[] = [];
+      const customVariantNames: string[] = [];
 
-          if (!variantType) {
-            console.warn(`Variant type not found for key: ${key}`);
-            return null;
-          }
+      selectedVariantKeys.forEach((key) => {
+        const normalizedKey = normalizeVariantKey(key);
+        const variantType = variantTypes.find(
+          (vt) => normalizeVariantKey(vt.name) === normalizedKey
+        );
 
-          return {
+        if (variantType) {
+          // This is a default variant (size, model, year)
+          defaultVariants.push({
             vtype_id: variantType.id,
-            value: variantValues[key].trim(),
-          };
-        })
-        .filter((v): v is { vtype_id: string; value: string } => v !== null);
+            value: String(variantValues[normalizedKey] ?? "").trim(),
+          });
+        } else {
+          // This is a custom variant that needs to be created
+          customVariantNames.push(normalizedKey);
+        }
+      });
 
-      // Prepare product data
+      // Prepare product data with only default variants initially
       const productData = {
         title: values.title.trim(),
         description: values.description.trim(),
@@ -629,7 +589,7 @@ export default function NewProductPage() {
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
         brand_id: values.brand_id,
-        currency: targetCurrency, // Always store as USD
+        currency: targetCurrency,
         is_active: Boolean(values.is_active),
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
@@ -645,7 +605,7 @@ export default function NewProductPage() {
         cost: convertedCost > 0 ? convertedCost : undefined,
         freight: convertedFreight > 0 ? convertedFreight : undefined,
         customer_groups: values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
-        variants: variantsData.length > 0 ? variantsData : undefined,
+        variants: defaultVariants.length > 0 ? defaultVariants : undefined,
         bulk_prices: await Promise.all(
           bulkPricing
             .filter(row => row.quantity && row.price)
@@ -667,6 +627,50 @@ export default function NewProductPage() {
       const createdProduct = await productsService.createProduct(productData);
       const productId = typeof createdProduct === 'string' ? createdProduct : createdProduct.id || String(createdProduct);
       setCreatedProductId(productId);
+
+      // Create custom variant types and update product with all variants
+      if (customVariantNames.length > 0) {
+        try {
+          const customVariantTypes: { id: string; name: string }[] = [];
+
+          // Create each custom variant type via API
+          for (const customName of customVariantNames) {
+            const response = await productsService.createCustomVariantType(productId, customName);
+            if (response?.data?.id && response?.data?.name) {
+              customVariantTypes.push({ id: response.data.id, name: response.data.name });
+            }
+          }
+
+          // Now update product with all variants (default + custom)
+          const allVariants = [
+            ...defaultVariants,
+            ...customVariantTypes.map((cvt) => ({
+              vtype_id: cvt.id,
+              value: String(variantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
+            })),
+          ];
+
+          if (allVariants.length > 0) {
+            await productsService.updateProduct({
+              id: productId,
+              title: values.title.trim(),
+              price: convertedPrice,
+              stock_quantity: Number(values.stock_quantity) || 0,
+              category_id: values.category_id,
+              brand_id: values.brand_id,
+              currency: targetCurrency,
+              variants: allVariants,
+            });
+          }
+        } catch (error: any) {
+          console.error("Failed to create custom variants:", error);
+          const msg =
+            error?.response?.data?.message ||
+            error?.message ||
+            "Custom variants creation failed";
+          setUploadErrors((prev) => [...prev, `Custom variants creation failed: ${msg}`]);
+        }
+      }
 
       // Upload featured image if any
       if (featuredImage) {
@@ -862,8 +866,6 @@ export default function NewProductPage() {
                   <div className="grid gap-2">
                     {variantOptions.map((k) => {
                       const label = k.charAt(0).toUpperCase() + k.slice(1);
-                      const variantType = variantTypes.find(v => v.name.toLowerCase() === k);
-                      const isRecentlyAdded = variantType ? recentlyAddedVariantTypes.has(variantType.id) : false;
 
                       return (
                         <div key={k} className="flex items-center justify-between">
@@ -877,17 +879,6 @@ export default function NewProductPage() {
                             />
                             <span>{label}</span>
                           </label>
-                          {isRecentlyAdded && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                              onClick={() => deleteVariantOption(variantType!.id, k)}
-                            >
-                              ×
-                            </Button>
-                          )}
                         </div>
                       );
                     })}

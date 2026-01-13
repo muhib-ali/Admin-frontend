@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {Eye} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,17 +37,19 @@ import { toast } from "sonner";
 import PromoCodeFormDialog, {
   PromoCodeFormValues,
 } from "@/components/promo-codes/promo-code-form";
+import api from "@/services/lib/api";
+import { usePromoCodesService, PromoCode } from "@/services/promo-codes";
+import { useHasPermission } from "@/hooks/use-permission";
+import { ENTITY_PERMS } from "@/rbac/permissions-map";
 
-type PromoCodeRow = {
-  id: string;
-  code: string;
-  value: number;
-  usage_limit: number;
-  expires_at: string;
-  active: boolean;
-  createdAt: string;
+type PromoCodeRow ={
+id: string,
+title: string,
+value: number,
+usage_limit: number,
+expires_at: string,
+active: boolean,
 };
-
 function StatusBadge({ active }: { active: boolean }) {
   return (
     <Badge
@@ -74,32 +77,16 @@ function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-const DUMMY: PromoCodeRow[] = [
-  {
-    id: "pc_1",
-    code: "NEWYEAR10",
-    value: 10,
-    usage_limit: 100,
-    expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-    active: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "pc_2",
-    code: "WELCOME5",
-    value: 5,
-    usage_limit: 50,
-    expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-    active: false,
-    createdAt: new Date().toISOString(),
-  },
-];
 
 export default function PromoCodesPage() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  const [rows, setRows] = React.useState<PromoCodeRow[]>(DUMMY);
+  const promoCodesService = usePromoCodesService(api);
+
+  const [rows, setRows] = React.useState<PromoCode[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [total, setTotal] = React.useState(0);
 
   const [page, setPage] = React.useState(1);
   const limit = 5;
@@ -116,7 +103,38 @@ export default function PromoCodesPage() {
   );
 
   const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<PromoCodeRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<PromoCode | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const canList = useHasPermission(ENTITY_PERMS.promoCodes.list);
+  const canCreate = useHasPermission(ENTITY_PERMS.promoCodes.create);
+  const canRead = useHasPermission(ENTITY_PERMS.promoCodes.read);
+  const canUpdate = useHasPermission(ENTITY_PERMS.promoCodes.update);
+  const canDelete = useHasPermission(ENTITY_PERMS.promoCodes.delete);
+
+  const fetch = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await promoCodesService.getAllPromoCodes({
+        page,
+        limit,
+        search: debouncedQuery || undefined,
+      });
+      if (response.status) {
+        setRows(response.data.promoCodes);
+        setTotal(response.data.pagination.total);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load promo codes");
+    } finally {
+      setLoading(false);
+    }
+  }, [promoCodesService, page, limit, debouncedQuery]);
+
+  React.useEffect(() => {
+    if (!mounted) return;
+    fetch();
+  }, [fetch, mounted]);
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 200);
@@ -127,103 +145,88 @@ export default function PromoCodesPage() {
     setPage(1);
   }, [debouncedQuery]);
 
-  const filtered = React.useMemo(() => {
-    if (!debouncedQuery) return rows;
-    const q = debouncedQuery.toLowerCase();
-    return rows.filter((r) => r.code.toLowerCase().includes(q));
-  }, [rows, debouncedQuery]);
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const pageSafe = Math.min(Math.max(1, page), totalPages);
-  const startIdx = (pageSafe - 1) * limit;
-  const paginated = filtered.slice(startIdx, startIdx + limit);
-
   const openCreate = () => {
     setFormMode("create");
     setCurrent(undefined);
     setOpenForm(true);
   };
 
-  const openEdit = (r: PromoCodeRow) => {
+  const openEdit = (r: PromoCode) => {
     setFormMode("edit");
     setCurrent({
       id: r.id,
       code: r.code,
-      value: r.value,
+      value: Number(r.value),
       usage_limit: r.usage_limit,
       expires_at: r.expires_at,
-      active: r.active,
+      active: r.is_active,
     });
     setOpenForm(true);
   };
 
-  const openView = (r: PromoCodeRow) => {
+  const openView = (r: PromoCode) => {
     setFormMode("view");
     setCurrent({
       id: r.id,
       code: r.code,
-      value: r.value,
+      value: Number(r.value),
       usage_limit: r.usage_limit,
       expires_at: r.expires_at,
-      active: r.active,
+      active: r.is_active,
     });
     setOpenForm(true);
   };
 
-  const requestRemove = (r: PromoCodeRow) => {
+  const requestRemove = (r: PromoCode) => {
     setDeleteTarget(r);
     setDeleteOpen(true);
   };
 
   const confirmRemove = async () => {
     if (!deleteTarget) return;
-    setRows((prev) => prev.filter((x) => x.id !== deleteTarget.id));
-    toast.success("Promo code deleted");
+    try {
+      await promoCodesService.deletePromoCode({ id: deleteTarget.id });
+      toast.success("Promo code deleted");
+      fetch();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete promo code");
+    }
     setDeleteOpen(false);
     setDeleteTarget(null);
   };
 
   const upsert = async (data: PromoCodeFormValues) => {
-    const nowIso = new Date().toISOString();
-
-    if (formMode === "create") {
-      const next: PromoCodeRow = {
-        id: makeId(),
-        code: data.code,
-        value: data.value,
-        usage_limit: data.usage_limit,
-        expires_at: data.expires_at,
-        active: data.active,
-        createdAt: nowIso,
-      };
-      setRows((prev) => [next, ...prev]);
-      toast.success("Promo code created");
-      return;
+    try {
+      if (formMode === "create") {
+        await promoCodesService.createPromoCode({
+          code: data.code,
+          value: data.value,
+          usageLimit: data.usage_limit,
+          expiresAt: data.expires_at,
+          isActive: data.active,
+        });
+        toast.success("Promo code created");
+      } else {
+        await promoCodesService.updatePromoCode({
+          id: data.id!,
+          code: data.code,
+          value: data.value,
+          usageLimit: data.usage_limit,
+          expiresAt: data.expires_at,
+          isActive: data.active,
+        });
+        toast.success("Promo code updated");
+      }
+      setOpenForm(false);
+      setCurrent(undefined);
+      fetch();
+    } catch (err: any) {
+      toast.error(err?.message || `Failed to ${formMode} promo code`);
     }
-
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === data.id
-          ? {
-              ...r,
-              code: data.code,
-              value: data.value,
-              usage_limit: data.usage_limit,
-              expires_at: data.expires_at,
-              active: data.active,
-            }
-          : r
-      )
-    );
-    toast.success("Promo code updated");
   };
 
-  const pagHasPrev = pageSafe > 1;
-  const pagHasNext = pageSafe < totalPages;
-
-  const pagStart = total === 0 ? 0 : startIdx + 1;
-  const pagEnd = total === 0 ? 0 : Math.min(startIdx + limit, total);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const pageSafe = Math.min(Math.max(1, page), totalPages);
 
   return (
     <PermissionBoundary screen="/dashboard/promo-codes" mode="block">
@@ -236,7 +239,7 @@ export default function PromoCodesPage() {
             </p>
           </div>
 
-          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
+          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}  disabled={!canCreate}>
             <Plus className="h-4 w-4" />
             Add Promo Code
           </Button>
@@ -280,15 +283,21 @@ export default function PromoCodesPage() {
                         Loading…
                       </TableCell>
                     </TableRow>
-                  ) : paginated.length === 0 ? (
+                  ) : loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-8 text-center text-muted-foreground">
+                        Loading…
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="p-8 text-center text-muted-foreground">
                         No promo codes found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginated.map((p, idx) => {
-                      const isLast = idx === paginated.length - 1;
+                    rows.map((p, idx) => {
+                      const isLast = idx === rows.length - 1;
                       return (
                         <TableRow
                           key={p.id}
@@ -311,10 +320,10 @@ export default function PromoCodesPage() {
                             {fmtDateTime(p.expires_at)}
                           </TableCell>
                           <TableCell className="px-4 py-3">
-                            <StatusBadge active={p.active} />
+                            <StatusBadge active={p.is_active} />
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground px-4 py-3">
-                            {fmtDateTime(p.createdAt)}
+                            {fmtDateTime(p.created_at)}
                           </TableCell>
 
                           <TableCell className={`text-right ${isLast ? "rounded-br-xl" : ""} px-4 py-3`}>
@@ -325,20 +334,33 @@ export default function PromoCodesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuItem className="gap-2" onClick={() => openView(p)}>
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="gap-2" onClick={() => openEdit(p)}>
-                                  <Pencil className="h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="gap-2 text-destructive focus:text-destructive"
-                                  onClick={() => requestRemove(p)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
+                                   {canRead && (
+                                                                  <DropdownMenuItem
+                                                                    className="gap-2"
+                                                                    onClick={() => openView(p)}
+                                                                  >
+                                                                    <Eye className="h-4 w-4" />
+                                                                    View
+                                                                  </DropdownMenuItem>
+                                                                )}
+                                                                {canUpdate && (
+                                                                  <DropdownMenuItem
+                                                                    className="gap-2"
+                                                                    onClick={() => openEdit(p)}
+                                                                  >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                    Edit
+                                                                  </DropdownMenuItem>
+                                                                )}
+                                 {canDelete && (
+                                                                 <DropdownMenuItem
+                                                                   className="gap-2 text-destructive focus:text-destructive"
+                                                                   onClick={() => requestRemove(p)}
+                                                                 >
+                                                                   <Trash2 className="h-4 w-4" />
+                                                                   Delete
+                                                                 </DropdownMenuItem>
+                                                               )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -352,7 +374,7 @@ export default function PromoCodesPage() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-4">
               <div className="text-sm text-muted-foreground">
-                {total === 0 ? "" : `Showing ${pagStart}-${pagEnd} of ${total}`}
+                {total === 0 ? "" : `Showing ${(pageSafe - 1) * limit + 1}-${Math.min(pageSafe * limit, total)} of ${total}`}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -360,7 +382,7 @@ export default function PromoCodesPage() {
                   variant="pagination"
                   clickVariant="default"
                   size="sm"
-                  disabled={!pagHasPrev}
+                  disabled={pageSafe <= 1}
                   className="gap-1"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
@@ -372,7 +394,7 @@ export default function PromoCodesPage() {
                   variant="pagination"
                   clickVariant="default"
                   size="sm"
-                  disabled={!pagHasNext}
+                  disabled={pageSafe >= totalPages}
                   className="gap-1"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >

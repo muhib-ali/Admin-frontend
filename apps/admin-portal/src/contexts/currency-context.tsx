@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 
 export interface Country {
   name: {
@@ -42,9 +42,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Cache for converted amounts to avoid repeated API calls
-  const [conversionCache, setConversionCache] = useState<Map<string, number>>(new Map());
+
+  // Cache for converted amounts to avoid repeated API calls.
+  // Using a ref here prevents rerendering the whole app on every conversion.
+  const conversionCacheRef = useRef<Map<string, number>>(new Map());
 
   console.log('🌍 CurrencyProvider initialized');
 
@@ -63,7 +64,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedCountry]);
 
-  const loadCountries = async () => {
+  const loadCountries = useCallback(async () => {
     try {
       setLoading(true);
       const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -103,9 +104,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadSelectedCountry = () => {
+  const loadSelectedCountry = useCallback(() => {
     const saved = localStorage.getItem('selectedCountry');
     if (saved) {
       try {
@@ -114,9 +115,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         console.error('Error parsing saved country:', err);
       }
     }
-  };
+  }, []);
 
-  const loadExchangeRates = async () => {
+  const loadExchangeRates = useCallback(async () => {
     if (!selectedCountry) return;
 
     try {
@@ -153,23 +154,22 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       setError('Failed to load exchange rates');
       console.error('Error loading exchange rates:', err);
     }
-  };
+  }, [selectedCountry]);
 
-  const selectCountry = (country: Country) => {
+  const selectCountry = useCallback((country: Country) => {
     setSelectedCountry(country);
     localStorage.setItem('selectedCountry', JSON.stringify(country));
-  };
+  }, []);
 
-  const convertAmount = async (amount: number, fromCurrency: string, toCurrency: string): Promise<number> => {
+  const convertAmount = useCallback(async (amount: number, fromCurrency: string, toCurrency: string): Promise<number> => {
     if (fromCurrency === toCurrency) return amount;
 
     // Create cache key
     const cacheKey = `${amount}-${fromCurrency}-${toCurrency}`;
     
     // Check cache first
-    if (conversionCache.has(cacheKey)) {
-      return conversionCache.get(cacheKey)!;
-    }
+    const cached = conversionCacheRef.current.get(cacheKey);
+    if (cached !== undefined) return cached;
 
     try {
       const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -201,7 +201,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       if (data.status) {
         const convertedAmount = data.data.amount;
         // Cache the result
-        setConversionCache(prev => new Map(prev.set(cacheKey, convertedAmount)));
+        conversionCacheRef.current.set(cacheKey, convertedAmount);
         return convertedAmount;
       } else {
         // Handle rate limiting specifically
@@ -225,7 +225,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
           }
           
           // Cache the fallback result
-          setConversionCache(prev => new Map(prev.set(cacheKey, fallbackAmount)));
+          conversionCacheRef.current.set(cacheKey, fallbackAmount);
           return fallbackAmount;
         }
         throw new Error(data.message || 'Conversion failed');
@@ -235,9 +235,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       // Return original amount as last resort
       return amount;
     }
-  };
+  }, []);
 
-  const batchConvertAmounts = async (amounts: number[], fromCurrency: string, toCurrency: string): Promise<number[]> => {
+  const batchConvertAmounts = useCallback(async (amounts: number[], fromCurrency: string, toCurrency: string): Promise<number[]> => {
     if (fromCurrency === toCurrency) return amounts;
 
     // Check cache for each amount and only convert uncached ones
@@ -246,8 +246,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
     amounts.forEach((amount, index) => {
       const cacheKey = `${amount}-${fromCurrency}-${toCurrency}`;
-      if (conversionCache.has(cacheKey)) {
-        results[index] = conversionCache.get(cacheKey)!;
+      const cached = conversionCacheRef.current.get(cacheKey);
+      if (cached !== undefined) {
+        results[index] = cached;
       } else {
         uncachedAmounts.push({ index, amount });
       }
@@ -271,24 +272,24 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     }
 
     return results;
-  };
+  }, [convertAmount]);
 
-  const refreshRates = async () => {
+  const refreshRates = useCallback(async () => {
     await loadExchangeRates();
-  };
+  }, [loadExchangeRates]);
 
-  const getCurrencySymbol = (): string => {
+  const getCurrencySymbol = useCallback((): string => {
     if (!selectedCountry) return '$';
     const currencies = Object.values(selectedCountry.currencies);
     return currencies.length > 0 ? currencies[0].symbol : '$';
-  };
+  }, [selectedCountry]);
 
-  const getCurrencyCode = (): string => {
+  const getCurrencyCode = useCallback((): string => {
     if (!selectedCountry) return 'USD';
     return Object.keys(selectedCountry.currencies)[0] || 'USD';
-  };
+  }, [selectedCountry]);
 
-  const value: CurrencyContextType = {
+  const value: CurrencyContextType = useMemo(() => ({
     selectedCountry,
     countries,
     exchangeRates,
@@ -300,7 +301,19 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     refreshRates,
     getCurrencySymbol,
     getCurrencyCode,
-  };
+  }), [
+    selectedCountry,
+    countries,
+    exchangeRates,
+    loading,
+    error,
+    selectCountry,
+    convertAmount,
+    batchConvertAmounts,
+    refreshRates,
+    getCurrencySymbol,
+    getCurrencyCode,
+  ]);
 
   return (
     <CurrencyContext.Provider value={value}>

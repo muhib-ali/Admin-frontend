@@ -59,18 +59,37 @@ export type ProductsBulkUploadResponse = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function isCanceledError(e: any): boolean {
+  return (
+    e?.code === "ERR_CANCELED" ||
+    e?.message === "canceled" ||
+    e?.name === "CanceledError" ||
+    e?.__CANCEL__ === true
+  );
+}
+
 function parseRetryAfter(hdr?: string): number | null {
   if (!hdr) return null;
-  const n = Number(hdr);
-  return Number.isFinite(n) ? Math.max(0, n) : null;
+  const raw = String(hdr).trim();
+  // Retry-After can be seconds or an HTTP-date.
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+
+  const asDate = new Date(raw);
+  if (Number.isFinite(asDate.getTime())) {
+    const diffMs = asDate.getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffMs / 1000));
+  }
+
+  return null;
 }
 
 async function with429Retry<T>(
   fn: () => Promise<T>,
   {
-    retries = 4,
-    baseDelayMs = 400,
-    maxDelayMs = 8000,
+    retries = 6,
+    baseDelayMs = 1500,
+    maxDelayMs = 30000,
   }: { retries?: number; baseDelayMs?: number; maxDelayMs?: number } = {}
 ): Promise<T> {
   let attempt = 0;
@@ -78,13 +97,25 @@ async function with429Retry<T>(
     try {
       return await fn();
     } catch (e: any) {
+      // Important: if caller aborted (AbortController / route change / React strict mode),
+      // do not retry.
+      if (isCanceledError(e)) throw e;
+
       const status = e?.response?.status;
-      const retryAfterHdr = e?.response?.headers?.["retry-after"] as
+      const headers = e?.response?.headers as Record<string, any> | undefined;
+      const retryAfterHdr = (headers?.["retry-after"] ?? headers?.["Retry-After"]) as
         | string
         | undefined;
       const retryAfterSec = parseRetryAfter(retryAfterHdr);
       const canRetry = status === 429 && attempt < retries;
-      if (!canRetry) throw e;
+      if (!canRetry) {
+        if (status === 429) {
+          throw new Error(
+            "Too many requests (429). Please wait a few seconds and try again."
+          );
+        }
+        throw e;
+      }
 
       let delayMs =
         retryAfterSec != null
@@ -285,18 +316,38 @@ export async function listProducts(
   search?: string,
   opts?: { signal?: AbortSignal }
 ) {
+  // Deduplicate in-flight list requests (Next dev / StrictMode can fire effects twice)
+  // and avoid hammering the API which can trigger 429.
+  const reqKey = JSON.stringify({ page, limit, search: search?.trim() || "" });
+  if (inflightListProducts.has(reqKey)) {
+    return inflightListProducts.get(reqKey)!;
+  }
+
   const params = sanitize(
     { page, limit, search: search?.trim() || undefined },
     ["page", "limit", "search"]
   );
-  const { data } = await with429Retry(() =>
-    api.get<ProductsListResponse>("/products/getAll", {
-      params,
-      signal: opts?.signal,
-    })
-  );
-  return { rows: data?.data?.products ?? [], pagination: data?.data?.pagination };
+
+  const promise = (async () => {
+    const { data } = await with429Retry(() =>
+      api.get<ProductsListResponse>("/products/getAll", {
+        params,
+        signal: opts?.signal,
+      })
+    );
+    return { rows: data?.data?.products ?? [], pagination: data?.data?.pagination };
+  })().finally(() => {
+    inflightListProducts.delete(reqKey);
+  });
+
+  inflightListProducts.set(reqKey, promise);
+  return promise;
 }
+
+const inflightListProducts = new Map<
+  string,
+  Promise<{ rows: ProductItem[]; pagination?: any }>
+>();
 
 export async function getProductById(id: string) {
   const { data } = await with429Retry(() =>
@@ -557,7 +608,7 @@ export async function deleteProductImageById(productId: string, imageId: string)
   return json as any;
 }
 
-// Image upload for multiple files (max 5)
+// Image upload for multiple files (max 10)
 export async function uploadProductImages(productId: string, files: File[]) {
   const base = process.env.NEXT_PUBLIC_API_URL;
   if (!base) {
@@ -567,7 +618,7 @@ export async function uploadProductImages(productId: string, files: File[]) {
   // Validate files
   const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
   const maxFileSize = 5 * 1024 * 1024; // 5MB
-  const maxFiles = 5;
+  const maxFiles = 10;
 
   if (files.length > maxFiles) {
     throw new Error(`Maximum ${maxFiles} images allowed`);
@@ -669,4 +720,99 @@ export async function uploadProductVideo(productId: string, file: File) {
   }
 
   return { url: String(url), fileName: fileName ? String(fileName) : file.name };
+}
+
+// Create custom variant type for a specific product
+export async function createCustomVariantType(productId: string, name: string) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const res = await fetch(`${base}/products/${productId}/custom-variant-types`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Create custom variant type failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Unlink/delete custom variant type from a specific product
+export async function unlinkCustomVariantType(productId: string, vtypeId: string) {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const res = await fetch(`${base}/products/${productId}/custom-variant-types/${vtypeId}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Unlink custom variant type failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
+}
+
+// Get default variant types (size, model, year)
+export async function getDefaultVariantTypes() {
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
+
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const res = await fetch(`${base}/products/getAll?variantTypes=true`, {
+    method: "GET",
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as any)?.message;
+    const error = (json as any)?.error;
+    const msg =
+      message && error
+        ? `${message}: ${error}`
+        : message || error || `Get default variant types failed (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json as any;
 }

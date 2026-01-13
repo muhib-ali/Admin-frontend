@@ -127,6 +127,7 @@ export default function Sidebar({ collapsed = false }: Props) {
       [
         { href: "/dashboard/orders", label: "Orders" },
         { href: "/dashboard/bulk-orders", label: "Bulk Orders" },
+        { href: "/dashboard/reviews", label: "Reviews" },
       ] as const,
     []
   );
@@ -135,7 +136,8 @@ export default function Sidebar({ collapsed = false }: Props) {
     if (!pathname) return;
     if (
       pathname.startsWith("/dashboard/orders") ||
-      pathname.startsWith("/dashboard/bulk-orders")
+      pathname.startsWith("/dashboard/bulk-orders") ||
+      pathname.startsWith("/dashboard/reviews")
     ) {
       setOrderMgmtOpen(true);
     }
@@ -247,13 +249,14 @@ export default function Sidebar({ collapsed = false }: Props) {
                   className={cn(
                     "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     (pathname?.startsWith("/dashboard/orders") ||
-                      pathname?.startsWith("/dashboard/bulk-orders"))
+                      pathname?.startsWith("/dashboard/bulk-orders") ||
+                      pathname?.startsWith("/dashboard/reviews"))
                       ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
                       : "text-gray-400 hover:bg-zinc-900 hover:text-white"
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <ShoppingCart className={cn("h-5 w-5 shrink-0 transition-colors", (pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bulk-orders")) ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
+                    <ShoppingCart className={cn("h-5 w-5 shrink-0 transition-colors", (pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bulk-orders") || pathname?.startsWith("/dashboard/reviews")) ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
                     <span className="truncate">Order Management</span>
                   </span>
                   <ChevronDown
@@ -268,7 +271,9 @@ export default function Sidebar({ collapsed = false }: Props) {
                   <div className="mt-1 space-y-1 pl-6">
                     {orderMgmtLinks.map((c) => {
                       const childActive = pathname?.startsWith(c.href);
-                      return (
+                      const perm = ADMIN_LINK_PERM[c.href];
+
+                      const linkNode = (
                         <Link
                           key={c.href}
                           href={c.href}
@@ -284,6 +289,15 @@ export default function Sidebar({ collapsed = false }: Props) {
                           <span className="truncate">{c.label}</span>
                         </Link>
                       );
+
+                      if (perm) {
+                        return (
+                          <PermissionGate key={c.href} route={perm} fallback={null}>
+                            {linkNode}
+                          </PermissionGate>
+                        );
+                      }
+                      return linkNode;
                     })}
                   </div>
                 )}

@@ -37,6 +37,9 @@ export default function ProductsPage() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
+  const loadingRef = React.useRef(false);
+  const lastFetchRef = React.useRef<{ key: string; at: number } | null>(null);
+
   const STORAGE_KEY = "admin_portal_static_products_v1";
 
   const readStoredProducts = React.useCallback((): ProductRow[] => {
@@ -123,6 +126,13 @@ export default function ProductsPage() {
     if (!mounted) return;
     const ac = new AbortController();
 
+    const reqKey = JSON.stringify({ page, limit, q: (debouncedQuery || "").trim() });
+    const last = lastFetchRef.current;
+    if (last && last.key === reqKey && Date.now() - last.at < 800) {
+      return () => ac.abort();
+    }
+    lastFetchRef.current = { key: reqKey, at: Date.now() };
+
     (async () => {
       try {
         if (!canList) {
@@ -131,6 +141,7 @@ export default function ProductsPage() {
           return;
         }
         setLoading(true);
+        loadingRef.current = true;
         const { rows: list, pagination: pg } = await listProducts(
           page,
           limit,
@@ -147,6 +158,7 @@ export default function ProductsPage() {
         toast.error(e?.response?.data?.message || "Failed to load products");
       } finally {
         setLoading(false);
+        loadingRef.current = false;
       }
     })();
 
@@ -173,6 +185,7 @@ export default function ProductsPage() {
 
   const refetch = React.useCallback(async () => {
     if (!canList) return;
+    if (loadingRef.current) return;
     const { rows: list, pagination: pg } = await listProducts(
       page,
       limit,

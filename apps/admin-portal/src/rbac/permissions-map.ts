@@ -101,6 +101,25 @@ export const ENTITY_PERMS = {
     update: "invoices/update",
     delete: "invoices/delete",
   },
+  promoCodes: {
+    list:   "promo-codes/getAll",
+    create: "promo-codes/create",
+    read:   "promo-codes/getById",
+    update: "promo-codes/update",
+    delete: "promo-codes/delete",
+  },
+  orders: {
+    list:   "orders/getAll",
+    read:   "orders/getById",
+    accept: "orders/accept",
+    reject: "orders/reject",
+  },
+  reviews: {
+    list:    "reviews/getAll",
+    read:    "reviews/getById", 
+    approve: "reviews/approve",
+    delete:  "reviews/delete",
+  },
 } as const;
 
 export const SCREEN_PERM: Record<string, string> = {
@@ -166,4 +185,17 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/invoices/new":            ENTITY_PERMS.invoices.create,
   "/dashboard/invoices/[id]":           ENTITY_PERMS.invoices.read,
   "/dashboard/invoices/[id]/edit":      ENTITY_PERMS.invoices.update,
+
+  "/dashboard/promo-codes":             ENTITY_PERMS.promoCodes.list,
+  "/dashboard/promo-codes/create":      ENTITY_PERMS.promoCodes.create,
+  "/dashboard/promo-codes/[id]":         ENTITY_PERMS.promoCodes.read,
+  "/dashboard/promo-codes/[id]/edit":    ENTITY_PERMS.promoCodes.update,
+
+  "/dashboard/orders":                   ENTITY_PERMS.orders.list,
+  "/dashboard/orders/[id]":              ENTITY_PERMS.orders.read,
+
+  "/dashboard/reviews":                   ENTITY_PERMS.reviews.list,
+  "/dashboard/reviews/[id]":              ENTITY_PERMS.reviews.read,
+  "/dashboard/reviews/[id]/approve":       ENTITY_PERMS.reviews.approve,
+  "/dashboard/reviews/[id]/delete":        ENTITY_PERMS.reviews.delete,
 };

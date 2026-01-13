@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronLeft, ChevronRight, MoreHorizontal, Package, Truck, Trash2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Truck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,18 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -37,103 +24,31 @@ import {
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ordersApi, Order, Pagination } from "@/services/orders";
+import { useCurrency } from "@/contexts/currency-context";
 
-type OrderStatus = "Pending" | "Accepted" | "Rejected";
+type OrderStatus = "pending" | "accepted" | "rejected";
 
 type OrderRow = {
-  id: string;
+  orderId: string;
+  orderNumber: string;
   customer: string;
   items: number;
   total: number;
   status: OrderStatus;
   createdAt: string;
+  convertedTotal?: number;
 };
-
-const DUMMY_ORDERS: OrderRow[] = [
-  {
-    id: "ORD-1001",
-    customer: "Platform Admin",
-    items: 3,
-    total: 149.99,
-    status: "Pending",
-    createdAt: "2025-12-16T10:15:00Z",
-  },
-  {
-    id: "ORD-1002",
-    customer: "Customer A",
-    items: 1,
-    total: 39.5,
-    status: "Accepted",
-    createdAt: "2025-12-16T12:05:00Z",
-  },
-  {
-    id: "ORD-1003",
-    customer: "Customer B",
-    items: 5,
-    total: 389,
-    status: "Rejected",
-    createdAt: "2025-12-16T15:42:00Z",
-  },
-  {
-    id: "ORD-1004",
-    customer: "Customer C",
-    items: 2,
-    total: 89.99,
-    status: "Accepted",
-    createdAt: "2025-12-15T09:20:00Z",
-  },
-  {
-    id: "ORD-1005",
-    customer: "Customer D",
-    items: 4,
-    total: 219.0,
-    status: "Pending",
-    createdAt: "2025-12-14T18:11:00Z",
-  },
-  {
-    id: "ORD-1006",
-    customer: "Customer E",
-    items: 6,
-    total: 540.25,
-    status: "Pending",
-    createdAt: "2025-12-13T08:33:00Z",
-  },
-  {
-    id: "ORD-1007",
-    customer: "Customer F",
-    items: 2,
-    total: 74.75,
-    status: "Rejected",
-    createdAt: "2025-12-12T14:09:00Z",
-  },
-];
-
-type OrderFormValues = {
-  id: string;
-  customer: string;
-  items: number;
-  total: number;
-  status: OrderStatus;
-};
-
-function nextOrderId(existing: OrderRow[]) {
-  const nums = existing
-    .map((o) => Number(String(o.id).replace(/\D/g, "")))
-    .filter((n) => Number.isFinite(n));
-  const max = nums.length ? Math.max(...nums) : 1000;
-  return `ORD-${max + 1}`;
-}
 
 function StatusBadge({ status }: { status: OrderStatus }) {
   const map: Record<OrderStatus, string> = {
-    Pending: "bg-amber-500/10 text-amber-700",
-    Accepted: "bg-emerald-500/10 text-emerald-700",
-    Rejected: "bg-rose-500/10 text-rose-700",
+    pending: "bg-amber-500/10 text-amber-700",
+    accepted: "bg-emerald-500/10 text-emerald-700",
+    rejected: "bg-rose-500/10 text-rose-700",
   };
   return (
     <Badge variant="secondary" className={map[status]}>
-      {status}
+      {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
 }
@@ -142,74 +57,129 @@ export default function OrdersPage() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  const [orders, setOrders] = React.useState<OrderRow[]>(DUMMY_ORDERS);
+  const [orders, setOrders] = React.useState<OrderRow[]>([]);
+  const [pagination, setPagination] = React.useState<Pagination | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  
+  // Use existing currency context from topbar
+  const { getCurrencyCode, convertAmount, getCurrencySymbol } = useCurrency();
+  const targetCurrency = getCurrencyCode();
 
   const [query, setQuery] = React.useState("");
+  const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<"All" | OrderStatus>(
     "All"
   );
   const [page, setPage] = React.useState(1);
   const limit = 5;
 
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [dialogMode, setDialogMode] = React.useState<"create" | "view" | "edit">(
-    "create"
-  );
-  const [activeOrder, setActiveOrder] = React.useState<OrderRow | null>(null);
-
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteTarget, setDeleteTarget] = React.useState<OrderRow | null>(null);
-
-  const [form, setForm] = React.useState<OrderFormValues>({
-    id: "",
-    customer: "",
-    items: 1,
-    total: 0,
-    status: "Pending",
-  });
-
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const byQuery = !q
-      ? orders
-      : orders.filter((o) =>
-          [o.id, o.customer, o.status].some((v) =>
-            String(v).toLowerCase().includes(q)
-          )
-        );
-
-    if (statusFilter === "All") return byQuery;
-    return byQuery.filter((o) => o.status === statusFilter);
-  }, [query, orders, statusFilter]);
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, 400);
+    return () => clearTimeout(t);
+  }, [query]);
 
   React.useEffect(() => {
     setPage(1);
-  }, [query, statusFilter]);
+  }, [debouncedQuery, statusFilter, targetCurrency]);
 
-  const setOrderStatus = (id: string, next: OrderStatus) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: next } : o)));
+  const fetchOrders = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = { page, limit };
+      if (statusFilter !== "All") {
+        params.status = statusFilter;
+      }
+      if (debouncedQuery) {
+        params.search = debouncedQuery;
+      }
+      const response = await ordersApi.getAll(params);
+      if (response.status && response.data?.orders) {
+        const transformedOrders = await Promise.all(
+          response.data.orders.map(async (order: Order) => {
+            const total = parseFloat(order.total_amount);
+            let convertedTotal: number | undefined;
+            
+            try {
+              convertedTotal = await convertAmount(total, 'USD', targetCurrency);
+            } catch (error) {
+              console.warn('Currency conversion failed:', error);
+            }
+
+            return {
+              orderId: order.id,
+              orderNumber: order.order_number,
+              customer: `${order.first_name} ${order.last_name}`,
+              items: (order.order_items ?? []).reduce(
+                (sum, item) => sum + (item.quantity || 0),
+                0
+              ),
+              total,
+              status: order.status,
+              createdAt: order.created_at,
+              convertedTotal,
+            };
+          })
+        );
+        setOrders(transformedOrders);
+        setPagination(response.data.pagination);
+      } else {
+        setOrders([]);
+        setPagination(null);
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+      toast.error("Failed to fetch orders");
+      setOrders([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, statusFilter, debouncedQuery, targetCurrency, convertAmount]);
+
+  React.useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+
+  const acceptOrder = async (id: string) => {
+    try {
+      const response = await ordersApi.accept(id);
+      
+      if (response.status) {
+        toast.success("Order accepted successfully");
+        fetchOrders();
+      }
+    } catch (error) {
+      console.error("Failed to accept order:", error);
+      toast.error("Failed to accept order");
+    }
   };
 
-  const acceptOrder = (id: string) => {
-    setOrderStatus(id, "Accepted");
-    toast.success("Order accepted");
+  const rejectOrder = async (id: string) => {
+    try {
+      const response = await ordersApi.reject(id);
+      
+      if (response.status) {
+        toast.success("Order rejected successfully");
+        fetchOrders();
+      }
+    } catch (error) {
+      console.error("Failed to reject order:", error);
+      toast.error("Failed to reject order");
+    }
   };
 
-  const rejectOrder = (id: string) => {
-    setOrderStatus(id, "Rejected");
-    toast.success("Order rejected");
-  };
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const total = pagination?.total || 0;
+  const totalPages = pagination?.totalPages || 1;
   const pagPage = Math.min(page, totalPages);
   const pagStart = total === 0 ? 0 : (pagPage - 1) * limit + 1;
   const pagEnd = total === 0 ? 0 : Math.min(pagPage * limit, total);
 
   const rows = React.useMemo(() => {
-    const start = (pagPage - 1) * limit;
-    return filtered.slice(start, start + limit);
-  }, [filtered, pagPage]);
+    return orders;
+  }, [orders]);
 
   const renderCreatedAt = (iso: string) => {
     if (!mounted) return "—";
@@ -220,76 +190,7 @@ export default function OrdersPage() {
     }
   };
 
-  const openCreate = () => {
-    const id = nextOrderId(orders);
-    setDialogMode("create");
-    setActiveOrder(null);
-    setForm({ id, customer: "", items: 1, total: 0, status: "Pending" });
-    setDialogOpen(true);
-  };
 
-  const openView = (o: OrderRow) => {
-    setDialogMode("view");
-    setActiveOrder(o);
-    setForm({ id: o.id, customer: o.customer, items: o.items, total: o.total, status: o.status });
-    setDialogOpen(true);
-  };
-
-  const openEdit = (o: OrderRow) => {
-    setDialogMode("edit");
-    setActiveOrder(o);
-    setForm({ id: o.id, customer: o.customer, items: o.items, total: o.total, status: o.status });
-    setDialogOpen(true);
-  };
-
-  const requestDelete = (o: OrderRow) => {
-    setDeleteTarget(o);
-    setDeleteOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (!deleteTarget) return;
-    setOrders((prev) => prev.filter((x) => x.id !== deleteTarget.id));
-    toast.success("Order deleted");
-    setDeleteOpen(false);
-    setDeleteTarget(null);
-  };
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload: OrderRow = {
-      id: form.id.trim(),
-      customer: form.customer.trim(),
-      items: Number(form.items) || 0,
-      total: Number(form.total) || 0,
-      status: form.status,
-      createdAt: activeOrder?.createdAt ?? new Date().toISOString(),
-    };
-
-    if (!payload.customer) {
-      toast.error("Customer is required");
-      return;
-    }
-    if (payload.items <= 0) {
-      toast.error("Items must be greater than 0");
-      return;
-    }
-    if (payload.total < 0) {
-      toast.error("Total cannot be negative");
-      return;
-    }
-
-    if (dialogMode === "create") {
-      setOrders((prev) => [payload, ...prev]);
-      toast.success("Order created");
-      setDialogOpen(false);
-      return;
-    }
-
-    setOrders((prev) => prev.map((x) => (x.id === payload.id ? payload : x)));
-    toast.success("Order updated");
-    setDialogOpen(false);
-  };
 
   return (
     <PermissionBoundary screen="/dashboard/orders" mode="block">
@@ -301,11 +202,6 @@ export default function OrdersPage() {
               Manage customer orders
             </p>
           </div>
-
-          <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
-            <Package className="h-4 w-4" />
-            Create Order
-          </Button>
         </div>
 
         <Card className="shadow-sm">
@@ -323,9 +219,9 @@ export default function OrdersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="Accepted">Accepted</SelectItem>
-                    <SelectItem value="Rejected">Rejected</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -357,7 +253,16 @@ export default function OrdersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        Loading orders...
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={7}
@@ -371,7 +276,7 @@ export default function OrdersPage() {
                       const isLast = idx === rows.length - 1;
                       return (
                         <TableRow
-                          key={o.id}
+                          key={o.orderId}
                           className="odd:bg-muted/30 even:bg-white hover:bg-transparent"
                         >
                           <TableCell className={isLast ? "rounded-bl-xl" : ""}>
@@ -380,7 +285,7 @@ export default function OrdersPage() {
                                 <Truck className="h-4 w-4" />
                               </span>
                               <div className="min-w-0">
-                                <div className="font-medium truncate">{o.id}</div>
+                                <div className="font-medium truncate">{o.orderNumber}</div>
                               </div>
                             </div>
                           </TableCell>
@@ -391,7 +296,16 @@ export default function OrdersPage() {
 
                           <TableCell>{o.items}</TableCell>
 
-                          <TableCell>${o.total.toFixed(2)}</TableCell>
+                          <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">${o.total.toFixed(2)}</div>
+                            {o.convertedTotal && (
+                              <div className="text-xs text-muted-foreground">
+                                {getCurrencySymbol()}{o.convertedTotal.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
 
                           <TableCell>
                             <StatusBadge status={o.status} />
@@ -408,52 +322,18 @@ export default function OrdersPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => rejectOrder(o.id)}
-                                disabled={o.status !== "Pending"}
+                                onClick={() => rejectOrder(o.orderId)}
+                                disabled={o.status !== "pending"}
                               >
                                 Reject
                               </Button>
                               <Button
                                 size="sm"
-                                onClick={() => acceptOrder(o.id)}
-                                disabled={o.status !== "Pending"}
+                                onClick={() => acceptOrder(o.orderId)}
+                                disabled={o.status !== "pending"}
                               >
                                 Accept
                               </Button>
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    aria-label="More actions"
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => openView(o)}
-                                  >
-                                    View
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => openEdit(o)}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="gap-2 text-destructive"
-                                    onClick={() => requestDelete(o)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -495,130 +375,6 @@ export default function OrdersPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="p-0">
-            <DialogHeader className="px-6 pt-6 pb-3">
-              <DialogTitle>
-                {dialogMode === "create"
-                  ? "Create Order"
-                  : dialogMode === "edit"
-                    ? `Edit ${form.id}`
-                    : `Order ${form.id}`}
-              </DialogTitle>
-            </DialogHeader>
-
-            <form onSubmit={handleSave} className="flex max-h-[90vh] flex-col">
-              <div className="px-6 pb-6 overflow-y-auto max-h-[calc(90vh-160px)]">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="order-id">Order ID</Label>
-                    <Input id="order-id" value={form.id} disabled />
-                  </div>
-                  <div>
-                    <Label htmlFor="order-status">Status</Label>
-                    <Input
-                      id="order-status"
-                      value={form.status}
-                      disabled={dialogMode === "view"}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          status: e.target.value as OrderStatus,
-                        }))
-                      }
-                      placeholder="Pending / Accepted / Rejected"
-                    />
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Allowed: Pending, Accepted, Rejected
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 mt-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="order-customer">Customer *</Label>
-                    <Input
-                      id="order-customer"
-                      value={form.customer}
-                      disabled={dialogMode === "view"}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, customer: e.target.value }))
-                      }
-                      placeholder="Customer name"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="order-items">Items *</Label>
-                    <Input
-                      id="order-items"
-                      type="number"
-                      min={1}
-                      value={form.items}
-                      disabled={dialogMode === "view"}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          items: Number(e.target.value),
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="order-total">Total ($)</Label>
-                    <Input
-                      id="order-total"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={form.total}
-                      disabled={dialogMode === "view"}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          total: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="sticky flex justify-end gap-3 border-t bg-background px-6 py-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                >
-                  {dialogMode === "view" ? "Close" : "Cancel"}
-                </Button>
-                {dialogMode !== "view" && (
-                  <Button type="submit">
-                    {dialogMode === "create" ? "Create" : "Update"}
-                  </Button>
-                )}
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <ConfirmDialog
-          open={deleteOpen}
-          onOpenChange={(v) => {
-            if (!v) setDeleteTarget(null);
-            setDeleteOpen(v);
-          }}
-          title="Delete order"
-          description={deleteTarget ? `Are you sure you want to delete order ${deleteTarget.id}? This action cannot be undone.` : "This action cannot be undone."}
-          confirmText="Delete"
-          cancelText="Cancel"
-          destructive
-          onConfirm={confirmDelete}
-        />
       </div>
     </PermissionBoundary>
   );
