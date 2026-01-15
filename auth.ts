@@ -116,6 +116,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
 
+  trustHost: true, // Required for Railway/proxy deployments
+
   callbacks: {
     async jwt({ token, user, trigger, session }): Promise<ExtendedJWT> {
       const extendedToken = token as ExtendedJWT;
