@@ -24,6 +24,8 @@ export default function PermissionBoundary({
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
+  console.log("PermissionBoundary:", { screen, allowed, mounted });
+
   if (!mounted) return null;
 
   if (allowed) return <>{children}</>;

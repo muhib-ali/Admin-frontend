@@ -114,6 +114,12 @@ export const ENTITY_PERMS = {
     accept: "orders/accept",
     reject: "orders/reject",
   },
+  bulkOrders: {
+    list:       "bulk-orders/getAll",
+    read:       "bulk-orders/getById",
+    acceptItem: "bulk-orders/acceptItem",
+    rejectItem: "bulk-orders/rejectItem",
+  },
   reviews: {
     list:    "reviews/getAll",
     read:    "reviews/getById", 
@@ -193,6 +199,9 @@ export const SCREEN_PERM: Record<string, string> = {
 
   "/dashboard/orders":                   ENTITY_PERMS.orders.list,
   "/dashboard/orders/[id]":              ENTITY_PERMS.orders.read,
+
+  "/dashboard/bulk-orders":              ENTITY_PERMS.bulkOrders.list,
+  "/dashboard/bulk-orders/[id]":         ENTITY_PERMS.bulkOrders.read,
 
   "/dashboard/reviews":                   ENTITY_PERMS.reviews.list,
   "/dashboard/reviews/[id]":              ENTITY_PERMS.reviews.read,

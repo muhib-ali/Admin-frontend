@@ -11,10 +11,10 @@ export function useEntityPerms(entity: EntityKey) {
 
   return {
     canList:   !!hasPermission(PERM.list),
-    canCreate: !!('create' in PERM && hasPermission(PERM.create)),
+    canCreate: !!hasPermission(PERM.create),
     canRead:   !!hasPermission(PERM.read),
-    canUpdate: !!('update' in PERM && hasPermission(PERM.update)),
-    canDelete: !!('delete' in PERM && hasPermission(PERM.delete)),
+    canUpdate: !!hasPermission(PERM.update),
+    canDelete: !!hasPermission(PERM.delete),
     canViewRolePerms:   entity === "roles" ? !!hasPermission(ENTITY_PERMS.roles.extras.getRolePerms) : false,
     canUpdateRolePerms: entity === "roles" ? !!hasPermission(ENTITY_PERMS.roles.extras.updateRolePerms) : false,
     PERM,
