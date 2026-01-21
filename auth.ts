@@ -63,6 +63,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
           if (!response.ok) {
+            // Treat bad credentials as a normal credentials failure
+            // (prevents NextAuth from surfacing confusing 'Configuration' errors in the UI)
+            if (response.status === 401 || response.status === 403) {
+              return null;
+            }
+
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || "Login failed");
           }
@@ -70,6 +76,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const data = await response.json();
 
           if (!data.status || !data.data) {
+            // Some backends return 200 with status=false for invalid credentials
+            const message = (data.message || "").toLowerCase();
+            if (message.includes("invalid") || message.includes("credential") || message.includes("unauthorized")) {
+              return null;
+            }
             throw new Error(data.message || "Login failed");
           }
 

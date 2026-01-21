@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as productsService from "@/services/products";
 import { toast } from "react-toastify";
+import { Loader2, SearchX } from "lucide-react";
 import {
   getAllWarehousesDropdown,
   getAllSuppliersDropdown,
@@ -331,21 +332,20 @@ export default function ProductViewPage() {
         {loading ? (
           <Card className="border-neutral-200 shadow-sm">
             <CardContent className="p-10 text-center">
-              <div className="mx-auto mb-3 h-10 w-10 rounded-full border-2 border-neutral-300 border-t-neutral-900 animate-spin" />
-              <div className="text-sm font-medium text-neutral-900">
-                Loading product details…
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
+                <Loader2 className="h-6 w-6 animate-spin text-neutral-600" />
               </div>
-              <div className="mt-1 text-xs text-neutral-500">
-                Fetching latest data
-              </div>
+              <div className="text-sm font-medium text-neutral-900">Loading product details…</div>
+              <div className="mt-1 text-xs text-neutral-500">Fetching latest data</div>
             </CardContent>
           </Card>
         ) : !product ? (
           <Card className="border-neutral-200 shadow-sm">
             <CardContent className="p-10 text-center">
-              <div className="text-sm font-semibold text-neutral-900">
-                Product not found
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
+                <SearchX className="h-6 w-6 text-neutral-600" />
               </div>
+              <div className="text-sm font-semibold text-neutral-900">Product not found</div>
               <div className="mt-1 text-xs text-neutral-500">
                 This product may have been removed or the ID is invalid.
               </div>

@@ -2,12 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight, Plus, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Plus, Loader2, SearchX, Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import PermissionBoundary from "@/components/permission-boundary";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProductCard } from "@/components/products/product-card";
 import { svgCardImage } from "@/components/products/product-utils";
 import type {
@@ -15,13 +21,13 @@ import type {
   CategoryOption,
   ProductRow,
 } from "@/components/products/product-form";
+import { useExport } from "@/hooks/use-export";
 import { useHasPermission } from "@/hooks/use-permission";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { toast } from "react-toastify";
 import {
   getProductsBulkUploadState,
   resetProductsBulkUploadState,
-  startProductsBulkUploadExcel,
   subscribeProductsBulkUpload,
   deleteProduct,
   deleteProductImage,
@@ -36,6 +42,8 @@ export default function ProductsPage() {
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
+
+  const { isExporting, exportToCSV } = useExport();
 
   const loadingRef = React.useRef(false);
   const lastFetchRef = React.useRef<{ key: string; at: number } | null>(null);
@@ -53,7 +61,6 @@ export default function ProductsPage() {
     }
   }, []);
 
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const lastBulkToastRef = React.useRef<number>(0);
   const [bulkUploadState, setBulkUploadState] = React.useState(() =>
     getProductsBulkUploadState()
@@ -81,6 +88,70 @@ export default function ProductsPage() {
   const canRead = useHasPermission(ENTITY_PERMS.products.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.products.update);
   const canDelete = useHasPermission(ENTITY_PERMS.products.delete);
+
+  const exportRows = React.useCallback(() => {
+    return rows.map((p) => ({
+      id: p.id,
+      title: p.title,
+      sku: p.sku ?? "",
+      price: p.price,
+      currency: p.currency,
+      stock_quantity: p.stock_quantity,
+      brand: p.brand?.name ?? "",
+      category: p.category?.name ?? "",
+      is_active: p.is_active,
+      created_at: p.created_at,
+    }));
+  }, [rows]);
+
+  const handleExportCSV = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        toast.error("No products to export");
+        return;
+      }
+      await exportToCSV(data, "products");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Export failed");
+    }
+  }, [canList, exportRows, exportToCSV]);
+
+  const handleExportExcel = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        toast.error("No products to export");
+        return;
+      }
+
+      const headers = Object.keys(data[0] || {});
+      const escape = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const table = `\n        <table>\n          <thead>\n            <tr>${headers
+              .map((h) => `<th>${escape(h)}</th>`)
+              .join("")}</tr>\n          </thead>\n          <tbody>\n            ${data
+              .map(
+                (row) =>
+                  `<tr>${headers
+                    .map((h) => `<td>${escape((row as any)[h])}</td>`)
+                    .join("")}</tr>`
+              )
+              .join("\n")}\n          </tbody>\n        </table>\n      `;
+
+      const html = `<!doctype html><html><head><meta charset=\"utf-8\" /></head><body>${table}</body></html>`;
+      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "products.xls";
+      link.click();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Export failed");
+    }
+  }, [canList, exportRows]);
 
   const extractFileName = React.useCallback((url?: string | null): string | null => {
     if (!url) return null;
@@ -238,32 +309,6 @@ export default function ProductsPage() {
     }
   }, [mounted, bulkUploadState, refetch]);
 
-  const triggerExcelPick = () => {
-    if (!canCreate) return;
-    if (bulkUploadState.status === "uploading") return;
-    fileInputRef.current?.click();
-  };
-
-  const onExcelSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = (e.target.files ?? [])[0];
-    if (!file) return;
-
-    try {
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
-        throw new Error("Only .xlsx or .xls files are allowed");
-      }
-
-      startProductsBulkUploadExcel(file);
-    } catch (err: any) {
-      toast.error(err?.message || "Bulk upload failed");
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-    setDeleteOpen(false);
-    setDeleteTarget(null);
-  };
-
   const goToView = (p: ProductRow) => {
     if (!canRead) return;
     router.push(`/dashboard/products/view/${p.id}`);
@@ -336,14 +381,6 @@ export default function ProductsPage() {
   return (
     <PermissionBoundary screen="/dashboard/products" mode="block">
       <div className="space-y-6 scrollbar-stable">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-          className="hidden"
-          onChange={onExcelSelected}
-        />
-
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold truncate">Products</h1>
@@ -353,15 +390,6 @@ export default function ProductsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              className="gap-2 w-full sm:w-auto bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300"
-              onClick={triggerExcelPick}
-              disabled={!canCreate || bulkUploadState.status === "uploading"}
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
-            </Button>
             <Button className="gap-2 w-full sm:w-auto" onClick={goToCreate} disabled={!canCreate}>
               <Plus className="h-4 w-4" />
               Add Product
@@ -389,14 +417,40 @@ export default function ProductsPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Products</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="h-9 pl-9 w-full"
-                  placeholder="Search products..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="h-9 pl-9 w-full"
+                    placeholder="Search products..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled={!canList || isExporting || bulkUploadState.status === "uploading"}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportExcel} className="gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>
@@ -424,16 +478,26 @@ export default function ProductsPage() {
                 </div>
               </div>
             ) : loading ? (
-              <div className="mt-1 rounded-xl border p-10 text-center text-muted-foreground">
-                Loading products…
+              <div className="mt-1 rounded-xl border p-10 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+                <div className="text-sm font-medium text-foreground">Loading products…</div>
+                <div className="mt-1 text-xs text-muted-foreground">Fetching latest catalog</div>
               </div>
             ) : !canList ? (
               <div className="mt-1 rounded-xl border p-10 text-center text-muted-foreground">
                 You don't have permission to view products.
               </div>
             ) : rows.length === 0 ? (
-              <div className="mt-1 rounded-xl border p-10 text-center text-muted-foreground">
-                No products found.
+              <div className="mt-1 rounded-xl border p-10 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <SearchX className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div className="text-sm font-semibold text-foreground">Product not found</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Try a different search term.
+                </div>
               </div>
             ) : (
               <div className="mt-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

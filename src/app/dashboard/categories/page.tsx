@@ -10,6 +10,8 @@ import {
   Plus,
   Pencil,
   Trash2,
+  SearchX,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -346,8 +348,11 @@ export default function CategoriesPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        Loading categories…
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading categories…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
@@ -358,8 +363,14 @@ export default function CategoriesPage() {
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No categories found.
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="grid h-10 w-10 place-items-center rounded-full bg-muted">
+                            <SearchX className="h-5 w-5 text-muted-foreground" />
+                          </span>
+                          <div className="text-sm font-semibold text-foreground">Category not found</div>
+                          <div className="text-xs text-muted-foreground">Try a different search term.</div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (

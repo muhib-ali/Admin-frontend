@@ -64,19 +64,36 @@ import { useHasPermission } from "@/hooks/use-permission";
 
 /* ---------------- PermissionsDisplay (inline panel in Permissions tab) ---------------- */
 
-function PermissionsDisplay({
-  roleId,
-  roleTitle,
-  canViewRolePerms,
-  canUpdateRolePerms,
-  onSaved,
-}: {
-  roleId: string;
-  roleTitle: string;
-  canViewRolePerms: boolean;
-  canUpdateRolePerms: boolean;
-  onSaved: (updated: any[]) => void;
-}) {
+type PermissionsDisplayMeta = {
+  totalSelected: number;
+  saving: boolean;
+};
+
+type PermissionsDisplayHandle = {
+  save: () => void;
+};
+
+const PermissionsDisplay = React.forwardRef<
+  PermissionsDisplayHandle,
+  {
+    roleId: string;
+    roleTitle: string;
+    canViewRolePerms: boolean;
+    canUpdateRolePerms: boolean;
+    onSaved: (updated: any[]) => void;
+    onMetaChange?: (meta: PermissionsDisplayMeta) => void;
+  }
+>(function PermissionsDisplay(
+  {
+    roleId,
+    roleTitle,
+    canViewRolePerms,
+    canUpdateRolePerms,
+    onSaved,
+    onMetaChange,
+  },
+  ref
+) {
   const [modules, setModules] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -113,6 +130,10 @@ function PermissionsDisplay({
     (sum, m) => sum + m.permissions.filter((p: any) => p.is_allowed).length,
     0
   );
+
+  React.useEffect(() => {
+    onMetaChange?.({ totalSelected, saving });
+  }, [onMetaChange, totalSelected, saving]);
 
   const filteredModules = React.useMemo(() => {
     if (!searchQuery.trim()) return modules;
@@ -169,6 +190,16 @@ function PermissionsDisplay({
     }
   }
 
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      save: () => {
+        void handleSave();
+      },
+    }),
+    [handleSave]
+  );
+
   function clearSearch() {
     setSearchQuery("");
   }
@@ -195,7 +226,6 @@ function PermissionsDisplay({
         <div className="text-sm text-muted-foreground">
           Toggle which actions this role can access.
         </div>
-        <Badge variant="secondary">{totalSelected} allowed</Badge>
       </div>
 
       <div className="relative">
@@ -287,17 +317,9 @@ function PermissionsDisplay({
           })
         )}
       </div>
-
-      {canUpdateRolePerms && (
-        <div className="flex justify-end gap-2">
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </div>
-      )}
     </div>
   );
-}
+});
 
 /* ---------------- RolesPage (standardised like JobFiles/Permissions) ---------------- */
 
@@ -336,6 +358,12 @@ export default function RolesPage() {
   const canUpdateRolePerms = useHasPermission(
     ENTITY_PERMS.roles.extras.updateRolePerms
   );
+
+  const permissionsRef = React.useRef<PermissionsDisplayHandle | null>(null);
+  const [permMeta, setPermMeta] = React.useState<PermissionsDisplayMeta>({
+    totalSelected: 0,
+    saving: false,
+  });
 
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   React.useEffect(() => {
@@ -944,64 +972,87 @@ export default function RolesPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="w-full max-w-full sm:max-w-md lg:max-w-lg">
-                      <label
-                        htmlFor="role-select"
-                        className="block text-sm font-medium mb-2"
-                      >
-                        Select Role
-                      </label>
-                      <Select
-                        value={permRole?.id || ""}
-                        onValueChange={(value) => {
-                          const selectedRole = roles.find((r) => r.id === value);
-                          if (selectedRole) {
-                            setPermRole(selectedRole);
-                            (async () => {
-                              if (permCountMap[selectedRole.id] == null) {
-                                try {
-                                  const perms = await getRolePerms(
-                                    selectedRole.id
-                                  );
-                                  const c = perms.reduce(
-                                    (sum: number, m: any) =>
-                                      sum +
-                                      m.permissions.filter(
-                                        (p: any) => p.is_allowed
-                                      ).length,
-                                    0
-                                  );
-                                  setPermCountMap((prev) => ({
-                                    ...prev,
-                                    [selectedRole.id]: c,
-                                  }));
-                                } catch {
-                                  // ignore
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="w-full max-w-full sm:max-w-md lg:max-w-lg">
+                        <label
+                          htmlFor="role-select"
+                          className="block text-sm font-medium mb-2"
+                        >
+                          Select Role
+                        </label>
+                        <Select
+                          value={permRole?.id || ""}
+                          onValueChange={(value) => {
+                            const selectedRole = roles.find((r) => r.id === value);
+                            if (selectedRole) {
+                              setPermRole(selectedRole);
+                              setPermMeta({ totalSelected: 0, saving: false });
+                              (async () => {
+                                if (permCountMap[selectedRole.id] == null) {
+                                  try {
+                                    const perms = await getRolePerms(
+                                      selectedRole.id
+                                    );
+                                    const c = perms.reduce(
+                                      (sum: number, m: any) =>
+                                        sum +
+                                        m.permissions.filter(
+                                          (p: any) => p.is_allowed
+                                        ).length,
+                                      0
+                                    );
+                                    setPermCountMap((prev) => ({
+                                      ...prev,
+                                      [selectedRole.id]: c,
+                                    }));
+                                  } catch {
+                                    // ignore
+                                  }
                                 }
-                              }
-                            })();
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Select a role --" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          {filtered.map((r) => (
-                            <SelectItem key={r.id} value={r.id}>
-                              {r.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                              })();
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="-- Select a role --" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {filtered.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {permRole && (
+                        <div className="flex items-end justify-end sm:items-end">
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge variant="secondary">
+                              {permMeta.totalSelected} allowed
+                            </Badge>
+                            {canUpdateRolePerms && (
+                              <Button
+                                onClick={() => permissionsRef.current?.save()}
+                                disabled={permMeta.saving}
+                              >
+                                {permMeta.saving ? "Saving…" : "Save"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {permRole && (
                       <PermissionsDisplay
+                        ref={permissionsRef}
                         roleId={permRole.id}
                         roleTitle={permRole.title}
                         canViewRolePerms={canViewRolePerms}
                         canUpdateRolePerms={canUpdateRolePerms}
+                        onMetaChange={setPermMeta}
                         onSaved={(updated) => {
                           const count = updated.reduce(
                             (s: number, m: any) =>

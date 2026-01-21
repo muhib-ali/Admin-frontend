@@ -4,6 +4,7 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import { Label } from "@/components/ui/label";
 import { useSession } from "next-auth/react";
 
@@ -68,9 +69,8 @@ export default function ProfileSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="ps-password">Password</Label>
-              <Input
+              <PasswordField
                 id="ps-password"
-                type="password"
                 className="h-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -80,9 +80,8 @@ export default function ProfileSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="ps-new-password">New Password</Label>
-              <Input
+              <PasswordField
                 id="ps-new-password"
-                type="password"
                 className="h-10"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}

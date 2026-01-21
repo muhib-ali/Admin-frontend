@@ -4,6 +4,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User } from "lucide-react";
@@ -112,9 +113,8 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
             <Label htmlFor="user-password">
               Password {mode === "create" ? "*" : "(leave blank to keep current)"}
             </Label>
-            <Input
+            <PasswordField
               id="user-password"
-              type="password"
               placeholder={mode === "create" ? "Enter password" : "••••••••"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}

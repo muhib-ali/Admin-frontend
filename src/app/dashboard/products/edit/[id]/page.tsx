@@ -9,7 +9,7 @@ import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { toast } from "react-toastify";
-import { Upload, X, Video } from "lucide-react";
+import { Upload, X, Video, Loader2, SearchX } from "lucide-react";
 import Image from "next/image";
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
@@ -1317,14 +1317,20 @@ export default function ProductEditPage() {
 
         {loading ? (
           <Card className="shadow-sm">
-            <CardContent className="p-10 text-center text-muted-foreground">
-              Loading…
+            <CardContent className="p-10 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+              <div className="text-sm font-medium text-foreground">Loading…</div>
             </CardContent>
           </Card>
         ) : !product ? (
           <Card className="shadow-sm">
-            <CardContent className="p-10 text-center text-muted-foreground">
-              Product not found.
+            <CardContent className="p-10 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <SearchX className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div className="text-sm font-semibold text-foreground">Product not found</div>
             </CardContent>
           </Card>
         ) : (

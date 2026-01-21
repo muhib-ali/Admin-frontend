@@ -4,6 +4,7 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import { Label } from "@/components/ui/label";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
@@ -285,9 +286,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-current">Current Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-current" 
-                type="password" 
                 className="h-10" 
                 value={currentPassword} 
                 onChange={(e) => setCurrentPassword(e.target.value)} 
@@ -298,9 +298,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-new">New Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-new" 
-                type="password" 
                 className="h-10" 
                 value={newPassword} 
                 onChange={(e) => setNewPassword(e.target.value)} 
@@ -311,9 +310,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-confirm">Confirm New Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-confirm" 
-                type="password" 
                 className="h-10" 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)} 
