@@ -19,4 +19,5 @@ export const ADMIN_LINK_PERM: Record<string, string> = {
   "/dashboard/promo-codes":  ENTITY_PERMS.promoCodes.list,
   "/dashboard/orders":      ENTITY_PERMS.orders.list,
   "/dashboard/bulk-orders": ENTITY_PERMS.bulkOrders.list,
+  "/dashboard/reviews":     ENTITY_PERMS.reviews.list,
 };

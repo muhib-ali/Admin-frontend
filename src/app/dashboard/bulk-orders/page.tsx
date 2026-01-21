@@ -26,6 +26,7 @@ import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
 import { bulkOrdersApi, Order, Pagination } from "@/services/orders";
 import { useCurrency } from "@/contexts/currency-context";
+import { useHasPermission } from "@/hooks/use-permission";
 
 type BulkOrderStatus = "pending" | "accepted" | "rejected" | "partially_accepted";
 
@@ -66,6 +67,10 @@ export default function BulkOrdersPage() {
   const [pagination, setPagination] = React.useState<Pagination | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+
+  // Permission checks
+  const canAcceptItem = useHasPermission("bulk-orders/acceptItem");
+  const canRejectItem = useHasPermission("bulk-orders/rejectItem");
 
   const { getCurrencyCode, convertAmount, getCurrencySymbol } = useCurrency();
   const targetCurrency = getCurrencyCode();
@@ -271,26 +276,30 @@ export default function BulkOrdersPage() {
                                   <TableCell className="text-right">
                                     {isPending ? (
                                       <div className="flex gap-2 justify-end">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="gap-1 text-emerald-600 border-emerald-600 hover:bg-emerald-50"
-                                          onClick={() => handleAcceptItem(order.id, item.id)}
-                                          disabled={isActionLoading}
-                                        >
-                                          <Check className="h-3 w-3" />
-                                          Accept
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="gap-1 text-rose-600 border-rose-600 hover:bg-rose-50"
-                                          onClick={() => handleRejectItem(order.id, item.id)}
-                                          disabled={isActionLoading}
-                                        >
-                                          <X className="h-3 w-3" />
-                                          Reject
-                                        </Button>
+                                        {canAcceptItem && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="gap-1 text-emerald-600 border-emerald-600 hover:bg-emerald-50"
+                                            onClick={() => handleAcceptItem(order.id, item.id)}
+                                            disabled={isActionLoading}
+                                          >
+                                            <Check className="h-3 w-3" />
+                                            Accept
+                                          </Button>
+                                        )}
+                                        {canRejectItem && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="gap-1 text-rose-600 border-rose-600 hover:bg-rose-50"
+                                            onClick={() => handleRejectItem(order.id, item.id)}
+                                            disabled={isActionLoading}
+                                          >
+                                            <X className="h-3 w-3" />
+                                            Reject
+                                          </Button>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className="text-sm text-muted-foreground">—</span>

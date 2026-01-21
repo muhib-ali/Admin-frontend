@@ -26,8 +26,9 @@ import PermissionBoundary from "@/components/permission-boundary";
 import { toast } from "sonner";
 import { ordersApi, Order, Pagination } from "@/services/orders";
 import { useCurrency } from "@/contexts/currency-context";
+import { useHasPermission } from "@/hooks/use-permission";
 
-type OrderStatus = "pending" | "accepted" | "rejected";
+type OrderStatus = "pending" | "accepted" | "rejected" | "partially_accepted";
 
 type OrderRow = {
   orderId: string;
@@ -45,10 +46,11 @@ function StatusBadge({ status }: { status: OrderStatus }) {
     pending: "bg-amber-500/10 text-amber-700",
     accepted: "bg-emerald-500/10 text-emerald-700",
     rejected: "bg-rose-500/10 text-rose-700",
+    partially_accepted: "bg-blue-500/10 text-blue-700",
   };
   return (
     <Badge variant="secondary" className={map[status]}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {status === "partially_accepted" ? "Partially Accepted" : status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
 }
@@ -60,6 +62,10 @@ export default function OrdersPage() {
   const [orders, setOrders] = React.useState<OrderRow[]>([]);
   const [pagination, setPagination] = React.useState<Pagination | null>(null);
   const [loading, setLoading] = React.useState(false);
+  
+  // Permission checks
+  const canAcceptOrder = useHasPermission("orders/accept");
+  const canRejectOrder = useHasPermission("orders/reject");
   
   // Use existing currency context from topbar
   const { getCurrencyCode, convertAmount, getCurrencySymbol } = useCurrency();
@@ -319,21 +325,25 @@ export default function OrdersPage() {
                             className={`text-right ${isLast ? "rounded-br-xl" : ""}`}
                           >
                             <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => rejectOrder(o.orderId)}
-                                disabled={o.status !== "pending"}
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => acceptOrder(o.orderId)}
-                                disabled={o.status !== "pending"}
-                              >
-                                Accept
-                              </Button>
+                              {canRejectOrder && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => rejectOrder(o.orderId)}
+                                  disabled={o.status !== "pending"}
+                                >
+                                  Reject
+                                </Button>
+                              )}
+                              {canAcceptOrder && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => acceptOrder(o.orderId)}
+                                  disabled={o.status !== "pending"}
+                                >
+                                  Accept
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

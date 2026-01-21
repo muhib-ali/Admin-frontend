@@ -101,11 +101,26 @@ export default function Sidebar({ collapsed = false }: Props) {
     []
   );
 
+  const orderMgmtPerms = React.useMemo(
+    () => ({
+      orders: ADMIN_LINK_PERM["/dashboard/orders"],
+      bulkOrders: ADMIN_LINK_PERM["/dashboard/bulk-orders"],
+      reviews: ADMIN_LINK_PERM["/dashboard/reviews"],
+    }),
+    []
+  );
+
   const canSeeCategories = useHasPermission(productMgmtPerms.categories);
   const canSeeBrands = useHasPermission(productMgmtPerms.brands);
   const canSeeProducts = useHasPermission(productMgmtPerms.products);
   const canSeeProductMgmt =
     canSeeCategories || canSeeBrands || canSeeProducts;
+
+  const canSeeOrders = useHasPermission(orderMgmtPerms.orders);
+  const canSeeBulkOrders = useHasPermission(orderMgmtPerms.bulkOrders);
+  const canSeeReviews = useHasPermission(orderMgmtPerms.reviews);
+  const canSeeOrderMgmt =
+    canSeeOrders || canSeeBulkOrders || canSeeReviews;
 
   const [orderMgmtOpen, setOrderMgmtOpen] = React.useState(false);
   const [productMgmtOpen, setProductMgmtOpen] = React.useState(false);
@@ -240,7 +255,7 @@ export default function Sidebar({ collapsed = false }: Props) {
             return <li key={href}>{dashboardLink}</li>;
           })()}
 
-          {!collapsed && (
+          {!collapsed && canSeeOrderMgmt && (
             <li>
               <div className="flex flex-col">
                 <button
@@ -269,36 +284,59 @@ export default function Sidebar({ collapsed = false }: Props) {
 
                 {orderMgmtOpen && (
                   <div className="mt-1 space-y-1 pl-6">
-                    {orderMgmtLinks.map((c) => {
-                      const childActive = pathname?.startsWith(c.href);
-                      const perm = ADMIN_LINK_PERM[c.href];
-
-                      const linkNode = (
+                    {canSeeOrders && (
+                      <PermissionGate route={orderMgmtPerms.orders} fallback={null}>
                         <Link
-                          key={c.href}
-                          href={c.href}
-                          onClick={(e) => handleNavigation(e, c.href)}
+                          href="/dashboard/orders"
+                          onClick={(e) => handleNavigation(e, "/dashboard/orders")}
                           className={cn(
                             "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
-                            childActive
+                            pathname?.startsWith("/dashboard/orders")
                               ? "bg-zinc-900 text-white"
                               : "text-gray-500 hover:bg-zinc-900 hover:text-white"
                           )}
                         >
-                          <ChevronRight className={cn("h-4 w-4 shrink-0 transition-colors", childActive ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
-                          <span className="truncate">{c.label}</span>
+                          <ChevronRight className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/orders") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
+                          <span className="truncate">Orders</span>
                         </Link>
-                      );
+                      </PermissionGate>
+                    )}
 
-                      if (perm) {
-                        return (
-                          <PermissionGate key={c.href} route={perm} fallback={null}>
-                            {linkNode}
-                          </PermissionGate>
-                        );
-                      }
-                      return linkNode;
-                    })}
+                    {canSeeBulkOrders && (
+                      <PermissionGate route={orderMgmtPerms.bulkOrders} fallback={null}>
+                        <Link
+                          href="/dashboard/bulk-orders"
+                          onClick={(e) => handleNavigation(e, "/dashboard/bulk-orders")}
+                          className={cn(
+                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                            pathname?.startsWith("/dashboard/bulk-orders")
+                              ? "bg-zinc-900 text-white"
+                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                          )}
+                        >
+                          <ChevronRight className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/bulk-orders") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
+                          <span className="truncate">Bulk Orders</span>
+                        </Link>
+                      </PermissionGate>
+                    )}
+
+                    {canSeeReviews && (
+                      <PermissionGate route={orderMgmtPerms.reviews} fallback={null}>
+                        <Link
+                          href="/dashboard/reviews"
+                          onClick={(e) => handleNavigation(e, "/dashboard/reviews")}
+                          className={cn(
+                            "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                            pathname?.startsWith("/dashboard/reviews")
+                              ? "bg-zinc-900 text-white"
+                              : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                          )}
+                        >
+                          <ChevronRight className={cn("h-4 w-4 shrink-0 transition-colors", pathname?.startsWith("/dashboard/reviews") ? "text-red-600" : "text-gray-500 group-hover:text-red-600")} />
+                          <span className="truncate">Reviews</span>
+                        </Link>
+                      </PermissionGate>
+                    )}
                   </div>
                 )}
               </div>
