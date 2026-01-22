@@ -126,6 +126,13 @@ export const ENTITY_PERMS = {
     approve: "reviews/approve",
     delete:  "reviews/delete",
   },
+  blogs: {
+    list:   "blogs/getAll",
+    create: "blogs/create",
+    read:   "blogs/getById",
+    update: "blogs/update",
+    delete: "blogs/delete",
+  },
 } as const;
 
 export const SCREEN_PERM: Record<string, string> = {
@@ -207,4 +214,9 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/reviews/[id]":              ENTITY_PERMS.reviews.read,
   "/dashboard/reviews/[id]/approve":       ENTITY_PERMS.reviews.approve,
   "/dashboard/reviews/[id]/delete":        ENTITY_PERMS.reviews.delete,
+
+  "/dashboard/blogs":                     ENTITY_PERMS.blogs.list,
+  "/dashboard/blogs/create":              ENTITY_PERMS.blogs.create,
+  "/dashboard/blogs/[id]":                ENTITY_PERMS.blogs.read,
+  "/dashboard/blogs/[id]/edit":           ENTITY_PERMS.blogs.update,
 };
