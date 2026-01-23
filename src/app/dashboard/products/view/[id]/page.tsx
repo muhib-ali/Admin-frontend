@@ -15,6 +15,7 @@ import {
   getAllVariantTypesDropdown,
   getAllTaxesDropdown,
 } from "@/services/dropdowns";
+import { listTaxes } from "@/services/taxes";
 import { useCurrency } from "@/contexts/currency-context";
 
 type StoredProduct = {
@@ -119,6 +120,7 @@ export default function ProductViewPage() {
   const [taxes, setTaxes] = React.useState<
     Array<{ value: string; label: string }>
   >([]);
+  const [taxRows, setTaxRows] = React.useState<{ id: string; title: string; rate: number }[]>([]);
 
   const displayPrice = React.useCallback(
     async (price: number, fromCurrency: string = "USD") => {
@@ -164,16 +166,48 @@ export default function ProductViewPage() {
         const cost = safeNumber(product?.cost);
         const freight = safeNumber(product?.freight);
         const discountPercent = safeNumber(product?.discount);
+        let taxRate = safeNumber(product?.tax?.rate ?? 0);
 
-        const totalCost = selling + cost + freight;
-        const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
+        console.log("=== CONVERT ALL PRICES DEBUG ===");
+        console.log("Initial tax rate from product.tax?.rate:", taxRate);
+
+        // If product tax rate is 0, try to get it from taxRows using tax_id
+        if (taxRate === 0 && product?.tax_id) {
+          const taxFromRows = taxRows.find((t) => t.id === product.tax_id);
+          if (taxFromRows?.rate) {
+            taxRate = taxFromRows.rate;
+            console.log("Tax Rate found from taxRows:", taxRate);
+          }
+        }
+
+        console.log("Final tax rate being used:", taxRate);
+
+        // Base price includes selling price + cost + freight
+        const basePrice = selling + cost + freight;
+        
+        // Calculate tax on base price
+        const taxAmount = basePrice * (taxRate / 100);
+        
+        // Total price with tax included
+        const totalPriceWithTax = basePrice + taxAmount;
+        
+        // Apply discount on total price (including tax)
+        const priceAfterDiscount = discountPercent > 0
+          ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
+          : totalPriceWithTax;
+
+        console.log("Converted prices calculation:");
+        console.log("Base Price:", basePrice);
+        console.log("Tax Amount:", taxAmount);
+        console.log("Total Price with Tax:", totalPriceWithTax);
+        console.log("Price After Discount:", priceAfterDiscount);
 
         const [sellingPrice, costPrice, freightPrice, totalCostPrice, priceAfterDiscountPrice] =
           await Promise.all([
             displayPrice(selling, product.currency || "USD"),
             displayPrice(cost, product.currency || "USD"),
             displayPrice(freight, product.currency || "USD"),
-            displayPrice(totalCost, product.currency || "USD"),
+            displayPrice(totalPriceWithTax, product.currency || "USD"), // Updated to include tax
             displayPrice(priceAfterDiscount, product.currency || "USD"),
           ]);
 
@@ -181,7 +215,7 @@ export default function ProductViewPage() {
           sellingPrice,
           cost: costPrice,
           freight: freightPrice,
-          totalCost: totalCostPrice,
+          totalCost: totalCostPrice, // This now includes tax
           priceAfterDiscount: priceAfterDiscountPrice,
         });
       } catch (error) {
@@ -195,17 +229,43 @@ export default function ProductViewPage() {
   React.useEffect(() => {
     const fetchDropdowns = async () => {
       try {
-        const [warehousesList, suppliersList, variantTypesList, taxesList] =
+        const [warehousesList, suppliersList, variantTypesList, taxesList, taxData] =
           await Promise.all([
             getAllWarehousesDropdown(),
             getAllSuppliersDropdown(),
             getAllVariantTypesDropdown(),
             getAllTaxesDropdown(),
+            listTaxes(1, 100, undefined),
           ]);
         setWarehouses(warehousesList);
         setSuppliers(suppliersList);
         setVariantTypes(variantTypesList);
-        setTaxes(taxesList);
+        
+        // Create a unified tax mapping that works for both dropdown and calculations
+        const unifiedTaxMap = new Map<string, { id: string; title: string; rate: number }>();
+        
+        // Map dropdown taxes (for the select dropdown)
+        setTaxes((taxesList ?? []).map((t: any) => {
+          const taxInfo = { value: t.value, label: t.label };
+          // Also map to tax rate data if available
+          const matchingTaxRate = (taxData?.rows ?? []).find((tr: any) => tr.id === t.value);
+          if (matchingTaxRate) {
+            unifiedTaxMap.set(t.value, {
+              id: matchingTaxRate.id,
+              title: matchingTaxRate.title,
+              rate: matchingTaxRate.rate
+            });
+          }
+          return taxInfo;
+        }));
+        
+        // Set tax rows using the unified map
+        setTaxRows(Array.from(unifiedTaxMap.values()));
+        
+        console.log("=== VIEW PAGE TAX DEBUG ===");
+        console.log("Product tax_id:", product?.tax_id);
+        console.log("Available taxes after loading:", taxesList.map(t => ({ value: t.value, label: t.label })));
+        console.log("Tax rows with rates:", Array.from(unifiedTaxMap.values()));
       } catch (error) {
         console.error("Failed to fetch dropdowns:", error);
       }
@@ -272,15 +332,23 @@ export default function ProductViewPage() {
 
   const getTaxRate = React.useCallback(
     (taxId: string) => {
+      // First try to get from product tax object
       if (product?.tax?.rate) return product.tax.rate;
-      const tax = taxes.find((t) => t.value === taxId);
-      if (tax?.label) {
-        const rateMatch = tax.label.match(/(\d+(?:\.\d+)?)%?/);
+      
+      // Then try to get from taxRows (with proper rate data)
+      const tax = taxRows.find((t) => t.id === taxId);
+      if (tax?.rate) return tax.rate;
+      
+      // Fallback to old logic if needed
+      const fallbackTax = taxes.find((t) => t.value === taxId);
+      if (fallbackTax?.label) {
+        const rateMatch = fallbackTax.label.match(/(\d+(?:\.\d+)?)%?/);
         return rateMatch ? parseFloat(rateMatch[1]) : 0;
       }
+      
       return 0;
     },
-    [product, taxes]
+    [product, taxRows, taxes]
   );
 
   const pricing = React.useMemo(() => {
@@ -288,12 +356,61 @@ export default function ProductViewPage() {
     const cost = safeNumber(product?.cost);
     const freight = safeNumber(product?.freight);
     const discountPercent = safeNumber(product?.discount);
+    const taxRate = safeNumber(product?.tax?.rate ?? 0);
 
-    const totalCost = selling + cost + freight;
-    const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
+    console.log("=== VIEW PAGE PRICING CALCULATION ===");
+    console.log("Product data:", {
+      selling_price: product?.selling_price,
+      price: product?.price,
+      cost: product?.cost,
+      freight: product?.freight,
+      discount: product?.discount,
+      tax: product?.tax
+    });
+    console.log("Parsed values:");
+    console.log("Selling Price:", selling);
+    console.log("Cost:", cost);
+    console.log("Freight:", freight);
+    console.log("Discount %:", discountPercent);
+    console.log("Tax Rate from product.tax?.rate:", taxRate);
 
-    return { totalCost, priceAfterDiscount };
-  }, [product]);
+    // If product tax rate is 0, try to get it from taxRows using tax_id
+    let finalTaxRate = taxRate;
+    if (finalTaxRate === 0 && product?.tax_id) {
+      const taxFromRows = taxRows.find((t) => t.id === product.tax_id);
+      if (taxFromRows?.rate) {
+        finalTaxRate = taxFromRows.rate;
+        console.log("Tax Rate found from taxRows:", finalTaxRate);
+      }
+    }
+
+    console.log("Final Tax Rate being used:", finalTaxRate);
+
+    // Base price includes selling price + cost + freight
+    const basePrice = selling + cost + freight;
+    console.log("Base Price (Selling + Cost + Freight):", basePrice);
+    
+    // Calculate tax on base price
+    const taxAmount = basePrice * (finalTaxRate / 100);
+    console.log("Tax Amount:", taxAmount);
+    
+    // Total price with tax included
+    const totalPriceWithTax = basePrice + taxAmount;
+    console.log("Total Price with Tax:", totalPriceWithTax);
+    
+    // Apply discount on total price (including tax)
+    const priceAfterDiscount = discountPercent > 0
+      ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
+      : totalPriceWithTax;
+    console.log("Final Price After Discount:", priceAfterDiscount);
+
+    return { 
+      totalCost: totalPriceWithTax, // Updated to include tax
+      priceAfterDiscount,
+      taxAmount,
+      basePrice,
+    };
+  }, [product, taxRows]);
 
   return (
     <PermissionBoundary screen="/dashboard/products/view[id]" mode="block">
@@ -533,7 +650,14 @@ export default function ProductViewPage() {
                   <Field label="Discount" value={`${product.discount || "0"}%`} />
                   <Field label="Start Date" value={product.start_discount_date || "—"} />
                   <Field label="End Date" value={product.end_discount_date || "—"} />
-                  <Field label="Total Price" value={product.total_price || "—"} />
+                  <Field 
+                    label="Total Price" 
+                    value={
+                      convertedPrices
+                        ? `${convertedPrices.totalCost.symbol} ${convertedPrices.totalCost.amount.toFixed(2)}`
+                        : `${product.currency} ${pricing.totalCost.toFixed(2)}`
+                    } 
+                  />
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

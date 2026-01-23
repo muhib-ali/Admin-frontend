@@ -39,6 +39,7 @@ export type ProductRow = {
   title: string;
   description: string;
   price: number;
+  total_price?: number;
   stock_quantity: number;
   category_id: string;
   brand_id: string;

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronLeft, ChevronRight, Truck } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Truck, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,10 +63,8 @@ export default function OrdersPage() {
   const [orders, setOrders] = React.useState<OrderRow[]>([]);
   const [pagination, setPagination] = React.useState<Pagination | null>(null);
   const [loading, setLoading] = React.useState(false);
-  
-  // Permission checks
-  const canAcceptOrder = useHasPermission("orders/accept");
-  const canRejectOrder = useHasPermission("orders/reject");
+  const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = React.useState(false);
   
   // Use existing currency context from topbar
   const { getCurrencyCode, convertAmount, getCurrencySymbol } = useCurrency();
@@ -148,32 +147,16 @@ export default function OrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-
-  const acceptOrder = async (id: string) => {
+  const viewOrder = async (id: string) => {
     try {
-      const response = await ordersApi.accept(id);
-      
-      if (response.status) {
-        toast.success("Order accepted successfully");
-        fetchOrders();
+      const response = await ordersApi.getById(id);
+      if (response.status && response.data) {
+        setSelectedOrder(response.data);
+        setIsViewDialogOpen(true);
       }
     } catch (error) {
-      console.error("Failed to accept order:", error);
-      toast.error("Failed to accept order");
-    }
-  };
-
-  const rejectOrder = async (id: string) => {
-    try {
-      const response = await ordersApi.reject(id);
-      
-      if (response.status) {
-        toast.success("Order rejected successfully");
-        fetchOrders();
-      }
-    } catch (error) {
-      console.error("Failed to reject order:", error);
-      toast.error("Failed to reject order");
+      console.error("Failed to fetch order details:", error);
+      toast.error("Failed to fetch order details");
     }
   };
 
@@ -325,25 +308,15 @@ export default function OrdersPage() {
                             className={`text-right ${isLast ? "rounded-br-xl" : ""}`}
                           >
                             <div className="flex items-center justify-end gap-2">
-                              {canRejectOrder && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => rejectOrder(o.orderId)}
-                                  disabled={o.status !== "pending"}
-                                >
-                                  Reject
-                                </Button>
-                              )}
-                              {canAcceptOrder && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => acceptOrder(o.orderId)}
-                                  disabled={o.status !== "pending"}
-                                >
-                                  Accept
-                                </Button>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => viewOrder(o.orderId)}
+                                className="gap-1"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -385,6 +358,131 @@ export default function OrdersPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Order Details Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Order Details</DialogTitle>
+            </DialogHeader>
+            {selectedOrder && (
+              <div className="space-y-6">
+                {/* Order Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Order Information</h3>
+                    <div className="space-y-1 text-sm">
+                      <p><span className="font-medium">Order Number:</span> {selectedOrder.order_number}</p>
+                      <p><span className="font-medium">Status:</span> <StatusBadge status={selectedOrder.status} /></p>
+                      <p><span className="font-medium">Order Type:</span> {selectedOrder.order_type || 'regular'}</p>
+                      <p><span className="font-medium">Created:</span> {renderCreatedAt(selectedOrder.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Customer Information</h3>
+                    <div className="space-y-1 text-sm">
+                      <p><span className="font-medium">Name:</span> {selectedOrder.first_name} {selectedOrder.last_name}</p>
+                      <p><span className="font-medium">Email:</span> {selectedOrder.email}</p>
+                      <p><span className="font-medium">Phone:</span> {selectedOrder.phone}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">Shipping Address</h3>
+                  <div className="text-sm">
+                    <p>{selectedOrder.address}</p>
+                    <p>{selectedOrder.city}, {selectedOrder.state} {selectedOrder.zip_code}</p>
+                    <p>{selectedOrder.country}</p>
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">Order Items</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left p-3 border-b">Product</th>
+                          <th className="text-left p-3 border-b">SKU</th>
+                          <th className="text-center p-3 border-b">Quantity</th>
+                          <th className="text-right p-3 border-b">Unit Price</th>
+                          <th className="text-right p-3 border-b">Total Price</th>
+                          {selectedOrder.order_type === 'bulk' && (
+                            <>
+                              <th className="text-right p-3 border-b">Requested Price</th>
+                              <th className="text-right p-3 border-b">Offered Price</th>
+                              <th className="text-center p-3 border-b">Item Status</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.order_items.map((item, index) => (
+                          <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                            <td className="p-3 border-b">{item.product_name}</td>
+                            <td className="p-3 border-b">{item.product_sku}</td>
+                            <td className="text-center p-3 border-b">{item.quantity}</td>
+                            <td className="text-right p-3 border-b">${parseFloat(item.unit_price).toFixed(2)}</td>
+                            <td className="text-right p-3 border-b">${parseFloat(item.total_price).toFixed(2)}</td>
+                            {selectedOrder.order_type === 'bulk' && (
+                              <>
+                                <td className="text-right p-3 border-b">
+                                  ${item.requested_price_per_unit ? parseFloat(item.requested_price_per_unit).toFixed(2) : 'N/A'}
+                                </td>
+                                <td className="text-right p-3 border-b">
+                                  ${item.offered_price_per_unit ? parseFloat(item.offered_price_per_unit).toFixed(2) : 'N/A'}
+                                </td>
+                                <td className="text-center p-3 border-b">
+                                  <Badge variant="secondary" className={
+                                    item.item_status === 'accepted' ? 'bg-emerald-500/10 text-emerald-700' :
+                                    item.item_status === 'pending' ? 'bg-amber-500/10 text-amber-700' :
+                                    'bg-rose-500/10 text-rose-700'
+                                  }>
+                                    {item.item_status || 'N/A'}
+                                  </Badge>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Order Totals */}
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">Order Totals</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>${parseFloat(selectedOrder.subtotal_amount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Discount:</span>
+                      <span>-${parseFloat(selectedOrder.discount_amount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                      <span>Total:</span>
+                      <span>${parseFloat(selectedOrder.total_amount).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {selectedOrder.notes && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Notes</h3>
+                    <p className="text-sm">{selectedOrder.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </PermissionBoundary>
   );

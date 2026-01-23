@@ -4,6 +4,7 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
+import { listTaxes } from "@/services/taxes";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
@@ -134,6 +135,7 @@ export default function ProductEditPage() {
   const [categories, setCategories] = React.useState<Option[]>([]);
   const [brands, setBrands] = React.useState<Option[]>([]);
   const [taxes, setTaxes] = React.useState<Option[]>([]);
+  const [taxRows, setTaxRows] = React.useState<{ id: string; title: string; rate: number }[]>([]);
   const [suppliers, setSuppliers] = React.useState<Option[]>([]);
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
@@ -189,7 +191,16 @@ export default function ProductEditPage() {
 
     (async () => {
       try {
-        const [cats, brs, tax, sup, wh, cvg, defaultVTypes] = await Promise.all([
+        const [
+          cats,
+          brs,
+          tax,
+          sup,
+          wh,
+          cvg,
+          defaultVTypes,
+          taxData,
+        ] = await Promise.all([
           getAllCategoriesDropdown({ signal: ac.signal }),
           getAllBrandsDropdown({ signal: ac.signal }),
           getAllTaxesDropdown({ signal: ac.signal }),
@@ -197,11 +208,29 @@ export default function ProductEditPage() {
           getAllWarehousesDropdown({ signal: ac.signal }),
           getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
           productsService.getDefaultVariantTypes(),
+          listTaxes(1, 100, undefined, { signal: ac.signal }),
         ]);
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
         setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
-        setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
+        // Create a unified tax mapping that works for both dropdown and calculations
+        const unifiedTaxMap = new Map<string, { id: string; title: string; rate: number }>();
+        
+        // Map dropdown taxes (for the select dropdown)
+        setTaxes((tax ?? []).map((t: any) => {
+          const taxInfo = { id: t.value, name: t.label };
+          // Also map to tax rate data if available
+          const matchingTaxRate = (taxData?.rows ?? []).find((tr: any) => tr.id === t.value);
+          if (matchingTaxRate) {
+            unifiedTaxMap.set(t.value, {
+              id: matchingTaxRate.id,
+              title: matchingTaxRate.title,
+              rate: matchingTaxRate.rate
+            });
+          }
+          return taxInfo;
+        }));
+        
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
         // Load default variant types from API (size, model, year)
@@ -213,7 +242,14 @@ export default function ProductEditPage() {
           }))
         );
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
-      } catch {
+        
+        // Set tax rows using the unified map
+        setTaxRows(Array.from(unifiedTaxMap.values()));
+      } catch (error: any) {
+        // Only log if it's not a canceled error (AbortController)
+        if (error?.name !== 'CanceledError' && error?.message !== 'canceled') {
+          console.error('Error loading dropdown data:', error);
+        }
         // ignore UI-only page for now
       }
     })();
@@ -371,6 +407,12 @@ export default function ProductEditPage() {
           is_active: productData?.is_active ?? true,
         });
 
+        // Debug: Log the loaded tax_id and available taxes
+        console.log("=== TAX DEBUG ===");
+        console.log("Product tax_id:", productData?.tax_id);
+        console.log("Available taxes after loading:", taxes.map(t => ({ id: t.id, name: t.name })));
+        console.log("Tax rows with rates:", taxRows);
+
         // Load bulk pricing
         if (convertedBulkPricing.length > 0) {
           setBulkPricing(convertedBulkPricing);
@@ -487,7 +529,10 @@ export default function ProductEditPage() {
         setPendingGalleryImages([]);
         setPendingVideo(null);
       } catch (error: any) {
-        toast.error(error?.message || "Failed to load product");
+        // Only show error if it's not a canceled error (AbortController)
+        if (error?.name !== 'CanceledError' && error?.message !== 'canceled') {
+          toast.error(error?.message || "Failed to load product");
+        }
       } finally {
         setLoading(false);
       }
@@ -657,6 +702,56 @@ export default function ProductEditPage() {
   const selectedVariantKeys = React.useMemo(() => {
     return variantOptions.filter((k) => Boolean(variantSelected[k]));
   }, [variantOptions, variantSelected]);
+
+  const selectedTaxRate = React.useMemo(() => {
+    const tax = taxRows.find((t) => t.id === values.tax_id);
+    return tax?.rate ?? 0;
+  }, [taxRows, values.tax_id]);
+
+  const pricing = React.useMemo(() => {
+    const selling = Number(values.selling_price) || 0;
+    const freight = Number(values.freight) || 0;
+    const cost = Number(values.cost) || 0;
+    const discountPercent = Number(values.discount) || 0;
+
+    console.log("=== EDIT PAGE PRICING CALCULATION ===");
+    console.log("Selling Price:", selling);
+    console.log("Cost:", cost);
+    console.log("Freight:", freight);
+    console.log("Discount %:", discountPercent);
+    console.log("Selected Tax Rate:", selectedTaxRate);
+
+    // Base price includes selling price + cost + freight
+    const basePrice = selling + cost + freight;
+    console.log("Base Price (Selling + Cost + Freight):", basePrice);
+    
+    // Calculate tax on base price
+    const taxAmount = basePrice * (selectedTaxRate / 100);
+    console.log("Tax Amount:", taxAmount);
+    
+    // Total price with tax included
+    const totalPriceWithTax = basePrice + taxAmount;
+    console.log("Total Price with Tax:", totalPriceWithTax);
+    
+    // Apply discount on total price (including tax)
+    const priceAfterDiscount = discountPercent > 0
+      ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
+      : totalPriceWithTax;
+    console.log("Final Price After Discount:", priceAfterDiscount);
+
+    return {
+      taxAmount,
+      basePrice,
+      totalPriceWithTax,
+      priceAfterDiscount,
+    };
+  }, [
+    values.selling_price,
+    values.freight,
+    values.cost,
+    values.discount,
+    selectedTaxRate,
+  ]);
 
   // Cleanup blob URLs
   React.useEffect(() => {
@@ -1611,6 +1706,10 @@ export default function ProductEditPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* Debug info */}
+                    <div className="text-xs text-gray-500">
+                      Debug: tax_id="{values.tax_id}" | Available taxes: {taxes.map(t => `${t.id}:${t.name}`).join(', ')}
+                    </div>
                   </div>
                 </div>
 
@@ -1643,7 +1742,12 @@ export default function ProductEditPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="text-base font-semibold">Bulk pricing</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-base font-semibold">Bulk pricing</div>
+                    <Button type="button" variant="outline" onClick={addBulkRow} className="text-sm">
+                      + Add Bulk Pricing
+                    </Button>
+                  </div>
                   <div className="space-y-2">
                     {bulkPricing.map((row, idx) => (
                       <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
@@ -1692,6 +1796,24 @@ export default function ProductEditPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <div className="px-4 py-3 text-right">
+                    <div className="text-xs text-emerald-700">Total cost</div>
+                    <div className="text-xl font-bold text-neutral-900">
+                      {values.currency} {pricing.totalPriceWithTax.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <div className="px-4 py-3 text-right">
+                    <div className="text-xs text-emerald-700">Price after discount</div>
+                    <div className="text-xl font-bold text-neutral-900">
+                      {values.currency} {pricing.priceAfterDiscount.toFixed(2)}
+                    </div>
                   </div>
                 </div>
               </CardContent>

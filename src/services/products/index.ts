@@ -441,6 +441,19 @@ export async function updateProduct(payload: {
     );
     return data.data;
   } catch (e: any) {
+    console.error("Update product error details:", {
+      status: e?.response?.status,
+      statusText: e?.response?.statusText,
+      data: e?.response?.data,
+      message: e?.response?.data?.message,
+      error: e?.message,
+      fullError: e,
+      payload: payload
+    });
+    
+    // Log the full error object to see its structure
+    console.error("Full error object:", JSON.stringify(e, null, 2));
+    
     const msg = String(e?.response?.data?.message ?? "");
     if (msg.toLowerCase().includes("is_active")) {
       const { is_active, ...rest } = payload;
