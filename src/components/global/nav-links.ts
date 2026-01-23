@@ -8,6 +8,7 @@ import {
   Box,
   Truck,
   Layers,
+  FileText,
 } from "lucide-react";
 
 export const NAV_LINKS = [
@@ -15,6 +16,7 @@ export const NAV_LINKS = [
   { href: "/dashboard/customers", label: "Customers", icon: Users },
   { href: "/dashboard/orders", label: "Orders", icon: Truck },
   { href: "/dashboard/bulk-orders", label: "Bulk Orders", icon: Layers },
+  { href: "/dashboard/blogs", label: "Blogs", icon: FileText },
   { href: "/dashboard/projects", label: "Projects", icon: Package },
   { href: "/dashboard/subscriptions", label: "Subscriptions", icon: CreditCard },
 ];
