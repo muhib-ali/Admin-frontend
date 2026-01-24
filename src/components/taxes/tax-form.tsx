@@ -91,14 +91,44 @@ export default function TaxFormDialog({
 
           <div className="space-y-2">
             <Label htmlFor="tax-rate">Rate *</Label>
-            <Input
-              id="tax-rate"
-              placeholder="e.g., 15"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-              disabled={isReadOnly}
-              inputMode="decimal"
-            />
+            <div className="relative">
+              <Input
+                id="tax-rate"
+                placeholder="e.g., 15"
+                value={rate}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                    setRate(v);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.altKey) return;
+                  const allowed = [
+                    "Backspace",
+                    "Delete",
+                    "Tab",
+                    "Enter",
+                    "Escape",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "Home",
+                    "End",
+                  ];
+                  if (allowed.includes(e.key)) return;
+                  if (/^[0-9.]$/.test(e.key)) return;
+                  e.preventDefault();
+                }}
+                disabled={isReadOnly}
+                inputMode="decimal"
+                className="pr-10"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                %
+              </span>
+            </div>
             <p className="text-[11px] text-muted-foreground">
               Enter a numeric tax rate percentage (e.g. 15)
             </p>

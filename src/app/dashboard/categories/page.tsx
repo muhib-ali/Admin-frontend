@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import CategoryFormDialog, {
   CategoryFormValues,
 } from "@/components/categories/category-form";
@@ -146,7 +146,7 @@ export default function CategoriesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load categories");
+        notifyError(e?.response?.data?.message || "Failed to load categories");
       } finally {
         setLoading(false);
       }
@@ -195,7 +195,7 @@ export default function CategoriesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      notifyError(e?.response?.data?.message || "Failed to open category");
     }
   };
 
@@ -213,7 +213,7 @@ export default function CategoriesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      notifyError(e?.response?.data?.message || "Failed to open category");
     }
   };
 
@@ -226,7 +226,7 @@ export default function CategoriesPage() {
           description: data.description || "",
           isActive: data.active,
         });
-        toast.success("Category created");
+        notifySuccess("Category created");
       } else {
         if (!canUpdate) return;
         await updateCategory({
@@ -235,7 +235,7 @@ export default function CategoriesPage() {
           description: data.description || "",
           isActive: data.active,
         });
-        toast.success("Category updated");
+        notifySuccess("Category updated");
       }
 
       await refetch();
@@ -243,7 +243,7 @@ export default function CategoriesPage() {
       setCurrent(undefined);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      notifyError(e?.response?.data?.message || "Save failed");
     }
   };
 
@@ -260,7 +260,7 @@ export default function CategoriesPage() {
     try {
       setDeleting(true);
       await deleteCategory(deleteTarget.id);
-      toast.success("Category deleted");
+      notifySuccess("Category deleted");
 
       const { rows: list, pagination: pg } = await listCategories(
         page,
@@ -278,7 +278,7 @@ export default function CategoriesPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

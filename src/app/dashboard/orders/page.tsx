@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import { ordersApi, Order, Pagination } from "@/services/orders";
 import { useCurrency } from "@/contexts/currency-context";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -136,7 +136,7 @@ export default function OrdersPage() {
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
-      toast.error("Failed to fetch orders");
+      notifyError("Failed to fetch orders");
       setOrders([]);
       setPagination(null);
     } finally {
@@ -154,12 +154,12 @@ export default function OrdersPage() {
       const response = await ordersApi.accept(id);
       
       if (response.status) {
-        toast.success("Order accepted successfully");
+        notifySuccess("Order accepted successfully");
         fetchOrders();
       }
     } catch (error) {
       console.error("Failed to accept order:", error);
-      toast.error("Failed to accept order");
+      notifyError("Failed to accept order");
     }
   };
 
@@ -168,12 +168,12 @@ export default function OrdersPage() {
       const response = await ordersApi.reject(id);
       
       if (response.status) {
-        toast.success("Order rejected successfully");
+        notifySuccess("Order rejected successfully");
         fetchOrders();
       }
     } catch (error) {
       console.error("Failed to reject order:", error);
-      toast.error("Failed to reject order");
+      notifyError("Failed to reject order");
     }
   };
 

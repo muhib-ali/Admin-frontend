@@ -32,7 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import WarehouseFormDialog, {
   WarehouseFormValues,
 } from "@/components/warehouses/warehouse-form";
@@ -149,7 +149,7 @@ export default function WarehousesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load warehouses");
+        notifyError(e?.response?.data?.message || "Failed to load warehouses");
       } finally {
         setLoading(false);
       }
@@ -199,7 +199,7 @@ export default function WarehousesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open warehouse");
+      notifyError(e?.response?.data?.message || "Failed to open warehouse");
     }
   };
 
@@ -218,7 +218,7 @@ export default function WarehousesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open warehouse");
+      notifyError(e?.response?.data?.message || "Failed to open warehouse");
     }
   };
 
@@ -234,7 +234,7 @@ export default function WarehousesPage() {
         };
         console.log("Creating warehouse with payload:", payload);
         await createWarehouse(payload);
-        toast.success("Warehouse created");
+        notifySuccess("Warehouse created");
       } else {
         if (!canUpdate) return;
         const payload = {
@@ -246,7 +246,7 @@ export default function WarehousesPage() {
         };
         console.log("Updating warehouse with payload:", payload);
         await updateWarehouse(payload);
-        toast.success("Warehouse updated");
+        notifySuccess("Warehouse updated");
       }
 
       await refetch();
@@ -293,7 +293,7 @@ export default function WarehousesPage() {
         }
       }
       
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     }
   };
 
@@ -310,7 +310,7 @@ export default function WarehousesPage() {
     try {
       setDeleting(true);
       await deleteWarehouse(deleteTarget.id);
-      toast.success("Warehouse deleted");
+      notifySuccess("Warehouse deleted");
 
       const { rows: list, pagination: pg } = await listWarehouses(
         page,
@@ -328,7 +328,7 @@ export default function WarehousesPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

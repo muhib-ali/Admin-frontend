@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "react-toastify";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import {
   User,
   Plus,
@@ -122,7 +122,7 @@ export default function UsersPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load users");
+        notifyError(e?.response?.data?.message || "Failed to load users");
       } finally {
         setLoading(false);
       }
@@ -152,11 +152,11 @@ export default function UsersPage() {
         password: data.password!,
         roleId: data.roleId,
       });
-      toast.success("User created");
+      notifySuccess("User created");
       await refetchUsers();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Create failed");
+      notifyError(e?.response?.data?.message || "Create failed");
     }
   }
 
@@ -169,7 +169,7 @@ export default function UsersPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open user");
+      notifyError(e?.response?.data?.message || "Failed to open user");
     }
   }
 
@@ -186,11 +186,11 @@ export default function UsersPage() {
         payload.password = data.password;
       }
       await updateUser(payload);
-      toast.success("User updated");
+      notifySuccess("User updated");
       await refetchUsers();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Update failed");
+      notifyError(e?.response?.data?.message || "Update failed");
     }
   }
 
@@ -207,7 +207,7 @@ export default function UsersPage() {
     try {
       setDeleting(true);
       await deleteUser(deleteTargetId);
-      toast.success("User deleted");
+      notifySuccess("User deleted");
 
       const { rows, pagination: pg } = await listUsers(
         page,
@@ -225,7 +225,7 @@ export default function UsersPage() {
       setDeleteTargetId(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 
 import TaxFormDialog, { TaxFormValues } from "@/components/taxes/tax-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
@@ -146,7 +146,7 @@ export default function TaxPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load taxes");
+        notifyError(e?.response?.data?.message || "Failed to load taxes");
       } finally {
         setLoading(false);
       }
@@ -195,7 +195,7 @@ export default function TaxPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open tax");
+      notifyError(e?.response?.data?.message || "Failed to open tax");
     }
   };
 
@@ -213,7 +213,7 @@ export default function TaxPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open tax");
+      notifyError(e?.response?.data?.message || "Failed to open tax");
     }
   };
 
@@ -230,7 +230,7 @@ export default function TaxPage() {
         console.log("Payload type:", typeof payload);
         console.log("Rate type:", typeof payload.rate);
         await createTax(payload);
-        toast.success("Tax created");
+        notifySuccess("Tax created");
       } else {
         if (!canUpdate) return;
         const payload = {
@@ -241,7 +241,7 @@ export default function TaxPage() {
         };
         console.log("Updating tax with payload:", payload);
         await updateTax(payload);
-        toast.success("Tax updated");
+        notifySuccess("Tax updated");
       }
 
       await refetch();
@@ -288,7 +288,7 @@ export default function TaxPage() {
         }
       }
       
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     }
   };
 
@@ -305,7 +305,7 @@ export default function TaxPage() {
     try {
       setDeleting(true);
       await deleteTax(deleteTarget.id);
-      toast.success("Tax deleted");
+      notifySuccess("Tax deleted");
 
       const { rows: list, pagination: pg } = await listTaxes(
         page,
@@ -323,7 +323,7 @@ export default function TaxPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

@@ -8,7 +8,7 @@ import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
-import { toast } from "react-toastify";
+import { notifyError, notifySuccess, notifyInfo } from "@/utils/notify";
 import { Upload, X, Video, Loader2, SearchX } from "lucide-react";
 import Image from "next/image";
 import PermissionBoundary from "@/components/permission-boundary";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 const STORAGE_KEY = "admin_portal_static_products_v1";
 
@@ -176,7 +177,28 @@ export default function ProductEditPage() {
   const [featuredImage, setFeaturedImage] = React.useState<StoredMediaItem | null>(null); // Featured image (product_img_url)
   const [galleryImages, setGalleryImages] = React.useState<StoredMediaItem[]>([]); // Gallery images
   const [existingVideo, setExistingVideo] = React.useState<StoredMediaItem | null>(null); // Existing video
-  const [pendingFeaturedImage, setPendingFeaturedImage] = React.useState<MediaUpload | null>(null); // Pending featured image
+  const [pendingFeaturedImage, setPendingFeaturedImage] = React.useState<MediaUpload | null>(null);
+  
+  // Date range state for discount dates
+  const [discountDateRange, setDiscountDateRange] = React.useState<{ from?: Date; to?: Date }>();
+  
+  // Helper functions to convert between date range and string values
+  const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return { start: "", end: "" };
+    return {
+      start: range.from ? range.from.toISOString().split('T')[0] : "",
+      end: range.to ? range.to.toISOString().split('T')[0] : ""
+    };
+  };
+  
+  const stringsToDateRange = (start: string, end: string) => {
+    if (!start && !end) return undefined;
+    return {
+      from: start ? new Date(start + 'T00:00:00') : undefined,
+      to: end ? new Date(end + 'T00:00:00') : undefined
+    };
+  };
+  
   const [pendingGalleryImages, setPendingGalleryImages] = React.useState<MediaUpload[]>([]); // Pending gallery images
   const [pendingVideo, setPendingVideo] = React.useState<MediaUpload | null>(null); // Pending video
 
@@ -371,6 +393,13 @@ export default function ProductEditPage() {
           is_active: productData?.is_active ?? true,
         });
 
+        // Sync date range with values
+        const dateRange = stringsToDateRange(
+          formatDateForInput(productData?.start_discount_date),
+          formatDateForInput(productData?.end_discount_date)
+        );
+        setDiscountDateRange(dateRange);
+
         // Load bulk pricing
         if (convertedBulkPricing.length > 0) {
           setBulkPricing(convertedBulkPricing);
@@ -487,7 +516,7 @@ export default function ProductEditPage() {
         setPendingGalleryImages([]);
         setPendingVideo(null);
       } catch (error: any) {
-        toast.error(error?.message || "Failed to load product");
+        notifyError(error?.message || "Failed to load product");
       } finally {
         setLoading(false);
       }
@@ -547,6 +576,16 @@ export default function ProductEditPage() {
     updatePrices();
   }, [selectedCountry?.cca2, product]);
 
+  // Sync date range changes to values state
+  React.useEffect(() => {
+    const dateString = dateRangeToStrings(discountDateRange);
+    setValues(prev => ({
+      ...prev,
+      start_discount_date: dateString.start,
+      end_discount_date: dateString.end
+    }));
+  }, [discountDateRange]);
+
   // Create memoized blob URLs for pending media
   const pendingFeaturedImageUrl = React.useMemo(() => {
     return pendingFeaturedImage ? URL.createObjectURL(pendingFeaturedImage.file) : null;
@@ -579,7 +618,7 @@ export default function ProductEditPage() {
     }
     
     if (!id) {
-      toast.error("Product ID is required to create custom variant types");
+      notifyError("Product ID is required to create custom variant types");
       return;
     }
     
@@ -603,19 +642,19 @@ export default function ProductEditPage() {
         
         setVariantsOpen(true);
         setNewVariantName("");
-        toast.success(`Variant type "${raw}" created successfully`);
+        notifySuccess(`Variant type "${raw}" created successfully`);
       } else {
-        toast.error(response.message || "Failed to create variant type");
+        notifyError(response.message || "Failed to create variant type");
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to create variant type";
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     }
   };
 
   const deleteVariantOption = async (variantId: string, variantKey: string) => {
     if (!id) {
-      toast.error("Product ID is required to delete custom variant types");
+      notifyError("Product ID is required to delete custom variant types");
       return;
     }
     
@@ -646,11 +685,11 @@ export default function ProductEditPage() {
           return newValues;
         });
         
-        toast.success("Variant type unlinked successfully");
+        notifySuccess("Variant type unlinked successfully");
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to unlink variant type";
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     }
   };
 
@@ -687,11 +726,11 @@ export default function ProductEditPage() {
     const maxImageSize = 5 * 1024 * 1024; // 5MB
 
     if (!allowedImageTypes.includes(file.type)) {
-      toast.error(`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`);
+      notifyError(`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`);
       return;
     }
     if (file.size > maxImageSize) {
-      toast.error(`Image ${file.name} is too large. Maximum size is 5MB`);
+      notifyError(`Image ${file.name} is too large. Maximum size is 5MB`);
       return;
     }
 
@@ -757,7 +796,7 @@ export default function ProductEditPage() {
       setFeaturedImage(null);
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
-      toast.error(`Failed to remove featured image: ${errorMessage}`);
+      notifyError(`Failed to remove featured image: ${errorMessage}`);
     }
   };
 
@@ -797,7 +836,7 @@ export default function ProductEditPage() {
     }
 
     if (errors.length > 0) {
-      toast.error(errors.join(", "), { autoClose: 5000 });
+      notifyError(errors.join(", "));
     }
 
     if (next.length > 0) {
@@ -825,7 +864,7 @@ export default function ProductEditPage() {
       setGalleryImages((p) => p.filter((m) => m.id !== mediaId));
     } catch (error: any) {
       console.error("Failed to remove gallery image:", error);
-      toast.error(`Failed to remove image: ${error.message}`);
+      notifyError(`Failed to remove image: ${error.message}`);
     }
   };
 
@@ -848,15 +887,15 @@ export default function ProductEditPage() {
     const maxVideoSize = 50 * 1024 * 1024; // 50MB
 
     if (pendingVideo) {
-      toast.error("Only one video is allowed per product");
+      notifyError("Only one video is allowed per product");
       return;
     }
     if (!allowedVideoTypes.includes(file.type)) {
-      toast.error(`Invalid video type: ${file.name}. Only MP4, WebM, OGG, and QuickTime are allowed`);
+      notifyError(`Invalid video type: ${file.name}. Only MP4, WebM, OGG, and QuickTime are allowed`);
       return;
     }
     if (file.size > maxVideoSize) {
-      toast.error(`Video ${file.name} is too large. Maximum size is 50MB`);
+      notifyError(`Video ${file.name} is too large. Maximum size is 50MB`);
       return;
     }
 
@@ -1279,17 +1318,17 @@ export default function ProductEditPage() {
           console.error("Failed to reload product:", error);
         }
         
-        toast.success("Product updated successfully!", { autoClose: 3000 });
+        notifySuccess("Product updated successfully!");
         // Redirect to products list after successful update
         setTimeout(() => {
           router.push("/dashboard/products");
         }, 1000);
       } else {
-        toast.warning(`Product updated but some uploads failed. Check errors.`, { autoClose: 5000 });
+        notifyInfo(`Product updated but some uploads failed. Check errors.`);
       }
     } catch (error: any) {
       console.error("Failed to update product:", error);
-      toast.error(error?.message || "Failed to update product");
+      notifyError(error?.message || "Failed to update product");
       setUploadErrors(prev => [...prev, `Product update failed: ${error.message}`]);
     } finally {
       setIsUpdating(false);
@@ -1576,7 +1615,31 @@ export default function ProductEditPage() {
                       id="sellingPrice"
                       inputMode="decimal"
                       value={values.selling_price}
-                      onChange={(e) => setValues((p) => ({ ...p, selling_price: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                          setValues((p) => ({ ...p, selling_price: v }));
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey || e.metaKey || e.altKey) return;
+                        const allowed = [
+                          "Backspace",
+                          "Delete",
+                          "Tab",
+                          "Enter",
+                          "Escape",
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "ArrowUp",
+                          "ArrowDown",
+                          "Home",
+                          "End",
+                        ];
+                        if (allowed.includes(e.key)) return;
+                        if (/^[0-9.]$/.test(e.key)) return;
+                        e.preventDefault();
+                      }}
                     />
                   </div>
 
@@ -1586,7 +1649,31 @@ export default function ProductEditPage() {
                       id="cost"
                       inputMode="decimal"
                       value={values.cost}
-                      onChange={(e) => setValues((p) => ({ ...p, cost: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                          setValues((p) => ({ ...p, cost: v }));
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey || e.metaKey || e.altKey) return;
+                        const allowed = [
+                          "Backspace",
+                          "Delete",
+                          "Tab",
+                          "Enter",
+                          "Escape",
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "ArrowUp",
+                          "ArrowDown",
+                          "Home",
+                          "End",
+                        ];
+                        if (allowed.includes(e.key)) return;
+                        if (/^[0-9.]$/.test(e.key)) return;
+                        e.preventDefault();
+                      }}
                     />
                   </div>
 
@@ -1596,7 +1683,31 @@ export default function ProductEditPage() {
                       id="freight"
                       inputMode="decimal"
                       value={values.freight}
-                      onChange={(e) => setValues((p) => ({ ...p, freight: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                          setValues((p) => ({ ...p, freight: v }));
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey || e.metaKey || e.altKey) return;
+                        const allowed = [
+                          "Backspace",
+                          "Delete",
+                          "Tab",
+                          "Enter",
+                          "Escape",
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "ArrowUp",
+                          "ArrowDown",
+                          "Home",
+                          "End",
+                        ];
+                        if (allowed.includes(e.key)) return;
+                        if (/^[0-9.]$/.test(e.key)) return;
+                        e.preventDefault();
+                      }}
                     />
                   </div>
 
@@ -1627,24 +1738,42 @@ export default function ProductEditPage() {
                       id="discount"
                       inputMode="decimal"
                       value={values.discount}
-                      onChange={(e) => setValues((p) => ({ ...p, discount: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                          setValues((p) => ({ ...p, discount: v }));
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey || e.metaKey || e.altKey) return;
+                        const allowed = [
+                          "Backspace",
+                          "Delete",
+                          "Tab",
+                          "Enter",
+                          "Escape",
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "ArrowUp",
+                          "ArrowDown",
+                          "Home",
+                          "End",
+                        ];
+                        if (allowed.includes(e.key)) return;
+                        if (/^[0-9.]$/.test(e.key)) return;
+                        e.preventDefault();
+                      }}
                     />
                   </div>
 
                   <div className="grid gap-2">
                     <Label className="font-semibold">Start & end date</Label>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Input
-                        type="date"
-                        value={values.start_discount_date}
-                        onChange={(e) => setValues((p) => ({ ...p, start_discount_date: e.target.value }))}
-                      />
-                      <Input
-                        type="date"
-                        value={values.end_discount_date}
-                        onChange={(e) => setValues((p) => ({ ...p, end_discount_date: e.target.value }))}
-                      />
-                    </div>
+                    <DateRangePicker
+                      value={discountDateRange}
+                      onChange={setDiscountDateRange}
+                      placeholder="Select discount date range"
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
@@ -1661,9 +1790,29 @@ export default function ProductEditPage() {
                             value={row.quantity}
                             onChange={(e) => {
                               const v = e.target.value;
+                              if (!(v === "" || /^\d*$/.test(v))) return;
                               setBulkPricing((p) =>
                                 p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
                               );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.ctrlKey || e.metaKey || e.altKey) return;
+                              const allowed = [
+                                "Backspace",
+                                "Delete",
+                                "Tab",
+                                "Enter",
+                                "Escape",
+                                "ArrowLeft",
+                                "ArrowRight",
+                                "ArrowUp",
+                                "ArrowDown",
+                                "Home",
+                                "End",
+                              ];
+                              if (allowed.includes(e.key)) return;
+                              if (/^[0-9]$/.test(e.key)) return;
+                              e.preventDefault();
                             }}
                           />
                         </div>
@@ -1676,9 +1825,29 @@ export default function ProductEditPage() {
                             value={row.price}
                             onChange={(e) => {
                               const v = e.target.value;
+                              if (!(v === "" || /^\d*\.?\d*$/.test(v))) return;
                               setBulkPricing((p) =>
                                 p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
                               );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.ctrlKey || e.metaKey || e.altKey) return;
+                              const allowed = [
+                                "Backspace",
+                                "Delete",
+                                "Tab",
+                                "Enter",
+                                "Escape",
+                                "ArrowLeft",
+                                "ArrowRight",
+                                "ArrowUp",
+                                "ArrowDown",
+                                "Home",
+                                "End",
+                              ];
+                              if (allowed.includes(e.key)) return;
+                              if (/^[0-9.]$/.test(e.key)) return;
+                              e.preventDefault();
                             }}
                           />
                         </div>
@@ -1940,7 +2109,7 @@ export default function ProductEditPage() {
                                 } catch (error: any) {
                                   console.error("Failed to remove video:", error);
                                   const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
-                                  toast.error(`Failed to remove video: ${errorMessage}`);
+                                  notifyError(`Failed to remove video: ${errorMessage}`);
                                 }
                               } else {
                                 setExistingVideo(null);

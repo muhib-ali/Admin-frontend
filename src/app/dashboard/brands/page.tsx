@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import BrandFormDialog, {
   BrandFormValues,
 } from "@/components/brands/brand-form";
@@ -146,7 +146,7 @@ export default function BrandsPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load brands");
+        notifyError(e?.response?.data?.message || "Failed to load brands");
       } finally {
         setLoading(false);
       }
@@ -195,7 +195,7 @@ export default function BrandsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open brand");
+      notifyError(e?.response?.data?.message || "Failed to open brand");
     }
   };
 
@@ -213,7 +213,7 @@ export default function BrandsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open brand");
+      notifyError(e?.response?.data?.message || "Failed to open brand");
     }
   };
 
@@ -226,7 +226,7 @@ export default function BrandsPage() {
           description: data.description || "",
           isActive: data.isActive,
         });
-        toast.success("Brand created");
+        notifySuccess("Brand created");
       } else {
         if (!canUpdate) return;
         await updateBrand({
@@ -235,7 +235,7 @@ export default function BrandsPage() {
           description: data.description || "",
           isActive: data.isActive,
         });
-        toast.success("Brand updated");
+        notifySuccess("Brand updated");
       }
 
       await refetch();
@@ -243,7 +243,7 @@ export default function BrandsPage() {
       setCurrent(undefined);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      notifyError(e?.response?.data?.message || "Save failed");
     }
   };
 
@@ -260,7 +260,7 @@ export default function BrandsPage() {
     try {
       setDeleting(true);
       await deleteBrand(deleteTarget.id);
-      toast.success("Brand deleted");
+      notifySuccess("Brand deleted");
 
       const { rows: list, pagination: pg } = await listBrands(
         page,
@@ -278,7 +278,7 @@ export default function BrandsPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

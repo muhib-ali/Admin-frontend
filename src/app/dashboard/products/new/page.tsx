@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
@@ -207,6 +208,26 @@ export default function NewProductPage() {
   const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  // Date range state for discount dates
+  const [discountDateRange, setDiscountDateRange] = React.useState<{ from?: Date; to?: Date }>();
+
+  // Helper functions to convert between date range and string values
+  const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return { start: "", end: "" };
+    return {
+      start: range.from ? range.from.toISOString().split('T')[0] : "",
+      end: range.to ? range.to.toISOString().split('T')[0] : ""
+    };
+  };
+
+  const stringsToDateRange = (start: string, end: string) => {
+    if (!start && !end) return undefined;
+    return {
+      from: start ? new Date(start + 'T00:00:00') : undefined,
+      to: end ? new Date(end + 'T00:00:00') : undefined
+    };
+  };
+
   React.useEffect(() => {
     const ac = new AbortController();
 
@@ -291,6 +312,16 @@ export default function NewProductPage() {
 
     updatePrices();
   }, [selectedCountry?.cca2]);
+
+  // Sync date range changes to values state
+  React.useEffect(() => {
+    const dateString = dateRangeToStrings(discountDateRange);
+    setValues(prev => ({
+      ...prev,
+      start_discount_date: dateString.start,
+      end_discount_date: dateString.end
+    }));
+  }, [discountDateRange]);
 
   // Cleanup blob URLs
   React.useEffect(() => {
@@ -968,9 +999,31 @@ export default function NewProductPage() {
                   id="sellingPrice"
                   inputMode="decimal"
                   value={values.selling_price}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, selling_price: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, selling_price: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -998,7 +1051,31 @@ export default function NewProductPage() {
                   id="cost"
                   inputMode="decimal"
                   value={values.cost}
-                  onChange={(e) => setValues((p) => ({ ...p, cost: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, cost: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -1009,9 +1086,31 @@ export default function NewProductPage() {
                   id="freight"
                   inputMode="decimal"
                   value={values.freight}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, freight: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, freight: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -1052,40 +1151,46 @@ export default function NewProductPage() {
                   id="discount"
                   inputMode="decimal"
                   value={values.discount}
-                  onChange={(e) =>
-                    setValues((p) => ({
-                      ...p,
-                      discount: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({
+                        ...p,
+                        discount: v,
+                      }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
                   placeholder="0"
                 />
               </div>
 
               <div className="grid gap-2">
                 <Label className="font-semibold">Start & end date</Label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Input
-                    type="date"
-                    value={values.start_discount_date}
-                    onChange={(e) =>
-                      setValues((p) => ({
-                        ...p,
-                        start_discount_date: e.target.value,
-                      }))
-                    }
-                  />
-                  <Input
-                    type="date"
-                    value={values.end_discount_date}
-                    onChange={(e) =>
-                      setValues((p) => ({
-                        ...p,
-                        end_discount_date: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                <DateRangePicker
+                  value={discountDateRange}
+                  onChange={setDiscountDateRange}
+                  placeholder="Select discount date range"
+                  className="w-full"
+                />
               </div>
             </div>
 
@@ -1111,9 +1216,29 @@ export default function NewProductPage() {
                         value={row.quantity}
                         onChange={(e) => {
                           const v = e.target.value;
+                          if (!(v === "" || /^\d*$/.test(v))) return;
                           setBulkPricing((p) =>
                             p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
                           );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.ctrlKey || e.metaKey || e.altKey) return;
+                          const allowed = [
+                            "Backspace",
+                            "Delete",
+                            "Tab",
+                            "Enter",
+                            "Escape",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                            "Home",
+                            "End",
+                          ];
+                          if (allowed.includes(e.key)) return;
+                          if (/^[0-9]$/.test(e.key)) return;
+                          e.preventDefault();
                         }}
                         placeholder="0"
                       />
@@ -1127,9 +1252,29 @@ export default function NewProductPage() {
                         value={row.price}
                         onChange={(e) => {
                           const v = e.target.value;
+                          if (!(v === "" || /^\d*\.?\d*$/.test(v))) return;
                           setBulkPricing((p) =>
                             p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
                           );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.ctrlKey || e.metaKey || e.altKey) return;
+                          const allowed = [
+                            "Backspace",
+                            "Delete",
+                            "Tab",
+                            "Enter",
+                            "Escape",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                            "Home",
+                            "End",
+                          ];
+                          if (allowed.includes(e.key)) return;
+                          if (/^[0-9.]$/.test(e.key)) return;
+                          e.preventDefault();
                         }}
                         placeholder="0"
                       />
@@ -1468,14 +1613,37 @@ export default function NewProductPage() {
                   id="stockQty"
                   inputMode="numeric"
                   value={values.stock_quantity}
-                  onChange={(e) =>
-                    setValues((p) => ({
-                      ...p,
-                      stock_quantity: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*$/.test(v)) {
+                      setValues((p) => ({
+                        ...p,
+                        stock_quantity: v,
+                      }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
                   placeholder="0"
                 />
+
               </div>
             </div>
 

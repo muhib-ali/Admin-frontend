@@ -8,7 +8,7 @@ import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as productsService from "@/services/products";
-import { toast } from "react-toastify";
+import { notifyError } from "@/utils/notify";
 import { Loader2, SearchX } from "lucide-react";
 import {
   getAllWarehousesDropdown,
@@ -227,7 +227,7 @@ export default function ProductViewPage() {
         setProduct(productData);
       } catch (error: any) {
         console.error("Failed to load product:", error);
-        toast.error(error?.message || "Failed to load product");
+        notifyError(error?.message || "Failed to load product");
       } finally {
         setLoading(false);
       }

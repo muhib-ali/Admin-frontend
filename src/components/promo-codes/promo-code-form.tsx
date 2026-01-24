@@ -117,13 +117,43 @@ export default function PromoCodeFormDialog({
 
           <div className="space-y-2">
             <Label htmlFor="promo-value">Value *</Label>
-            <Input
-              id="promo-value"
-              type="number"
-              value={Number.isFinite(value) ? String(value) : ""}
-              onChange={(e) => setValue(Number(e.target.value))}
-              disabled={isReadOnly}
-            />
+            <div className="relative">
+              <Input
+                id="promo-value"
+                inputMode="decimal"
+                value={Number.isFinite(value) ? String(value) : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                    setValue(Number(v));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.altKey) return;
+                  const allowed = [
+                    "Backspace",
+                    "Delete",
+                    "Tab",
+                    "Enter",
+                    "Escape",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "Home",
+                    "End",
+                  ];
+                  if (allowed.includes(e.key)) return;
+                  if (/^[0-9.]$/.test(e.key)) return;
+                  e.preventDefault();
+                }}
+                disabled={isReadOnly}
+                className="pr-10"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                %
+              </span>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -132,9 +162,33 @@ export default function PromoCodeFormDialog({
               id="promo-usage"
               type="number"
               value={Number.isFinite(usageLimit) ? String(usageLimit) : ""}
-              onChange={(e) => setUsageLimit(Number(e.target.value))}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "" || /^\d+$/.test(value)) {
+                  setUsageLimit(Number(value));
+                }
+              }}
               disabled={isReadOnly}
               min={1}
+              onKeyDown={(e) => {
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                const allowed = [
+                  "Backspace",
+                  "Delete",
+                  "Tab",
+                  "Enter",
+                  "Escape",
+                  "ArrowLeft",
+                  "ArrowRight",
+                  "ArrowUp",
+                  "ArrowDown",
+                  "Home",
+                  "End",
+                ];
+                if (allowed.includes(e.key)) return;
+                if (/^[0-9]$/.test(e.key)) return;
+                e.preventDefault();
+              }}
             />
           </div>
 

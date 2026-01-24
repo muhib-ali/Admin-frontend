@@ -24,7 +24,7 @@ import type {
 import { useExport } from "@/hooks/use-export";
 import { useHasPermission } from "@/hooks/use-permission";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
-import { toast } from "react-toastify";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import {
   getProductsBulkUploadState,
   resetProductsBulkUploadState,
@@ -109,13 +109,13 @@ export default function ProductsPage() {
       if (!canList) return;
       const data = exportRows();
       if (!data.length) {
-        toast.error("No products to export");
+        notifyError("No products to export");
         return;
       }
       await exportToCSV(data, "products");
     } catch (e: any) {
       console.error(e);
-      toast.error("Export failed");
+      notifyError("Export failed");
     }
   }, [canList, exportRows, exportToCSV]);
 
@@ -124,7 +124,7 @@ export default function ProductsPage() {
       if (!canList) return;
       const data = exportRows();
       if (!data.length) {
-        toast.error("No products to export");
+        notifyError("No products to export");
         return;
       }
 
@@ -149,7 +149,7 @@ export default function ProductsPage() {
       link.click();
     } catch (e: any) {
       console.error(e);
-      toast.error("Export failed");
+      notifyError("Export failed");
     }
   }, [canList, exportRows]);
 
@@ -226,7 +226,7 @@ export default function ProductsPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load products");
+        notifyError(e?.response?.data?.message || "Failed to load products");
       } finally {
         setLoading(false);
         loadingRef.current = false;
@@ -249,7 +249,7 @@ export default function ProductsPage() {
         setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
       } catch (e: any) {
         console.error(e);
-        toast.error("Failed to load categories/brands");
+        notifyError("Failed to load categories/brands");
       }
     })();
   }, [mounted]);
@@ -281,11 +281,11 @@ export default function ProductsPage() {
 
       const { createdCount, failedCount } = bulkUploadState.result;
       if (createdCount > 0) {
-        toast.success(
+        notifySuccess(
           `Bulk upload successful: ${createdCount} created${failedCount ? `, ${failedCount} failed` : ""}`
         );
       } else {
-        toast.error(
+        notifyError(
           `Bulk upload completed: 0 created${failedCount ? `, ${failedCount} failed` : ""}`
         );
       }
@@ -304,7 +304,7 @@ export default function ProductsPage() {
     if (bulkUploadState.status === "error") {
       if (bulkUploadState.finishedAt <= lastBulkToastRef.current) return;
       lastBulkToastRef.current = bulkUploadState.finishedAt;
-      toast.error(bulkUploadState.error || "Bulk upload failed");
+      notifyError(bulkUploadState.error || "Bulk upload failed");
       resetProductsBulkUploadState();
     }
   }, [mounted, bulkUploadState, refetch]);
@@ -347,7 +347,7 @@ export default function ProductsPage() {
           console.error(e);
         }
       }
-      toast.success("Product deleted");
+      notifySuccess("Product deleted");
 
       try {
         const stored = readStoredProducts();
@@ -363,7 +363,7 @@ export default function ProductsPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import { bulkOrdersApi, Order, Pagination } from "@/services/orders";
 import { useCurrency } from "@/contexts/currency-context";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -103,7 +103,7 @@ export default function BulkOrdersPage() {
       setOrders(response.data.orders);
       setPagination(response.data.pagination);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to fetch bulk orders");
+      notifyError(error?.message || "Failed to fetch bulk orders");
       setOrders([]);
       setPagination(null);
     } finally {
@@ -120,10 +120,10 @@ export default function BulkOrdersPage() {
     setActionLoading(key);
     try {
       await bulkOrdersApi.acceptItem(orderId, orderItemId);
-      toast.success("Item accepted successfully");
+      notifySuccess("Item accepted successfully");
       await fetchOrders();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to accept item");
+      notifyError(error?.message || "Failed to accept item");
     } finally {
       setActionLoading(null);
     }
@@ -134,10 +134,10 @@ export default function BulkOrdersPage() {
     setActionLoading(key);
     try {
       await bulkOrdersApi.rejectItem(orderId, orderItemId);
-      toast.success("Item rejected successfully");
+      notifySuccess("Item rejected successfully");
       await fetchOrders();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to reject item");
+      notifyError(error?.message || "Failed to reject item");
     } finally {
       setActionLoading(null);
     }

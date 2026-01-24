@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "react-toastify";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import {
   Shield,
   Plus,
@@ -99,7 +99,7 @@ export default function PermissionsPage() {
         setModuleNameById(map);
       } catch (e: any) {
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load modules");
+        notifyError(e?.response?.data?.message || "Failed to load modules");
       }
     })();
   }, []);
@@ -122,7 +122,7 @@ export default function PermissionsPage() {
         setData(rows.map((p) => toRow(p, moduleNameById)));
       } catch (e: any) {
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load permissions");
+        notifyError(e?.response?.data?.message || "Failed to load permissions");
       } finally {
         setLoading(false);
       }
@@ -186,7 +186,7 @@ export default function PermissionsPage() {
           description: it.description,
         });
       }
-      toast.success(`Created ${items.length} permission(s)`);
+      notifySuccess(`Created ${items.length} permission(s)`);
 
       const { rows } = await listPermissions({
         page: 1,
@@ -196,7 +196,7 @@ export default function PermissionsPage() {
       setData(rows.map((p) => toRow(p, moduleNameById)));
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Create failed");
+      notifyError(e?.response?.data?.message || "Create failed");
     }
   };
 
@@ -216,7 +216,7 @@ export default function PermissionsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open permission");
+      notifyError(e?.response?.data?.message || "Failed to open permission");
     }
   };
 
@@ -230,12 +230,12 @@ export default function PermissionsPage() {
         slug: p.action,
         description: p.description,
       });
-      toast.success("Permission updated");
+      notifySuccess("Permission updated");
 
       setData((prev) => prev.map((x) => (x.id === p.id ? p : x)));
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Update failed");
+      notifyError(e?.response?.data?.message || "Update failed");
     }
   };
 
@@ -243,11 +243,11 @@ export default function PermissionsPage() {
     try {
       if (!canDelete) return;
       await deletePermission(id);
-      toast.success("Permission deleted");
+      notifySuccess("Permission deleted");
       setData((prev) => prev.filter((x) => x.id !== id));
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     }
   };
 

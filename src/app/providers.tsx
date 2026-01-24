@@ -20,7 +20,18 @@ export default function Providers({ children }: { children: ReactNode }) {
               {children}
             </ThemeProvider>
           </CurrencyProvider>
-          <Toaster position="top-right" richColors />
+          <Toaster 
+            position="top-right" 
+            richColors 
+            toastOptions={{
+              style: {
+                top: '5px',
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                color: '#166534',
+              },
+            }}
+          />
           <ToastContainer
             position="top-right"
             autoClose={5000}

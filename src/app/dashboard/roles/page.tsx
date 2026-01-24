@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { notifyError, notifyInfo, notifySuccess } from "@/utils/notify";
 import {
   Shield,
   Plus,
@@ -117,7 +117,7 @@ const PermissionsDisplay = React.forwardRef<
         setExpanded(allClosed);
       } catch (error) {
         console.error("Error fetching permissions:", error);
-        toast.error("Failed to load permissions");
+        notifyError("Failed to load permissions");
       } finally {
         setLoading(false);
       }
@@ -178,13 +178,13 @@ const PermissionsDisplay = React.forwardRef<
         current: [],
         next: modules,
       });
-      toast.success("Permissions updated");
+      notifySuccess("Permissions updated");
       const fresh = await getRolePerms(roleId);
       setModules(fresh);
       onSaved(fresh);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update permissions");
+      notifyError("Failed to update permissions");
     } finally {
       setSaving(false);
     }
@@ -400,7 +400,7 @@ export default function RolesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load roles");
+        notifyError(e?.response?.data?.message || "Failed to load roles");
       } finally {
         setLoading(false);
       }
@@ -495,11 +495,11 @@ export default function RolesPage() {
     if (!mounted || !canCreate) return;
     try {
       await createRole({ title: data.name });
-      toast.success("Role created");
+      notifySuccess("Role created");
       await refetchRoles();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Create failed");
+      notifyError(e?.response?.data?.message || "Create failed");
     }
   }
 
@@ -512,7 +512,7 @@ export default function RolesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open role");
+      notifyError(e?.response?.data?.message || "Failed to open role");
     }
   }
 
@@ -520,11 +520,11 @@ export default function RolesPage() {
     if (!mounted || !canUpdate || !editRole?.id) return;
     try {
       await updateRole({ id: editRole.id, title: data.name });
-      toast.success("Role updated");
+      notifySuccess("Role updated");
       await refetchRoles();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Update failed");
+      notifyError(e?.response?.data?.message || "Update failed");
     }
   }
 
@@ -532,7 +532,7 @@ export default function RolesPage() {
     if (!mounted || !canDelete) return;
     try {
       await deleteRole(id);
-      toast.success("Role deleted");
+      notifySuccess("Role deleted");
 
       const { rows, pagination: pg } = await listRoles(
         page,
@@ -553,7 +553,7 @@ export default function RolesPage() {
       });
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     }
   }
 
@@ -584,7 +584,7 @@ export default function RolesPage() {
 
   const handleExportCSV = () => {
     if (!filtered.length) {
-      toast.info("No roles to export.");
+      notifyInfo("No roles to export.");
       return;
     }
 
@@ -611,18 +611,18 @@ export default function RolesPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success("Roles exported as CSV.");
+    notifySuccess("Roles exported as CSV.");
   };
 
   const handleExportPDF = () => {
     if (!filtered.length) {
-      toast.info("No roles to export.");
+      notifyInfo("No roles to export.");
       return;
     }
 
     const popup = window.open("", "_blank");
     if (!popup) {
-      toast.error("Popup blocked. Please allow popups to export PDF.");
+      notifyError("Popup blocked. Please allow popups to export PDF.");
       return;
     }
 
