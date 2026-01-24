@@ -4,9 +4,10 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import { Label } from "@/components/ui/label";
 import { authService } from "@/services/auth";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import { useSession } from "next-auth/react";
 import { signOut } from "next-auth/react";
 
@@ -137,7 +138,7 @@ export default function AccountSettingsPage() {
       console.log("Profile update response:", response);
 
       if (response.status) {
-        toast.success("Profile updated successfully");
+        notifySuccess("Profile updated successfully");
         
         // Update local state
         setUser(response.data);
@@ -175,7 +176,7 @@ export default function AccountSettingsPage() {
       console.error("Profile update error:", error);
       const errorMessage = error.response?.data?.message || error.message || "Failed to update profile";
       setErrors({ general: errorMessage });
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     } finally {
       setSavingProfile(false);
     }
@@ -198,7 +199,7 @@ export default function AccountSettingsPage() {
       });
 
       if (response.status) {
-        toast.success("Password updated successfully");
+        notifySuccess("Password updated successfully");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -208,7 +209,7 @@ export default function AccountSettingsPage() {
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || "Failed to update password";
       setErrors({ general: errorMessage });
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -285,9 +286,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-current">Current Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-current" 
-                type="password" 
                 className="h-10" 
                 value={currentPassword} 
                 onChange={(e) => setCurrentPassword(e.target.value)} 
@@ -298,9 +298,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-new">New Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-new" 
-                type="password" 
                 className="h-10" 
                 value={newPassword} 
                 onChange={(e) => setNewPassword(e.target.value)} 
@@ -311,9 +310,8 @@ export default function AccountSettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="as-confirm">Confirm New Password</Label>
-              <Input 
+              <PasswordField 
                 id="as-confirm" 
-                type="password" 
                 className="h-10" 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)} 

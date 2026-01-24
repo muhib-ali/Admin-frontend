@@ -31,6 +31,7 @@ import PermissionGate from "@/components/permission-gate";
 import { ADMIN_LINK_PERM } from "@/rbac/link-permissions";
 import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
 import { useHasPermission } from "@/hooks/use-permission";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const ICONS = {
   BarChart2,
@@ -188,12 +189,13 @@ export default function Sidebar({ collapsed = false }: Props) {
   };
 
   return (
-    <div
-      className={cn(
-        "flex h-full min-h-0 flex-col max-w-full overflow-hidden bg-black",
-        collapsed ? "w-20" : "w-72"
-      )}
-    >
+    <TooltipProvider delayDuration={0}>
+      <div
+        className={cn(
+          "flex h-full min-h-0 flex-col max-w-full overflow-hidden bg-black",
+          collapsed ? "w-20" : "w-72"
+        )}
+      >
       <div className={cn("px-5 py-6", collapsed && "px-3")}>
         <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
           <div className={cn("text-2xl font-bold text-white tracking-tight", collapsed && "text-lg")}>
@@ -228,20 +230,29 @@ export default function Sidebar({ collapsed = false }: Props) {
             const perm = ADMIN_LINK_PERM[href];
 
             const dashboardLink = (
-              <Link
-                href={href}
-                onClick={(e) => handleNavigation(e, href)}
-                className={cn(
-                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                  active 
-                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
-                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
-                  collapsed && "justify-center"
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={href}
+                    onClick={(e) => handleNavigation(e, href)}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                      active 
+                        ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                        : "text-gray-400 hover:bg-zinc-900 hover:text-white",
+                      collapsed && "justify-center"
+                    )}
+                  >
+                    <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </Link>
+                </TooltipTrigger>
+                {collapsed && (
+                  <TooltipContent side="right">
+                    <p>{label}</p>
+                  </TooltipContent>
                 )}
-              >
-                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </Link>
+              </Tooltip>
             );
 
             if (perm) {
@@ -461,20 +472,29 @@ export default function Sidebar({ collapsed = false }: Props) {
             const perm = ADMIN_LINK_PERM[href];
 
             const linkNode = (
-              <Link
-                href={href}
-                onClick={(e) => handleNavigation(e, href)}
-                className={cn(
-                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                  active 
-                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
-                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
-                  collapsed && "justify-center"
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={href}
+                    onClick={(e) => handleNavigation(e, href)}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                      active 
+                        ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                        : "text-gray-400 hover:bg-zinc-900 hover:text-white",
+                      collapsed && "justify-center"
+                    )}
+                  >
+                    <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </Link>
+                </TooltipTrigger>
+                {collapsed && (
+                  <TooltipContent side="right">
+                    <p>{label}</p>
+                  </TooltipContent>
                 )}
-              >
-                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </Link>
+              </Tooltip>
             );
 
             if (perm) {
@@ -494,20 +514,29 @@ export default function Sidebar({ collapsed = false }: Props) {
             const perm = ADMIN_LINK_PERM[href];
 
             const linkNode = (
-              <Link
-                href={href}
-                onClick={(e) => handleNavigation(e, href)}
-                className={cn(
-                  "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
-                  active 
-                    ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
-                    : "text-gray-400 hover:bg-zinc-900 hover:text-white",
-                  collapsed && "justify-center"
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={href}
+                    onClick={(e) => handleNavigation(e, href)}
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
+                      active 
+                        ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r" 
+                        : "text-gray-400 hover:bg-zinc-900 hover:text-white",
+                      collapsed && "justify-center"
+                    )}
+                  >
+                    <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </Link>
+                </TooltipTrigger>
+                {collapsed && (
+                  <TooltipContent side="right">
+                    <p>{label}</p>
+                  </TooltipContent>
                 )}
-              >
-                <IconByName name={icon} className={cn("h-5 w-5 shrink-0 transition-colors", active ? "text-red-600" : "text-gray-400 group-hover:text-red-600")} />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </Link>
+              </Tooltip>
             );
 
             if (perm) {
@@ -525,13 +554,25 @@ export default function Sidebar({ collapsed = false }: Props) {
       </nav>
 
       <div className="lg:hidden px-2 py-2">
-        <button
-          onClick={handleLogout}
-          className="group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all w-full text-gray-400 hover:bg-zinc-900 hover:text-white"
-        >
-          <LogOut className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-red-600 transition-colors" />
-          {!collapsed && <span className="truncate">Log out</span>}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all w-full text-gray-400 hover:bg-zinc-900 hover:text-white",
+                collapsed && "justify-center"
+              )}
+            >
+              <LogOut className="h-5 w-5 shrink-0 text-gray-400 group-hover:text-red-600 transition-colors" />
+              {!collapsed && <span className="truncate">Log out</span>}
+            </button>
+          </TooltipTrigger>
+          {collapsed && (
+            <TooltipContent side="right">
+              <p>Log out</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       <div
@@ -543,5 +584,6 @@ export default function Sidebar({ collapsed = false }: Props) {
         {!collapsed ? "© 2025 All Rights Reserved" : "© 2025"}
       </div>
     </div>
+    </TooltipProvider>
   );
 }

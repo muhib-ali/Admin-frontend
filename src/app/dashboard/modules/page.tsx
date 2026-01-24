@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as Icons from "lucide-react";
-import { toast } from "react-toastify";
+import { notifyError, notifySuccess } from "@/utils/notify";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ export default function ModulesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load modules");
+        notifyError(e?.response?.data?.message || "Failed to load modules");
       } finally {
         setLoading(false);
       }
@@ -164,7 +164,7 @@ export default function ModulesPage() {
       setOpen(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open module");
+      notifyError(e?.response?.data?.message || "Failed to open module");
     }
   };
 
@@ -177,7 +177,7 @@ export default function ModulesPage() {
           slug: m.slug,
           description: m.description || "",
         });
-        toast.success("Module created");
+        notifySuccess("Module created");
       } else {
         if (!canUpdate) return;
         await updateModule({
@@ -186,7 +186,7 @@ export default function ModulesPage() {
           slug: m.slug,
           description: m.description || "",
         });
-        toast.success("Module updated");
+        notifySuccess("Module updated");
       }
 
       await refetch();
@@ -194,7 +194,7 @@ export default function ModulesPage() {
       setCurrent(undefined);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      notifyError(e?.response?.data?.message || "Save failed");
     }
   };
 
@@ -224,7 +224,7 @@ export default function ModulesPage() {
       }
 
       await deleteModule(moduleId);
-      toast.success("Module and its permissions deleted");
+      notifySuccess("Module and its permissions deleted");
 
       const { rows: list, pagination: pg } = await listModules(
         page,
@@ -243,7 +243,7 @@ export default function ModulesPage() {
     } catch (e: any) {
       console.error(e);
       const msg = e?.response?.data?.message || e?.message || "Delete failed";
-      toast.error(msg);
+      notifyError(msg);
     } finally {
       setDeleting(false);
     }

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
@@ -207,6 +208,26 @@ export default function NewProductPage() {
   const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  // Date range state for discount dates
+  const [discountDateRange, setDiscountDateRange] = React.useState<{ from?: Date; to?: Date }>();
+
+  // Helper functions to convert between date range and string values
+  const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return { start: "", end: "" };
+    return {
+      start: range.from ? range.from.toISOString().split('T')[0] : "",
+      end: range.to ? range.to.toISOString().split('T')[0] : ""
+    };
+  };
+
+  const stringsToDateRange = (start: string, end: string) => {
+    if (!start && !end) return undefined;
+    return {
+      from: start ? new Date(start + 'T00:00:00') : undefined,
+      to: end ? new Date(end + 'T00:00:00') : undefined
+    };
+  };
+
   React.useEffect(() => {
     const ac = new AbortController();
 
@@ -310,6 +331,16 @@ export default function NewProductPage() {
 
     updatePrices();
   }, [selectedCountry?.cca2]);
+
+  // Sync date range changes to values state
+  React.useEffect(() => {
+    const dateString = dateRangeToStrings(discountDateRange);
+    setValues(prev => ({
+      ...prev,
+      start_discount_date: dateString.start,
+      end_discount_date: dateString.end
+    }));
+  }, [discountDateRange]);
 
   // Cleanup blob URLs
   React.useEffect(() => {
@@ -1041,595 +1072,720 @@ export default function NewProductPage() {
                 className="data-[state=checked]:bg-green-600"
               />
             </div>
-
-            {!productDetailsComplete ? (
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                Complete product details to continue.
-              </div>
-            ) : null}
           </CardContent>
         </Card>
 
-        {productDetailsComplete ? (
-          <>
-            <Card className="shadow-sm bg-gray-100">
-              <CardHeader className="bg-gray-100">
-                <CardTitle className="text-lg">Pricing</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 bg-gray-100">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="sellingPrice" className="font-semibold">Selling price <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="sellingPrice"
-                      inputMode="decimal"
-                      value={values.selling_price}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, selling_price: e.target.value }))
-                      }
-                      placeholder="0"
-                    />
-                  </div>
+        <Card className="shadow-sm bg-gray-100">
+          <CardHeader className="bg-gray-100">
+            <CardTitle className="text-lg">Pricing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 bg-gray-100">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="sellingPrice" className="font-semibold">Selling price <span className="text-red-500">*</span></Label>
+                <Input
+                  id="sellingPrice"
+                  inputMode="decimal"
+                  value={values.selling_price}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, selling_price: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
+                  placeholder="0"
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">
-                      Currency
-                    </Label>
-                    <Input
-                      id="currency"
-                      name="currency"
-                      value={getCurrencyCode()}
-                      readOnly
-                      className="bg-gray-100 cursor-not-allowed"
-                      placeholder="Currency will be set based on your selection"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Currency is automatically set based on your global selection
-                    </p>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency" className="text-sm font-semibold text-gray-700">
+                  Currency
+                </Label>
+                <Input
+                  id="currency"
+                  name="currency"
+                  value={getCurrencyCode()}
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
+                  placeholder="Currency will be set based on your selection"
+                />
+                <p className="text-xs text-gray-500">
+                  Currency is automatically set based on your global selection
+                </p>
+              </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="cost" className="font-semibold">Cost <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="cost"
-                      inputMode="decimal"
-                      value={values.cost}
-                      onChange={(e) => setValues((p) => ({ ...p, cost: e.target.value }))}
-                      placeholder="0"
-                    />
-                  </div>
+              <div className="grid gap-2">
+                <Label htmlFor="cost" className="font-semibold">Cost <span className="text-red-500">*</span></Label>
+                <Input
+                  id="cost"
+                  inputMode="decimal"
+                  value={values.cost}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, cost: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
+                  placeholder="0"
+                />
+              </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="freight" className="font-semibold">Freight</Label>
-                    <Input
-                      id="freight"
-                      inputMode="decimal"
-                      value={values.freight}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, freight: e.target.value }))
-                      }
-                      placeholder="0"
-                    />
-                  </div>
+              <div className="grid gap-2">
+                <Label htmlFor="freight" className="font-semibold">Freight</Label>
+                <Input
+                  id="freight"
+                  inputMode="decimal"
+                  value={values.freight}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({ ...p, freight: v }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="font-semibold">Tax</Label>
+              <Select
+                value={values.tax_id}
+                onValueChange={(v) => setValues((p) => ({ ...p, tax_id: v }))}
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select tax" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taxes.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="px-4 py-3 text-right">
+                <div className="text-xs text-emerald-700">Total cost</div>
+                <div className="text-xl font-bold text-neutral-900">
+                  {values.currency} {pricing.totalCost.toFixed(2)}
                 </div>
+              </div>
+            </div>
 
-                <div className="grid gap-2">
-                  <Label className="font-semibold">Tax</Label>
-                  <Select
-                    value={values.tax_id}
-                    onValueChange={(v) => setValues((p) => ({ ...p, tax_id: v }))}
-                  >
-                    <SelectTrigger className="h-10 w-full">
-                      <SelectValue placeholder="Select tax" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {taxes.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="discount" className="font-semibold">Discount (%)</Label>
+                <Input
+                  id="discount"
+                  inputMode="decimal"
+                  value={values.discount}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                      setValues((p) => ({
+                        ...p,
+                        discount: v,
+                      }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9.]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-semibold">Start & end date</Label>
+                <DateRangePicker
+                  value={discountDateRange}
+                  onChange={setDiscountDateRange}
+                  placeholder="Select discount date range"
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <div className=" px-4 py-3 text-right">
+                <div className="text-xs text-emerald-700">Price after discount</div>
+                <div className="text-xl font-bold text-neutral-900">
+                  {values.currency} {pricing.priceAfterDiscount.toFixed(2)}
                 </div>
+              </div>
+            </div>
 
-                <div className="flex justify-end">
-                  <div className="px-4 py-3 text-right">
-                    <div className="text-xs text-emerald-700">Total cost</div>
-                    <div className="text-xl font-bold text-neutral-900">
-                      {values.currency} {pricing.totalPriceWithTax.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="discount" className="font-semibold">Discount (%)</Label>
-                    <Input
-                      id="discount"
-                      inputMode="decimal"
-                      value={values.discount}
-                      onChange={(e) =>
-                        setValues((p) => ({
-                          ...p,
-                          discount: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label className="font-semibold">Start & end date</Label>
-                    <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-3">
+              <div className="text-base font-semibold">Bulk pricing</div>
+              <div className="space-y-2">
+                {bulkPricing.map((row, idx) => (
+                  <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor={`bulkQty-${row.id}`} className="font-semibold">Quantity</Label>
                       <Input
-                        type="date"
-                        value={values.start_discount_date}
-                        onChange={(e) =>
-                          setValues((p) => ({
-                            ...p,
-                            start_discount_date: e.target.value,
-                          }))
-                        }
+                        id={`bulkQty-${row.id}`}
+                        inputMode="numeric"
+                        value={row.quantity}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!(v === "" || /^\d*$/.test(v))) return;
+                          setBulkPricing((p) =>
+                            p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
+                          );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.ctrlKey || e.metaKey || e.altKey) return;
+                          const allowed = [
+                            "Backspace",
+                            "Delete",
+                            "Tab",
+                            "Enter",
+                            "Escape",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                            "Home",
+                            "End",
+                          ];
+                          if (allowed.includes(e.key)) return;
+                          if (/^[0-9]$/.test(e.key)) return;
+                          e.preventDefault();
+                        }}
+                        placeholder="0"
                       />
+                    </div>
+
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor={`bulkPrice-${row.id}`} className="font-semibold">Price per product</Label>
                       <Input
-                        type="date"
-                        value={values.end_discount_date}
-                        onChange={(e) =>
-                          setValues((p) => ({
-                            ...p,
-                            end_discount_date: e.target.value,
-                          }))
-                        }
+                        id={`bulkPrice-${row.id}`}
+                        inputMode="decimal"
+                        value={row.price}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!(v === "" || /^\d*\.?\d*$/.test(v))) return;
+                          setBulkPricing((p) =>
+                            p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
+                          );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.ctrlKey || e.metaKey || e.altKey) return;
+                          const allowed = [
+                            "Backspace",
+                            "Delete",
+                            "Tab",
+                            "Enter",
+                            "Escape",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                            "Home",
+                            "End",
+                          ];
+                          if (allowed.includes(e.key)) return;
+                          if (/^[0-9.]$/.test(e.key)) return;
+                          e.preventDefault();
+                        }}
+                        placeholder="0"
                       />
                     </div>
-                  </div>
-                </div>
 
-               
-
-               
-                <div className="flex justify-end">
-                  <div className=" px-4 py-3 text-right">
-                    <div className="text-xs text-emerald-700">Price after discount</div>
-                    <div className="text-xl font-bold text-neutral-900">
-                      {values.currency} {pricing.priceAfterDiscount.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="text-base font-semibold">Bulk pricing</div>
-                  <div className="space-y-2">
-                    {bulkPricing.map((row, idx) => (
-                      <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
-                        <div className="grid gap-2 sm:col-span-2">
-                          <Label htmlFor={`bulkQty-${row.id}`} className="font-semibold">Quantity</Label>
-                          <Input
-                            id={`bulkQty-${row.id}`}
-                            inputMode="numeric"
-                            value={row.quantity}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setBulkPricing((p) =>
-                                p.map((r) => (r.id === row.id ? { ...r, quantity: v } : r))
-                              );
-                            }}
-                            placeholder="0"
-                          />
-                        </div>
-
-                        <div className="grid gap-2 sm:col-span-2">
-                          <Label htmlFor={`bulkPrice-${row.id}`} className="font-semibold">Price per product</Label>
-                          <Input
-                            id={`bulkPrice-${row.id}`}
-                            inputMode="decimal"
-                            value={row.price}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setBulkPricing((p) =>
-                                p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
-                              );
-                            }}
-                            placeholder="0"
-                          />
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button type="button" variant="outline" onClick={addBulkRow}>
-                            +
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => removeBulkRow(row.id)}
-                            disabled={bulkPricing.length <= 1 || idx === 0}
-                          >
-                            -
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm bg-gray-100">
-              <CardHeader className="bg-gray-100">
-                <CardTitle className="text-lg">Media</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 bg-gray-100">
-                <div className="grid gap-5 lg:grid-cols-3">
-                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-neutral-900">Featured Image</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Primary image for product listing (JPEG/PNG/WebP, max 5MB)
-                        </div>
-                      </div>
-
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={addBulkRow}>
+                        +
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => featuredImageInputRef.current?.click()}
+                        onClick={() => removeBulkRow(row.id)}
+                        disabled={bulkPricing.length <= 1 || idx === 0}
                       >
-                        <Upload className="h-4 w-4" />
-                        {featuredImage ? "Change" : "Upload"}
+                        -
                       </Button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                    <input
-                      ref={featuredImageInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleFeaturedImage(e.target.files);
-                        if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
-                      }}
-                    />
+        <Card className="shadow-sm bg-gray-100">
+          <CardHeader className="bg-gray-100">
+            <CardTitle className="text-lg">Media</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 bg-gray-100">
+            <div className="grid gap-5 lg:grid-cols-3">
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-neutral-900">Featured Image</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Primary image for product listing (JPEG/PNG/WebP, max 5MB)
+                    </div>
+                  </div>
 
-                    <div
-                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
-                      onClick={() => featuredImageInputRef.current?.click()}
-                    >
-                      {!featuredImage ? (
-                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => featuredImageInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {featuredImage ? "Change" : "Upload"}
+                  </Button>
+                </div>
+
+                <input
+                  ref={featuredImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFeaturedImage(e.target.files);
+                    if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
+                  }}
+                />
+
+                <div
+                  className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                  onClick={() => featuredImageInputRef.current?.click()}
+                >
+                  {!featuredImage ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                      <Image
+                        src={featuredImageLogo}
+                        alt="Featured upload"
+                        width={90}
+                        height={90}
+                        className="opacity-90"
+                      />
+                      <div className="text-sm font-medium text-neutral-800">
+                        Click to upload featured image
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        Recommended: square image, high quality
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
+                      <Image
+                        src={featuredImage.url}
+                        alt={featuredImage.file.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFeaturedImage();
+                        }}
+                        className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                        aria-label="Remove featured image"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Up to 4 images for the product detail page
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => galleryImagesInputRef.current?.click()}
+                    disabled={galleryImages.length >= 4}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Add ({galleryImages.length}/4)
+                  </Button>
+                </div>
+
+                <input
+                  ref={galleryImagesInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleGalleryImages(e.target.files);
+                    if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
+                  }}
+                />
+
+                <div
+                  className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                  onClick={() => galleryImagesInputRef.current?.click()}
+                >
+                  {galleryImages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                      <Image
+                        src={galleryImageLogo}
+                        alt="Gallery upload"
+                        width={90}
+                        height={90}
+                        className="opacity-90"
+                      />
+                      <div className="text-sm font-medium text-neutral-800">
+                        Click to upload gallery images
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        You can select multiple files at once
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {galleryImages.map((m) => (
+                        <div
+                          key={m.id}
+                          className="relative h-28 overflow-hidden rounded-xl border bg-muted"
+                        >
                           <Image
-                            src={featuredImageLogo}
-                            alt="Featured upload"
-                            width={90}
-                            height={90}
-                            className="opacity-90"
-                          />
-                          <div className="text-sm font-medium text-neutral-800">
-                            Click to upload featured image
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            Recommended: square image, high quality
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
-                          <Image
-                            src={featuredImage.url}
-                            alt={featuredImage.file.name}
+                            src={m.url}
+                            alt={m.file.name}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 768px) 100vw, 33vw"
+                            sizes="(max-width: 768px) 50vw, 16vw"
                           />
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeFeaturedImage();
+                              removeGalleryImage(m.id);
                             }}
-                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
-                            aria-label="Remove featured image"
+                            className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
+                            aria-label="Remove gallery image"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-neutral-900">Video</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      One video (MP4/WebM/OGG/QuickTime, max 50MB)
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Up to 4 images for the product detail page
-                        </div>
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => galleryImagesInputRef.current?.click()}
-                        disabled={galleryImages.length >= 4}
-                      >
-                        <Upload className="h-4 w-4" />
-                        Add ({galleryImages.length}/4)
-                      </Button>
-                    </div>
-
-                    <input
-                      ref={galleryImagesInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        handleGalleryImages(e.target.files);
-                        if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
-                      }}
-                    />
-
-                    <div
-                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
-                      onClick={() => galleryImagesInputRef.current?.click()}
-                    >
-                      {galleryImages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                          <Image
-                            src={galleryImageLogo}
-                            alt="Gallery upload"
-                            width={90}
-                            height={90}
-                            className="opacity-90"
-                          />
-                          <div className="text-sm font-medium text-neutral-800">
-                            Click to upload gallery images
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            You can select multiple files at once
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                          {galleryImages.map((m) => (
-                            <div
-                              key={m.id}
-                              className="relative h-28 overflow-hidden rounded-xl border bg-muted"
-                            >
-                              <Image
-                                src={m.url}
-                                alt={m.file.name}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 50vw, 16vw"
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeGalleryImage(m.id);
-                                }}
-                                className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                                aria-label="Remove gallery image"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-neutral-900">Video</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          One video (MP4/WebM/OGG/QuickTime, max 50MB)
-                        </div>
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => videoInputRef.current?.click()}
-                      >
-                        <Video className="h-4 w-4" />
-                        {videoFile ? "Change" : "Upload"}
-                      </Button>
-                    </div>
-
-                    <input
-                      ref={videoInputRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/ogg,video/quicktime"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleVideo(e.target.files);
-                        if (videoInputRef.current) videoInputRef.current.value = "";
-                      }}
-                    />
-
-                    <div
-                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
-                      onClick={() => videoInputRef.current?.click()}
-                    >
-                      {!videoFile ? (
-                        <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                          <Image
-                            src={videoUploadLogo}
-                            alt="Video upload"
-                            width={120}
-                            height={120}
-                            className="opacity-90"
-                          />
-                          <div className="text-sm font-medium text-neutral-800">
-                            Click to upload product video
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            Keep it short and clear (recommended)
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
-                          <video
-                            src={videoFile.url}
-                            className="h-full w-full object-cover"
-                            controls
-                            muted
-                            preload="metadata"
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeVideo();
-                            }}
-                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
-                            aria-label="Remove video"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    <Video className="h-4 w-4" />
+                    {videoFile ? "Change" : "Upload"}
+                  </Button>
                 </div>
 
-                {/* Upload Progress */}
-                {isUploading && (
-                  <div className="mt-4 space-y-2">
-                    {uploadProgress.gallery > 0 && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>Uploading images...</span>
-                          <span>{uploadProgress.gallery}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress.gallery}%` }}
-                          />
-                        </div>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleVideo(e.target.files);
+                    if (videoInputRef.current) videoInputRef.current.value = "";
+                  }}
+                />
+
+                <div
+                  className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                  onClick={() => videoInputRef.current?.click()}
+                >
+                  {!videoFile ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                      <Image
+                        src={videoUploadLogo}
+                        alt="Video upload"
+                        width={120}
+                        height={120}
+                        className="opacity-90"
+                      />
+                      <div className="text-sm font-medium text-neutral-800">
+                        Click to upload product video
                       </div>
-                    )}
-                    {uploadProgress.video > 0 && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>Uploading video...</span>
-                          <span>{uploadProgress.video}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress.video}%` }}
-                          />
-                        </div>
+                      <div className="text-xs text-neutral-500">
+                        Keep it short and clear (recommended)
                       </div>
-                    )}
+                    </div>
+                  ) : (
+                    <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
+                      <video
+                        src={videoFile.url}
+                        className="h-full w-full object-cover"
+                        controls
+                        muted
+                        preload="metadata"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeVideo();
+                        }}
+                        className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                        aria-label="Remove video"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Upload Progress */}
+            {isUploading && (
+              <div className="mt-4 space-y-2">
+                {uploadProgress.gallery > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Uploading images...</span>
+                      <span>{uploadProgress.gallery}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress.gallery}%` }}
+                      />
+                    </div>
                   </div>
                 )}
-
-                {/* Upload Errors */}
-                {uploadErrors.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-sm font-medium text-red-600">Upload Errors:</div>
-                    {uploadErrors.map((error, index) => (
-                      <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                        {error}
-                      </div>
-                    ))}
-                    {createdProductId && (
-                      <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                        Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
-                      </div>
-                    )}
+                {uploadProgress.video > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Uploading video...</span>
+                      <span>{uploadProgress.video}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress.video}%` }}
+                      />
+                    </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Inventory and shipping</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="stockQty" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="stockQty"
-                      inputMode="numeric"
-                      value={values.stock_quantity}
-                      onChange={(e) =>
-                        setValues((p) => ({
-                          ...p,
-                          stock_quantity: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                    />
+            {/* Upload Errors */}
+            {uploadErrors.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-sm font-medium text-red-600">Upload Errors:</div>
+                {uploadErrors.map((error, index) => (
+                  <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                    {error}
                   </div>
-                </div>
+                ))}
+                {createdProductId && (
+                  <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                    Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="weight" className="font-semibold">Weight</Label>
-                    <Input
-                      id="weight"
-                      value={values.weight}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, weight: e.target.value }))
-                      }
-                      placeholder="e.g. 1.2"
-                    />
-                  </div>
+        <Card className="shadow-sm bg-gray-100">
+          <CardHeader>
+            <CardTitle className="text-lg">Inventory and shipping</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 bg-gray-100">
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="length" className="font-semibold">Length</Label>
-                    <Input
-                      id="length"
-                      value={values.length}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, length: e.target.value }))
-                      }
-                      placeholder="e.g. 10"
-                    />
-                  </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="stockQty" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
+                <Input
+                  id="stockQty"
+                  inputMode="numeric"
+                  value={values.stock_quantity}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*$/.test(v)) {
+                      setValues((p) => ({
+                        ...p,
+                        stock_quantity: v,
+                      }));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey || e.metaKey || e.altKey) return;
+                    const allowed = [
+                      "Backspace",
+                      "Delete",
+                      "Tab",
+                      "Enter",
+                      "Escape",
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                    ];
+                    if (allowed.includes(e.key)) return;
+                    if (/^[0-9]$/.test(e.key)) return;
+                    e.preventDefault();
+                  }}
+                  placeholder="0"
+                />
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="width" className="font-semibold">Width</Label>
-                    <Input
-                      id="width"
-                      value={values.width}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, width: e.target.value }))
-                      }
-                      placeholder="e.g. 5"
-                    />
-                  </div>
+              </div>
+            </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="height" className="font-semibold">Height</Label>
-                    <Input
-                      id="height"
-                      value={values.height}
-                      onChange={(e) =>
-                        setValues((p) => ({ ...p, height: e.target.value }))
-                      }
-                      placeholder="e.g. 3"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        ) : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="weight" className="font-semibold">Weight</Label>
+                <Input
+                  id="weight"
+                  value={values.weight}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, weight: e.target.value }))
+                  }
+                  placeholder="e.g. 1.2"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="length" className="font-semibold">Length</Label>
+                <Input
+                  id="length"
+                  value={values.length}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, length: e.target.value }))
+                  }
+                  placeholder="e.g. 10"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="width" className="font-semibold">Width</Label>
+                <Input
+                  id="width"
+                  value={values.width}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, width: e.target.value }))
+                  }
+                  placeholder="e.g. 5"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="height" className="font-semibold">Height</Label>
+                <Input
+                  id="height"
+                  value={values.height}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, height: e.target.value }))
+                  }
+                  placeholder="e.g. 3"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </PermissionBoundary>
   );

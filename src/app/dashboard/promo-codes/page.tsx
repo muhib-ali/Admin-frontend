@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import PromoCodeFormDialog, {
   PromoCodeFormValues,
 } from "@/components/promo-codes/promo-code-form";
@@ -125,7 +125,7 @@ export default function PromoCodesPage() {
         setTotal(response.data.pagination.total);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to load promo codes");
+      notifyError(err?.message || "Failed to load promo codes");
     } finally {
       setLoading(false);
     }
@@ -186,10 +186,10 @@ export default function PromoCodesPage() {
     if (!deleteTarget) return;
     try {
       await promoCodesService.deletePromoCode({ id: deleteTarget.id });
-      toast.success("Promo code deleted");
+      notifySuccess("Promo code deleted");
       fetch();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to delete promo code");
+      notifyError(err?.message || "Failed to delete promo code");
     }
     setDeleteOpen(false);
     setDeleteTarget(null);
@@ -205,7 +205,7 @@ export default function PromoCodesPage() {
           expiresAt: data.expires_at,
           isActive: data.active,
         });
-        toast.success("Promo code created");
+        notifySuccess("Promo code created");
       } else {
         await promoCodesService.updatePromoCode({
           id: data.id!,
@@ -215,13 +215,13 @@ export default function PromoCodesPage() {
           expiresAt: data.expires_at,
           isActive: data.active,
         });
-        toast.success("Promo code updated");
+        notifySuccess("Promo code updated");
       }
       setOpenForm(false);
       setCurrent(undefined);
       fetch();
     } catch (err: any) {
-      toast.error(err?.message || `Failed to ${formMode} promo code`);
+      notifyError(err?.message || `Failed to ${formMode} promo code`);
     }
   };
 

@@ -10,6 +10,8 @@ import {
   Plus,
   Pencil,
   Trash2,
+  SearchX,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import BrandFormDialog, {
   BrandFormValues,
 } from "@/components/brands/brand-form";
@@ -144,7 +146,7 @@ export default function BrandsPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load brands");
+        notifyError(e?.response?.data?.message || "Failed to load brands");
       } finally {
         setLoading(false);
       }
@@ -193,7 +195,7 @@ export default function BrandsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open brand");
+      notifyError(e?.response?.data?.message || "Failed to open brand");
     }
   };
 
@@ -211,7 +213,7 @@ export default function BrandsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open brand");
+      notifyError(e?.response?.data?.message || "Failed to open brand");
     }
   };
 
@@ -224,7 +226,7 @@ export default function BrandsPage() {
           description: data.description || "",
           isActive: data.isActive,
         });
-        toast.success("Brand created");
+        notifySuccess("Brand created");
       } else {
         if (!canUpdate) return;
         await updateBrand({
@@ -233,7 +235,7 @@ export default function BrandsPage() {
           description: data.description || "",
           isActive: data.isActive,
         });
-        toast.success("Brand updated");
+        notifySuccess("Brand updated");
       }
 
       await refetch();
@@ -241,7 +243,7 @@ export default function BrandsPage() {
       setCurrent(undefined);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      notifyError(e?.response?.data?.message || "Save failed");
     }
   };
 
@@ -258,7 +260,7 @@ export default function BrandsPage() {
     try {
       setDeleting(true);
       await deleteBrand(deleteTarget.id);
-      toast.success("Brand deleted");
+      notifySuccess("Brand deleted");
 
       const { rows: list, pagination: pg } = await listBrands(
         page,
@@ -276,7 +278,7 @@ export default function BrandsPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }
@@ -346,8 +348,11 @@ export default function BrandsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        Loading brands…
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading brands…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
@@ -358,8 +363,14 @@ export default function BrandsPage() {
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No brands found.
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="grid h-10 w-10 place-items-center rounded-full bg-muted">
+                            <SearchX className="h-5 w-5 text-muted-foreground" />
+                          </span>
+                          <div className="text-sm font-semibold text-foreground">Brand not found</div>
+                          <div className="text-xs text-muted-foreground">Try a different search term.</div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (

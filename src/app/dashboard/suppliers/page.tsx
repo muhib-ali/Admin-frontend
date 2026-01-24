@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 
 import SupplierFormDialog, {
   SupplierFormValues,
@@ -152,7 +152,7 @@ export default function SuppliersPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load suppliers");
+        notifyError(e?.response?.data?.message || "Failed to load suppliers");
       } finally {
         setLoading(false);
       }
@@ -203,7 +203,7 @@ export default function SuppliersPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open supplier");
+      notifyError(e?.response?.data?.message || "Failed to open supplier");
     }
   };
 
@@ -223,7 +223,7 @@ export default function SuppliersPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open supplier");
+      notifyError(e?.response?.data?.message || "Failed to open supplier");
     }
   };
 
@@ -240,7 +240,7 @@ export default function SuppliersPage() {
         };
         console.log("Creating supplier with payload:", payload);
         await createSupplier(payload);
-        toast.success("Supplier created");
+        notifySuccess("Supplier created");
       } else {
         if (!canUpdate) return;
         const payload = {
@@ -253,7 +253,7 @@ export default function SuppliersPage() {
         };
         console.log("Updating supplier with payload:", payload);
         await updateSupplier(payload);
-        toast.success("Supplier updated");
+        notifySuccess("Supplier updated");
       }
 
       await refetch();
@@ -300,7 +300,7 @@ export default function SuppliersPage() {
         }
       }
       
-      toast.error(errorMessage);
+      notifyError(errorMessage);
     }
   };
 
@@ -317,7 +317,7 @@ export default function SuppliersPage() {
     try {
       setDeleting(true);
       await deleteSupplier(deleteTarget.id);
-      toast.success("Supplier deleted");
+      notifySuccess("Supplier deleted");
 
       const { rows: list, pagination: pg } = await listSuppliers(
         page,
@@ -335,7 +335,7 @@ export default function SuppliersPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }

@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Toaster } from "sonner";
 import NextAuthProvider from "@/components/providers/NextAuthProvider";
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider";
 import { UnsavedChangesProvider } from "@/contexts/UnsavedChangesContext";
@@ -19,6 +20,18 @@ export default function Providers({ children }: { children: ReactNode }) {
               {children}
             </ThemeProvider>
           </CurrencyProvider>
+          <Toaster 
+            position="top-right" 
+            richColors 
+            toastOptions={{
+              style: {
+                top: '5px',
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                color: '#166534',
+              },
+            }}
+          />
           <ToastContainer
             position="top-right"
             autoClose={5000}

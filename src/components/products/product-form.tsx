@@ -501,9 +501,31 @@ export function ProductForm({
                 className="h-10"
                 inputMode="decimal"
                 value={values.price}
-                onChange={(e) =>
-                  setValues((p) => ({ ...p, price: e.target.value }))
-                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                    setValues((p) => ({ ...p, price: v }));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.altKey) return;
+                  const allowed = [
+                    "Backspace",
+                    "Delete",
+                    "Tab",
+                    "Enter",
+                    "Escape",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "Home",
+                    "End",
+                  ];
+                  if (allowed.includes(e.key)) return;
+                  if (/^[0-9.]$/.test(e.key)) return;
+                  e.preventDefault();
+                }}
                 placeholder="0"
               />
               {errors.price ? <p className="text-xs text-red-600">{errors.price}</p> : null}
@@ -516,9 +538,31 @@ export function ProductForm({
                 className="h-10"
                 inputMode="numeric"
                 value={values.stock_quantity}
-                onChange={(e) =>
-                  setValues((p) => ({ ...p, stock_quantity: e.target.value }))
-                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "" || /^\d*$/.test(v)) {
+                    setValues((p) => ({ ...p, stock_quantity: v }));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.altKey) return;
+                  const allowed = [
+                    "Backspace",
+                    "Delete",
+                    "Tab",
+                    "Enter",
+                    "Escape",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "Home",
+                    "End",
+                  ];
+                  if (allowed.includes(e.key)) return;
+                  if (/^[0-9]$/.test(e.key)) return;
+                  e.preventDefault();
+                }}
                 placeholder="0"
               />
               {errors.stock_quantity ? (

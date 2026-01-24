@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 
 import BlogFormDialog, { BlogFormValues } from "@/components/blogs/blog-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
@@ -152,7 +152,7 @@ export default function BlogsPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load blogs");
+        notifyError(e?.response?.data?.message || "Failed to load blogs");
       } finally {
         setLoading(false);
       }
@@ -181,7 +181,7 @@ export default function BlogsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to load blog");
+      notifyError(e?.response?.data?.message || "Failed to load blog");
     }
   };
 
@@ -200,7 +200,7 @@ export default function BlogsPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to load blog");
+      notifyError(e?.response?.data?.message || "Failed to load blog");
     }
   };
 
@@ -208,13 +208,13 @@ export default function BlogsPage() {
     if (!canUpdate) return;
     try {
       await toggleBlogActive(row.id);
-      toast.success("Blog status updated successfully");
+      notifySuccess("Blog status updated successfully");
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, active: !r.active } : r))
       );
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to toggle blog status");
+      notifyError(e?.response?.data?.message || "Failed to toggle blog status");
     }
   };
 
@@ -230,13 +230,13 @@ export default function BlogsPage() {
     try {
       setDeleting(true);
       await deleteBlog(deleteTarget.id);
-      toast.success("Blog deleted successfully");
+      notifySuccess("Blog deleted successfully");
       setDeleteOpen(false);
       setDeleteTarget(null);
       setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to delete blog");
+      notifyError(e?.response?.data?.message || "Failed to delete blog");
     } finally {
       setDeleting(false);
     }
@@ -249,7 +249,7 @@ export default function BlogsPage() {
         if (formMode === "create") {
           if (!canCreate) return;
           const created = await createBlog(values);
-          toast.success("Blog created successfully");
+          notifySuccess("Blog created successfully");
           setRows((prev) => [
             {
               id: created.id,
@@ -270,7 +270,7 @@ export default function BlogsPage() {
             blog_img: values.blog_img,
             is_active: values.is_active,
           });
-          toast.success("Blog updated successfully");
+          notifySuccess("Blog updated successfully");
           setRows((prev) =>
             prev.map((r) =>
               r.id === updated.id
@@ -289,7 +289,7 @@ export default function BlogsPage() {
         setCurrent(undefined);
       } catch (e: any) {
         console.error(e);
-        toast.error(
+        notifyError(
           e?.response?.data?.message ||
             `Failed to ${formMode === "create" ? "create" : "update"} blog`
         );

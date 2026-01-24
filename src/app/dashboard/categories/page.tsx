@@ -10,6 +10,8 @@ import {
   Plus,
   Pencil,
   Trash2,
+  SearchX,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,7 +34,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import CategoryFormDialog, {
   CategoryFormValues,
 } from "@/components/categories/category-form";
@@ -144,7 +146,7 @@ export default function CategoriesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load categories");
+        notifyError(e?.response?.data?.message || "Failed to load categories");
       } finally {
         setLoading(false);
       }
@@ -193,7 +195,7 @@ export default function CategoriesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      notifyError(e?.response?.data?.message || "Failed to open category");
     }
   };
 
@@ -211,7 +213,7 @@ export default function CategoriesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open category");
+      notifyError(e?.response?.data?.message || "Failed to open category");
     }
   };
 
@@ -224,7 +226,7 @@ export default function CategoriesPage() {
           description: data.description || "",
           isActive: data.active,
         });
-        toast.success("Category created");
+        notifySuccess("Category created");
       } else {
         if (!canUpdate) return;
         await updateCategory({
@@ -233,7 +235,7 @@ export default function CategoriesPage() {
           description: data.description || "",
           isActive: data.active,
         });
-        toast.success("Category updated");
+        notifySuccess("Category updated");
       }
 
       await refetch();
@@ -241,7 +243,7 @@ export default function CategoriesPage() {
       setCurrent(undefined);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Save failed");
+      notifyError(e?.response?.data?.message || "Save failed");
     }
   };
 
@@ -258,7 +260,7 @@ export default function CategoriesPage() {
     try {
       setDeleting(true);
       await deleteCategory(deleteTarget.id);
-      toast.success("Category deleted");
+      notifySuccess("Category deleted");
 
       const { rows: list, pagination: pg } = await listCategories(
         page,
@@ -276,7 +278,7 @@ export default function CategoriesPage() {
       setDeleteTarget(null);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     } finally {
       setDeleting(false);
     }
@@ -346,8 +348,11 @@ export default function CategoriesPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        Loading categories…
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading categories…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
@@ -358,8 +363,14 @@ export default function CategoriesPage() {
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No categories found.
+                      <TableCell colSpan={5} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="grid h-10 w-10 place-items-center rounded-full bg-muted">
+                            <SearchX className="h-5 w-5 text-muted-foreground" />
+                          </span>
+                          <div className="text-sm font-semibold text-foreground">Category not found</div>
+                          <div className="text-xs text-muted-foreground">Try a different search term.</div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (

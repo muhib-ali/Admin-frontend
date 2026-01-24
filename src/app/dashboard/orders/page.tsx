@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import { ordersApi, Order, Pagination } from "@/services/orders";
 import { useCurrency } from "@/contexts/currency-context";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -135,7 +135,7 @@ export default function OrdersPage() {
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
-      toast.error("Failed to fetch orders");
+      notifyError("Failed to fetch orders");
       setOrders([]);
       setPagination(null);
     } finally {

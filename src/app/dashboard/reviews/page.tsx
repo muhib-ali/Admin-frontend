@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import PermissionBoundary from "@/components/permission-boundary";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "@/utils/notify";
 import { reviewsApi, Review, Pagination } from "@/services/reviews";
 import { ReviewForm } from "@/components/reviews/review-form";
 
@@ -134,7 +134,7 @@ export default function ReviewsPage() {
       }
     } catch (error: any) {
       console.error("Failed to fetch reviews:", error);
-      toast.error(error?.response?.data?.message || "Failed to fetch reviews");
+      notifyError(error?.response?.data?.message || "Failed to fetch reviews");
     } finally {
       setLoading(false);
     }
@@ -155,7 +155,7 @@ export default function ReviewsPage() {
       }
     } catch (error: any) {
       console.error("Failed to fetch review:", error);
-      toast.error(error?.response?.data?.message || "Failed to fetch review details");
+      notifyError(error?.response?.data?.message || "Failed to fetch review details");
     }
   };
 
@@ -165,12 +165,12 @@ export default function ReviewsPage() {
     try {
       const response = await reviewsApi.approve(selectedReview.id, data);
       if (response.status) {
-        toast.success(response.message || `Review ${data.status} successfully`);
+        notifySuccess(response.message || `Review ${data.status} successfully`);
         fetchReviews();
       }
     } catch (error: any) {
       console.error("Failed to update review:", error);
-      toast.error(error?.response?.data?.message || "Failed to update review");
+      notifyError(error?.response?.data?.message || "Failed to update review");
       throw error;
     }
   };
@@ -180,12 +180,12 @@ export default function ReviewsPage() {
       try {
         const response = await reviewsApi.delete(reviewId);
         if (response.status) {
-          toast.success(response.message || "Review deleted successfully");
+          notifySuccess(response.message || "Review deleted successfully");
           fetchReviews();
         }
       } catch (error: any) {
         console.error("Failed to delete review:", error);
-        toast.error(error?.response?.data?.message || "Failed to delete review");
+        notifyError(error?.response?.data?.message || "Failed to delete review");
       }
     }
   };

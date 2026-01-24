@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { notifyError, notifyInfo, notifySuccess } from "@/utils/notify";
 import {
   Shield,
   Plus,
@@ -64,19 +64,36 @@ import { useHasPermission } from "@/hooks/use-permission";
 
 /* ---------------- PermissionsDisplay (inline panel in Permissions tab) ---------------- */
 
-function PermissionsDisplay({
-  roleId,
-  roleTitle,
-  canViewRolePerms,
-  canUpdateRolePerms,
-  onSaved,
-}: {
-  roleId: string;
-  roleTitle: string;
-  canViewRolePerms: boolean;
-  canUpdateRolePerms: boolean;
-  onSaved: (updated: any[]) => void;
-}) {
+type PermissionsDisplayMeta = {
+  totalSelected: number;
+  saving: boolean;
+};
+
+type PermissionsDisplayHandle = {
+  save: () => void;
+};
+
+const PermissionsDisplay = React.forwardRef<
+  PermissionsDisplayHandle,
+  {
+    roleId: string;
+    roleTitle: string;
+    canViewRolePerms: boolean;
+    canUpdateRolePerms: boolean;
+    onSaved: (updated: any[]) => void;
+    onMetaChange?: (meta: PermissionsDisplayMeta) => void;
+  }
+>(function PermissionsDisplay(
+  {
+    roleId,
+    roleTitle,
+    canViewRolePerms,
+    canUpdateRolePerms,
+    onSaved,
+    onMetaChange,
+  },
+  ref
+) {
   const [modules, setModules] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -100,7 +117,7 @@ function PermissionsDisplay({
         setExpanded(allClosed);
       } catch (error) {
         console.error("Error fetching permissions:", error);
-        toast.error("Failed to load permissions");
+        notifyError("Failed to load permissions");
       } finally {
         setLoading(false);
       }
@@ -113,6 +130,10 @@ function PermissionsDisplay({
     (sum, m) => sum + m.permissions.filter((p: any) => p.is_allowed).length,
     0
   );
+
+  React.useEffect(() => {
+    onMetaChange?.({ totalSelected, saving });
+  }, [onMetaChange, totalSelected, saving]);
 
   const filteredModules = React.useMemo(() => {
     if (!searchQuery.trim()) return modules;
@@ -157,17 +178,27 @@ function PermissionsDisplay({
         current: [],
         next: modules,
       });
-      toast.success("Permissions updated");
+      notifySuccess("Permissions updated");
       const fresh = await getRolePerms(roleId);
       setModules(fresh);
       onSaved(fresh);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update permissions");
+      notifyError("Failed to update permissions");
     } finally {
       setSaving(false);
     }
   }
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      save: () => {
+        void handleSave();
+      },
+    }),
+    [handleSave]
+  );
 
   function clearSearch() {
     setSearchQuery("");
@@ -195,7 +226,6 @@ function PermissionsDisplay({
         <div className="text-sm text-muted-foreground">
           Toggle which actions this role can access.
         </div>
-        <Badge variant="secondary">{totalSelected} allowed</Badge>
       </div>
 
       <div className="relative">
@@ -287,17 +317,9 @@ function PermissionsDisplay({
           })
         )}
       </div>
-
-      {canUpdateRolePerms && (
-        <div className="flex justify-end gap-2">
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </div>
-      )}
     </div>
   );
-}
+});
 
 /* ---------------- RolesPage (standardised like JobFiles/Permissions) ---------------- */
 
@@ -337,6 +359,12 @@ export default function RolesPage() {
     ENTITY_PERMS.roles.extras.updateRolePerms
   );
 
+  const permissionsRef = React.useRef<PermissionsDisplayHandle | null>(null);
+  const [permMeta, setPermMeta] = React.useState<PermissionsDisplayMeta>({
+    totalSelected: 0,
+    saving: false,
+  });
+
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -372,7 +400,7 @@ export default function RolesPage() {
       } catch (e: any) {
         if (e?.code === "ERR_CANCELED" || e?.message === "canceled") return;
         console.error(e);
-        toast.error(e?.response?.data?.message || "Failed to load roles");
+        notifyError(e?.response?.data?.message || "Failed to load roles");
       } finally {
         setLoading(false);
       }
@@ -467,11 +495,11 @@ export default function RolesPage() {
     if (!mounted || !canCreate) return;
     try {
       await createRole({ title: data.name });
-      toast.success("Role created");
+      notifySuccess("Role created");
       await refetchRoles();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Create failed");
+      notifyError(e?.response?.data?.message || "Create failed");
     }
   }
 
@@ -484,7 +512,7 @@ export default function RolesPage() {
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Failed to open role");
+      notifyError(e?.response?.data?.message || "Failed to open role");
     }
   }
 
@@ -492,11 +520,11 @@ export default function RolesPage() {
     if (!mounted || !canUpdate || !editRole?.id) return;
     try {
       await updateRole({ id: editRole.id, title: data.name });
-      toast.success("Role updated");
+      notifySuccess("Role updated");
       await refetchRoles();
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Update failed");
+      notifyError(e?.response?.data?.message || "Update failed");
     }
   }
 
@@ -504,7 +532,7 @@ export default function RolesPage() {
     if (!mounted || !canDelete) return;
     try {
       await deleteRole(id);
-      toast.success("Role deleted");
+      notifySuccess("Role deleted");
 
       const { rows, pagination: pg } = await listRoles(
         page,
@@ -525,7 +553,7 @@ export default function RolesPage() {
       });
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.response?.data?.message || "Delete failed");
+      notifyError(e?.response?.data?.message || "Delete failed");
     }
   }
 
@@ -556,7 +584,7 @@ export default function RolesPage() {
 
   const handleExportCSV = () => {
     if (!filtered.length) {
-      toast.info("No roles to export.");
+      notifyInfo("No roles to export.");
       return;
     }
 
@@ -583,18 +611,18 @@ export default function RolesPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast.success("Roles exported as CSV.");
+    notifySuccess("Roles exported as CSV.");
   };
 
   const handleExportPDF = () => {
     if (!filtered.length) {
-      toast.info("No roles to export.");
+      notifyInfo("No roles to export.");
       return;
     }
 
     const popup = window.open("", "_blank");
     if (!popup) {
-      toast.error("Popup blocked. Please allow popups to export PDF.");
+      notifyError("Popup blocked. Please allow popups to export PDF.");
       return;
     }
 
@@ -944,64 +972,87 @@ export default function RolesPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="w-full max-w-full sm:max-w-md lg:max-w-lg">
-                      <label
-                        htmlFor="role-select"
-                        className="block text-sm font-medium mb-2"
-                      >
-                        Select Role
-                      </label>
-                      <Select
-                        value={permRole?.id || ""}
-                        onValueChange={(value) => {
-                          const selectedRole = roles.find((r) => r.id === value);
-                          if (selectedRole) {
-                            setPermRole(selectedRole);
-                            (async () => {
-                              if (permCountMap[selectedRole.id] == null) {
-                                try {
-                                  const perms = await getRolePerms(
-                                    selectedRole.id
-                                  );
-                                  const c = perms.reduce(
-                                    (sum: number, m: any) =>
-                                      sum +
-                                      m.permissions.filter(
-                                        (p: any) => p.is_allowed
-                                      ).length,
-                                    0
-                                  );
-                                  setPermCountMap((prev) => ({
-                                    ...prev,
-                                    [selectedRole.id]: c,
-                                  }));
-                                } catch {
-                                  // ignore
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="w-full max-w-full sm:max-w-md lg:max-w-lg">
+                        <label
+                          htmlFor="role-select"
+                          className="block text-sm font-medium mb-2"
+                        >
+                          Select Role
+                        </label>
+                        <Select
+                          value={permRole?.id || ""}
+                          onValueChange={(value) => {
+                            const selectedRole = roles.find((r) => r.id === value);
+                            if (selectedRole) {
+                              setPermRole(selectedRole);
+                              setPermMeta({ totalSelected: 0, saving: false });
+                              (async () => {
+                                if (permCountMap[selectedRole.id] == null) {
+                                  try {
+                                    const perms = await getRolePerms(
+                                      selectedRole.id
+                                    );
+                                    const c = perms.reduce(
+                                      (sum: number, m: any) =>
+                                        sum +
+                                        m.permissions.filter(
+                                          (p: any) => p.is_allowed
+                                        ).length,
+                                      0
+                                    );
+                                    setPermCountMap((prev) => ({
+                                      ...prev,
+                                      [selectedRole.id]: c,
+                                    }));
+                                  } catch {
+                                    // ignore
+                                  }
                                 }
-                              }
-                            })();
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="-- Select a role --" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          {filtered.map((r) => (
-                            <SelectItem key={r.id} value={r.id}>
-                              {r.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                              })();
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="-- Select a role --" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {filtered.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {permRole && (
+                        <div className="flex items-end justify-end sm:items-end">
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge variant="secondary">
+                              {permMeta.totalSelected} allowed
+                            </Badge>
+                            {canUpdateRolePerms && (
+                              <Button
+                                onClick={() => permissionsRef.current?.save()}
+                                disabled={permMeta.saving}
+                              >
+                                {permMeta.saving ? "Saving…" : "Save"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {permRole && (
                       <PermissionsDisplay
+                        ref={permissionsRef}
                         roleId={permRole.id}
                         roleTitle={permRole.title}
                         canViewRolePerms={canViewRolePerms}
                         canUpdateRolePerms={canUpdateRolePerms}
+                        onMetaChange={setPermMeta}
                         onSaved={(updated) => {
                           const count = updated.reduce(
                             (s: number, m: any) =>
