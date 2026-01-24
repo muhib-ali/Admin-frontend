@@ -25,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
@@ -209,7 +210,7 @@ export default function NewProductPage() {
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Date range state for discount dates
-  const [discountDateRange, setDiscountDateRange] = React.useState<{ from?: Date; to?: Date }>();
+  const [discountDateRange, setDiscountDateRange] = React.useState<DateRange>();
 
   // Helper functions to convert between date range and string values
   const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
@@ -558,6 +559,7 @@ export default function NewProductPage() {
       basePrice,
       totalPriceWithTax,
       priceAfterDiscount,
+      totalCost: totalPriceWithTax,
     };
   }, [
     values.selling_price,
@@ -1128,9 +1130,9 @@ export default function NewProductPage() {
                   className="bg-gray-100 cursor-not-allowed"
                   placeholder="Currency will be set based on your selection"
                 />
-                <p className="text-xs text-gray-500">
+                {/* <p className="text-xs text-gray-500">
                   Currency is automatically set based on your global selection
-                </p>
+                </p> */}
               </div>
 
               <div className="grid gap-2">

@@ -28,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 
 const STORAGE_KEY = "admin_portal_static_products_v1";
 
@@ -182,7 +183,7 @@ export default function ProductEditPage() {
   const [pendingFeaturedImage, setPendingFeaturedImage] = React.useState<MediaUpload | null>(null);
   
   // Date range state for discount dates
-  const [discountDateRange, setDiscountDateRange] = React.useState<{ from?: Date; to?: Date }>();
+  const [discountDateRange, setDiscountDateRange] = React.useState<DateRange>();
   
   // Helper functions to convert between date range and string values
   const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
@@ -1814,10 +1815,7 @@ export default function ProductEditPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {/* Debug info */}
-                    <div className="text-xs text-gray-500">
-                      Debug: tax_id="{values.tax_id}" | Available taxes: {taxes.map(t => `${t.id}:${t.name}`).join(', ')}
-                    </div>
+                   
                   </div>
                 </div>
 
