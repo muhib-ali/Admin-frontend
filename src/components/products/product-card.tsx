@@ -43,11 +43,14 @@ export function ProductCard({
   const imageSrc = product.product_img_url || svgCardImage(imgSeed);
   const statusLabel = product.is_active ? "Active" : "Inactive";
 
+  // Use total_price if available, otherwise fall back to price
+  const displayPriceValue = product.total_price ?? product.price;
+
   // Convert price when product or selected country changes
   React.useEffect(() => {
     const convertPrice = async () => {
       if (!selectedCountry) {
-        setConvertedPrice({ amount: product.price, symbol: '$' });
+        setConvertedPrice({ amount: displayPriceValue, symbol: '$' });
         return;
       }
 
@@ -56,20 +59,20 @@ export function ProductCard({
         const targetSymbol = Object.values(selectedCountry.currencies)[0]?.symbol || '$';
         
         if (targetCurrency === 'USD') {
-          setConvertedPrice({ amount: product.price, symbol: targetSymbol });
+          setConvertedPrice({ amount: displayPriceValue, symbol: targetSymbol });
           return;
         }
 
-        const converted = await convertAmount(product.price, 'USD', targetCurrency);
+        const converted = await convertAmount(displayPriceValue, 'USD', targetCurrency);
         setConvertedPrice({ amount: converted, symbol: targetSymbol });
       } catch (error) {
         console.error('Error converting price in ProductCard:', error);
-        setConvertedPrice({ amount: product.price, symbol: '$' });
+        setConvertedPrice({ amount: displayPriceValue, symbol: '$' });
       }
     };
 
     convertPrice();
-  }, [product.price, selectedCountry, convertAmount]);
+  }, [displayPriceValue, selectedCountry, convertAmount]);
 
   return (
     <div className="group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.12)] transition-all duration-300 hover:scale-[1.02]">

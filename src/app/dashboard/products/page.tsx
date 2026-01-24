@@ -171,6 +171,7 @@ export default function ProductsPage() {
       title: p.title,
       description: p.description ?? "",
       price: Number(p.price),
+      total_price: p.total_price ? Number(p.total_price) : undefined,
       stock_quantity: Number(p.stock_quantity ?? 0),
       category_id: p.category_id,
       brand_id: p.brand_id,

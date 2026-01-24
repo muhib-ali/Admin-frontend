@@ -246,10 +246,29 @@ export default function NewProductPage() {
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
         setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
-        setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
+        // Create a unified tax mapping that works for both dropdown and calculations
+        const unifiedTaxMap = new Map<string, { id: string; title: string; rate: number }>();
+        
+        // Map dropdown taxes (for the select dropdown)
+        setTaxes((tax ?? []).map((t: any) => {
+          const taxInfo = { id: t.value, name: t.label };
+          // Also map to tax rate data if available
+          const matchingTaxRate = (taxData?.rows ?? []).find((tr: any) => tr.id === t.value);
+          if (matchingTaxRate) {
+            unifiedTaxMap.set(t.value, {
+              id: matchingTaxRate.id,
+              title: matchingTaxRate.title,
+              rate: matchingTaxRate.rate
+            });
+          }
+          return taxInfo;
+        }));
+        
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
-        setTaxRows(taxData?.rows ?? []);
+        
+        // Set tax rows using the unified map
+        setTaxRows(Array.from(unifiedTaxMap.values()));
         // Load default variant types from API (size, model, year)
         const defaultVariantTypesData = defaultVTypes?.data ?? [];
         setVariantTypes(defaultVariantTypesData.map((vt: any) => ({ id: vt.id, name: vt.name })));
@@ -517,21 +536,33 @@ export default function NewProductPage() {
   const pricing = React.useMemo(() => {
     const selling = Number(values.selling_price) || 0;
     const freight = Number(values.freight) || 0;
+    const cost = Number(values.cost) || 0;
     const discountPercent = Number(values.discount) || 0;
 
-    const baseForTax = selling + freight;
-    const taxAmount = baseForTax * (selectedTaxRate / 100);
-    const totalCost = baseForTax + taxAmount;
-    const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
+    // Base price includes selling price + cost + freight
+    const basePrice = selling + cost + freight;
+    
+    // Calculate tax on base price
+    const taxAmount = basePrice * (selectedTaxRate / 100);
+    
+    // Total price with tax included
+    const totalPriceWithTax = basePrice + taxAmount;
+    
+    // Apply discount on total price (including tax)
+    const priceAfterDiscount = discountPercent > 0
+      ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
+      : totalPriceWithTax;
 
     return {
       taxAmount,
-      totalCost,
+      basePrice,
+      totalPriceWithTax,
       priceAfterDiscount,
     };
   }, [
     values.selling_price,
     values.freight,
+    values.cost,
     values.discount,
     selectedTaxRate,
   ]);
@@ -553,24 +584,42 @@ export default function NewProductPage() {
     setUploadErrors([]);
 
     try {
-      // Calculate total_price as price after discount
-      const basePrice = Number(values.selling_price) || 0;
-      const cost = Number(values.cost) || 0;
+      // Use the same pricing calculation as the UI
+      const selling = Number(values.selling_price) || 0;
       const freight = Number(values.freight) || 0;
+      const cost = Number(values.cost) || 0;
       const discountPercent = Number(values.discount) || 0;
 
-      const subtotal = basePrice + cost + freight;
-      const taxAmount = subtotal * (selectedTaxRate / 100);
-      const totalCost = subtotal + taxAmount;
+      console.log("=== PRICE CALCULATION DEBUG ===");
+      console.log("Selling Price:", selling);
+      console.log("Cost:", cost);
+      console.log("Freight:", freight);
+      console.log("Discount %:", discountPercent);
+      console.log("Selected Tax Rate:", selectedTaxRate);
+
+      // Base price includes selling price + cost + freight
+      const basePrice = selling + cost + freight;
+      console.log("Base Price (Selling + Cost + Freight):", basePrice);
+      
+      // Calculate tax on base price
+      const taxAmount = basePrice * (selectedTaxRate / 100);
+      console.log("Tax Amount:", taxAmount);
+      
+      // Total price with tax included
+      const totalPriceWithTax = basePrice + taxAmount;
+      console.log("Total Price with Tax:", totalPriceWithTax);
+      
+      // Apply discount on total price (including tax)
       const priceAfterDiscount = discountPercent > 0
-        ? totalCost - (totalCost * discountPercent) / 100
-        : totalCost;
+        ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
+        : totalPriceWithTax;
+      console.log("Final Price After Discount:", priceAfterDiscount);
 
       // Convert prices to USD for backend storage
       const sourceCurrency = getCurrencyCode();
       const targetCurrency = 'USD';
 
-      let convertedPrice = basePrice;
+      let convertedPrice = selling;
       let convertedCost = cost;
       let convertedFreight = freight;
       let convertedTotalPrice = priceAfterDiscount;
@@ -578,16 +627,24 @@ export default function NewProductPage() {
       if (sourceCurrency !== targetCurrency) {
         try {
           [convertedPrice, convertedCost, convertedFreight, convertedTotalPrice] = await Promise.all([
-            convertAmount(basePrice, sourceCurrency, targetCurrency),
+            convertAmount(selling, sourceCurrency, targetCurrency),
             convertAmount(cost, sourceCurrency, targetCurrency),
             convertAmount(freight, sourceCurrency, targetCurrency),
             convertAmount(priceAfterDiscount, sourceCurrency, targetCurrency),
           ]);
+          console.log("=== AFTER CURRENCY CONVERSION ===");
+          console.log("Converted Price:", convertedPrice);
+          console.log("Converted Cost:", convertedCost);
+          console.log("Converted Freight:", convertedFreight);
+          console.log("Converted Total Price:", convertedTotalPrice);
         } catch (error) {
           console.error('Currency conversion failed:', error);
           setUploadErrors(prev => [...prev, 'Currency conversion failed. Please try again.']);
           return;
         }
+      } else {
+        console.log("=== NO CURRENCY CONVERSION NEEDED ===");
+        console.log("Total Price to be sent:", convertedTotalPrice);
       }
 
       // Separate default variants (have vtype_id) from custom variants (need to be created)
@@ -662,36 +719,67 @@ export default function NewProductPage() {
       // Create custom variant types and update product with all variants
       if (customVariantNames.length > 0) {
         try {
-          const customVariantTypes: { id: string; name: string }[] = [];
+          // Create each custom variant type via API and track the mapping
+          const customVariantTypeMap = new Map<string, { id: string; name: string }>();
 
-          // Create each custom variant type via API
           for (const customName of customVariantNames) {
             const response = await productsService.createCustomVariantType(productId, customName);
             if (response?.data?.id && response?.data?.name) {
-              customVariantTypes.push({ id: response.data.id, name: response.data.name });
+              // Map the original normalized key to the API response
+              customVariantTypeMap.set(customName, { id: response.data.id, name: response.data.name });
             }
           }
 
           // Now update product with all variants (default + custom)
+          console.log("Custom variant values before update:", variantValues);
+          console.log("Custom variant type map:", Array.from(customVariantTypeMap.entries()));
+          
           const allVariants = [
             ...defaultVariants,
-            ...customVariantTypes.map((cvt) => ({
-              vtype_id: cvt.id,
-              value: String(variantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
-            })),
+            ...Array.from(customVariantTypeMap.entries()).map(([originalKey, cvt]) => {
+              const variantValue = String(variantValues[originalKey] ?? "").trim();
+              console.log(`Processing variant ${originalKey}: value="${variantValue}"`);
+              return {
+                vtype_id: cvt.id,
+                value: variantValue,
+              };
+            }),
           ];
+          
+          console.log("Final allVariants array:", allVariants);
 
-          if (allVariants.length > 0) {
-            await productsService.updateProduct({
+          // Only update if we have custom variants to add
+          if (allVariants.length > defaultVariants.length) {
+            console.log("Updating product with custom variants:", {
               id: productId,
               title: values.title.trim(),
+              description: values.description.trim(),
               price: convertedPrice,
               stock_quantity: Number(values.stock_quantity) || 0,
               category_id: values.category_id,
               brand_id: values.brand_id,
               currency: targetCurrency,
+              total_price: convertedTotalPrice,
               variants: allVariants,
             });
+            
+            try {
+              await productsService.updateProduct({
+                id: productId,
+                title: values.title.trim(),
+                description: values.description.trim(),
+                price: convertedPrice,
+                stock_quantity: Number(values.stock_quantity) || 0,
+                category_id: values.category_id,
+                brand_id: values.brand_id,
+                currency: targetCurrency,
+                total_price: convertedTotalPrice,
+                variants: allVariants,
+              });
+            } catch (updateError: any) {
+              console.error("Update product error:", updateError?.response?.data);
+              throw updateError;
+            }
           }
         } catch (error: any) {
           console.error("Failed to create custom variants:", error);
