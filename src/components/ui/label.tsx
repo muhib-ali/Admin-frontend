@@ -27,7 +27,8 @@ function renderWithRedAsterisks(node: React.ReactNode): React.ReactNode {
   }
 
   if (React.isValidElement(node)) {
-    return React.cloneElement(node, undefined, renderWithRedAsterisks(node.props.children))
+    const element = node as React.ReactElement<{ children?: React.ReactNode }>;
+    return React.cloneElement(element, undefined, renderWithRedAsterisks(element.props.children))
   }
 
   return node
