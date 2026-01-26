@@ -156,7 +156,7 @@ export default function OrdersPage() {
       }
     } catch (error) {
       console.error("Failed to fetch order details:", error);
-      toast.error("Failed to fetch order details");
+      notifyError("Failed to fetch order details");
     }
   };
 

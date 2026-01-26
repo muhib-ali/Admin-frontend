@@ -81,8 +81,8 @@ importers:
         specifier: ^3.0.5
         version: 3.0.5
       jspdf:
-        specifier: ^3.0.4
-        version: 3.0.4
+        specifier: ^4.0.0
+        version: 4.0.0
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
@@ -2308,8 +2308,8 @@ packages:
     resolution: {integrity: sha512-g1MWMLBiz8FKi1e4w0UyVL3w+iJceWAFBAaBnnGKOpNa5f8TLktkbre1+s6oICydWAm+HRUGTmI+//xv2hvXYA==}
     hasBin: true
 
-  jspdf@3.0.4:
-    resolution: {integrity: sha512-dc6oQ8y37rRcHn316s4ngz/nOjayLF/FFxBF4V9zamQKRqXxyiH1zagkCdktdWhtoQId5K20xt1lB90XzkB+hQ==}
+  jspdf@4.0.0:
+    resolution: {integrity: sha512-w12U97Z6edKd2tXDn3LzTLg7C7QLJlx0BPfM3ecjK2BckUl9/81vZ+r5gK4/3KQdhAcEZhENUxRhtgYBj75MqQ==}
 
   jsx-ast-utils@3.3.5:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
@@ -5421,7 +5421,7 @@ snapshots:
     dependencies:
       minimist: 1.2.8
 
-  jspdf@3.0.4:
+  jspdf@4.0.0:
     dependencies:
       '@babel/runtime': 7.28.4
       fast-png: 6.4.0
