@@ -16,6 +16,11 @@ export function notifySuccess(title: string, description?: string) {
 export function notifyError(title: string, description?: string) {
   toast.error(title, {
     description,
+    style: {
+      background: "#fef2f2",
+      border: "1px solid #fecaca",
+      color: "#991b1b",
+    },
   });
 }
 

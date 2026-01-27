@@ -10,6 +10,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -280,13 +281,19 @@ export default function PromoCodesPage() {
                   {!mounted ? (
                     <TableRow>
                       <TableCell colSpan={7} className="p-8 text-center text-muted-foreground">
-                        Loading…
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : loading ? (
                     <TableRow>
                       <TableCell colSpan={7} className="p-8 text-center text-muted-foreground">
-                        Loading…
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (

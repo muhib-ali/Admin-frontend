@@ -5,6 +5,7 @@ import { notifyError, notifyInfo, notifySuccess } from "@/utils/notify";
 import {
   Shield,
   Plus,
+  Eye,
   Pencil,
   Trash2,
   Search,
@@ -19,6 +20,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileX2,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -339,7 +341,7 @@ export default function RolesPage() {
 
   const [openForm, setOpenForm] = React.useState(false);
   const [formMode, setFormMode] =
-    React.useState<"create" | "edit" | "permissions">("create");
+    React.useState<"create" | "edit" | "view" | "permissions">("create");
   const [editRole, setEditRole] = React.useState<AdminRole | null>(null);
   const [permRole, setPermRole] = React.useState<AdminRole | null>(null);
 
@@ -509,6 +511,19 @@ export default function RolesPage() {
       const role = await getRoleById(roleId);
       setEditRole(role);
       setFormMode("edit");
+      setOpenForm(true);
+    } catch (e: any) {
+      console.error(e);
+      notifyError(e?.response?.data?.message || "Failed to open role");
+    }
+  }
+
+  async function openView(roleId: string) {
+    if (!mounted || !canRead) return;
+    try {
+      const role = await getRoleById(roleId);
+      setEditRole(role);
+      setFormMode("view");
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
@@ -731,7 +746,7 @@ export default function RolesPage() {
 
                   <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
                     {/* Search */}
-                    <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+                    <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         className="h-9 pl-9 w-full"
@@ -779,7 +794,10 @@ export default function RolesPage() {
               <CardContent className="px-3 sm:px-6">
                 {loading ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">
-                    Loading roles…
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading roles…
+                    </div>
                   </div>
                 ) : mounted && !canList ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">
@@ -789,7 +807,7 @@ export default function RolesPage() {
                   <>
                     {/* Table container – same pattern as other pages */}
                     <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-                      <Table className="min-w-[640px]">
+                      <Table className="min-w-160">
                         <TableHeader>
                           <TableRow className="bg-gray-200">
                             <TableHead className="rounded-tl-xl pl-14 ">
@@ -886,6 +904,15 @@ export default function RolesPage() {
                                         align="end"
                                         className="w-40"
                                       >
+                                        {canRead && (
+                                          <DropdownMenuItem
+                                            className="gap-2"
+                                            onClick={() => openView(r.id)}
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                            View
+                                          </DropdownMenuItem>
+                                        )}
                                         {canUpdate && (
                                           <DropdownMenuItem
                                             className="gap-2"
@@ -1032,13 +1059,20 @@ export default function RolesPage() {
                             <Badge variant="secondary">
                               {permMeta.totalSelected} allowed
                             </Badge>
-                            {canUpdateRolePerms && (
+                            {/* Hide save button for Platform Admin role */}
+                            {canUpdateRolePerms && permRole?.title?.toLowerCase() !== 'platform admin' && (
                               <Button
                                 onClick={() => permissionsRef.current?.save()}
                                 disabled={permMeta.saving}
                               >
                                 {permMeta.saving ? "Saving…" : "Save"}
                               </Button>
+                            )}
+                            {permRole?.title?.toLowerCase() === 'platform admin' && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">
+                                <Lock className="h-3 w-3 mr-1" />
+                                Non-editable
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -1051,7 +1085,7 @@ export default function RolesPage() {
                         roleId={permRole.id}
                         roleTitle={permRole.title}
                         canViewRolePerms={canViewRolePerms}
-                        canUpdateRolePerms={canUpdateRolePerms}
+                        canUpdateRolePerms={canUpdateRolePerms && permRole?.title?.toLowerCase() !== 'platform admin'}
                         onMetaChange={setPermMeta}
                         onSaved={(updated) => {
                           const count = updated.reduce(

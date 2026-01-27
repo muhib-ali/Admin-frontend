@@ -5,6 +5,7 @@ import { notifyError, notifySuccess } from "@/utils/notify";
 import {
   User,
   Plus,
+  Eye,
   Pencil,
   Trash2,
   Search,
@@ -12,6 +13,7 @@ import {
   ChevronRight,
   MoreHorizontal,
   FileX2,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -66,7 +68,9 @@ export default function UsersPage() {
   const [pagination, setPagination] = React.useState<any | null>(null);
 
   const [openForm, setOpenForm] = React.useState(false);
-  const [formMode, setFormMode] = React.useState<"create" | "edit">("create");
+  const [formMode, setFormMode] = React.useState<"create" | "edit" | "view">(
+    "create"
+  );
   const [editUser, setEditUser] = React.useState<AdminUser | null>(null);
 
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -75,6 +79,7 @@ export default function UsersPage() {
 
   const canList = useHasPermission(ENTITY_PERMS.users.list);
   const canCreate = useHasPermission(ENTITY_PERMS.users.create);
+  const canRead = useHasPermission(ENTITY_PERMS.users.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.users.update);
   const canDelete = useHasPermission(ENTITY_PERMS.users.delete);
 
@@ -166,6 +171,19 @@ export default function UsersPage() {
       const user = await getUserById(userId);
       setEditUser(user);
       setFormMode("edit");
+      setOpenForm(true);
+    } catch (e: any) {
+      console.error(e);
+      notifyError(e?.response?.data?.message || "Failed to open user");
+    }
+  }
+
+  async function openView(userId: string) {
+    if (!mounted || !canRead) return;
+    try {
+      const user = await getUserById(userId);
+      setEditUser(user);
+      setFormMode("view");
       setOpenForm(true);
     } catch (e: any) {
       console.error(e);
@@ -296,7 +314,10 @@ export default function UsersPage() {
           <CardContent className="px-3 sm:px-6">
             {loading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                Loading users…
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading users…
+                </div>
               </div>
             ) : mounted && !canList ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
@@ -401,41 +422,53 @@ export default function UsersPage() {
                                   isLast ? "rounded-br-xl" : ""
                                 }`}
                               >
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      aria-label="More actions"
+                                {/* Hide actions for Platform Admin users */}
+                                {u.role?.title?.toLowerCase() !== 'platform admin' && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label="More actions"
+                                      >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="w-40"
                                     >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent
-                                    align="end"
-                                    className="w-40"
-                                  >
-                                    {canUpdate && (
-                                      <DropdownMenuItem
-                                        className="gap-2"
-                                        onClick={() => openEdit(u.id)}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                        Edit
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canDelete && (
-                                      <DropdownMenuItem
-                                        className="gap-2 text-destructive focus:text-destructive"
-                                        onClick={() => requestDelete(u.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      {canRead && (
+                                        <DropdownMenuItem
+                                          className="gap-2"
+                                          onClick={() => openView(u.id)}
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                          View
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canUpdate && (
+                                        <DropdownMenuItem
+                                          className="gap-2"
+                                          onClick={() => openEdit(u.id)}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                          Edit
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canDelete && (
+                                        <DropdownMenuItem
+                                          className="gap-2 text-destructive focus:text-destructive"
+                                          onClick={() => requestDelete(u.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
                               </TableCell>
                             </TableRow>
                           );

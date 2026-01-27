@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   FolderTree,
   Plus,
+  Eye,
   Pencil,
   Trash2,
   SearchX,
@@ -414,6 +415,15 @@ export default function CategoriesPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
+                                {canRead && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openView(c)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdate && (
                                   <DropdownMenuItem
                                     className="gap-2"

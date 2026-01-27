@@ -3,6 +3,7 @@
 import * as React from "react";
 import { DayPicker } from "react-day-picker";
 import { cn } from "@/utils/cn";
+import "./calendar.css";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
@@ -16,6 +17,13 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
+      style={{
+        '--rdp-accent-color': '#dc2626',
+        '--rdp-selected-color': '#dc2626',
+        '--rdp-hover-color': '#fef2f2',
+        '--rdp-selected-text-color': '#ffffff',
+        '--rdp-today-color': '#b91c1c',
+      } as React.CSSProperties}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
@@ -32,19 +40,17 @@ function Calendar({
         head_cell:
           "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
         row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:rounded-md [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        cell: "h-9 w-9 text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:rounded-md [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md flex items-center justify-center transition-colors"
         ),
         day_range_end: "day-range-end",
-        day_selected:
-          "bg-red-600 text-white hover:bg-red-600 focus:bg-red-700 focus:text-white",
-        day_today: "bg-accent text-accent-foreground",
+        day_selected: "rdp-selected",
+        day_today: "rdp-today",
         day_outside:
-          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+          "day-outside text-muted-foreground opacity-50",
         day_disabled: "text-muted-foreground opacity-50",
-        day_range_middle:
-          "aria-selected:bg-red-100 aria-selected:text-red-900",
+        day_range_middle: "rdp-range_middle",
         day_hidden: "invisible",
         ...classNames,
       }}

@@ -11,6 +11,7 @@ import {
   Pencil,
   Trash2,
   Eye,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -408,7 +409,10 @@ export default function SuppliersPage() {
                         colSpan={6}
                         className="p-8 text-center text-muted-foreground"
                       >
-                        Loading suppliers…
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading suppliers…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (

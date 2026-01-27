@@ -1,0 +1,45 @@
+/* Red Theme for Calendar */
+.rdp-selected {
+  background-color: #dc2626 !important;
+  color: white !important;
+  font-weight: 500 !important;
+}
+
+.rdp-today {
+  background-color: #fef2f2 !important;
+  color: #b91c1c !important;
+  font-weight: 500 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.rdp-day:hover:not(.rdp-selected):not(.rdp-disabled) {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+.rdp-range_middle {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+.rdp-day.rdp-outside {
+  opacity: 0.5 !important;
+}
+
+.rdp-day:focus {
+  outline: 2px solid #dc2626 !important;
+  outline-offset: 2px !important;
+}
+
+/* Fix centering for all calendar days */
+.rdp-day {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.rdp-selected,
+.rdp-today,
+.rdp-range_middle {
+  text-align: center !important;
+  vertical-align: middle !important;
+}

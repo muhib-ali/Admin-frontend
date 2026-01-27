@@ -27,7 +27,7 @@ export type ModuleRow = {
 export type ModuleFormProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "view";
   initial?: Partial<ModuleRow>;
   onSubmit: (data: ModuleRow) => void;
 };
@@ -67,7 +67,10 @@ export default function ModuleFormDialog({
     }
   }, [name, mode, slug]);
 
-  const title = mode === "create" ? "Create New Module" : "Edit Module";
+  const isReadOnly = mode === "view";
+
+  const title =
+    mode === "create" ? "Create New Module" : mode === "edit" ? "Edit Module" : "View Module";
   const cta = mode === "create" ? "Create" : "Update";
 
   const disabled = !name.trim() || !slug.trim() || !desc.trim();
@@ -92,6 +95,7 @@ export default function ModuleFormDialog({
               placeholder="e.g., Claim Management"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={isReadOnly}
             />
           </div>
 
@@ -102,6 +106,7 @@ export default function ModuleFormDialog({
               placeholder="claimManagement"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
+              disabled={isReadOnly}
             />
             <p className="text-[11px] text-muted-foreground">
               Backend requires a slug (e.g. <b>claimManagement</b>)
@@ -116,6 +121,7 @@ export default function ModuleFormDialog({
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={3}
+              disabled={isReadOnly}
             />
           </div>
 
@@ -126,6 +132,7 @@ export default function ModuleFormDialog({
               placeholder="Package"
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
+              disabled={isReadOnly}
             />
             <p className="text-[11px] text-muted-foreground">
               Lucide icon name (e.g. <b>Package</b>, <b>Boxes</b>, <b>Users</b>).
@@ -142,6 +149,7 @@ export default function ModuleFormDialog({
             <Switch
               checked={active}
               onCheckedChange={setActive}
+              disabled={isReadOnly}
               className="data-[state=checked]:bg-green-600"
             />
           </div>
@@ -149,25 +157,27 @@ export default function ModuleFormDialog({
 
         <DialogFooter className="mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {isReadOnly ? "Close" : "Cancel"}
           </Button>
-          <Button
-            onClick={() => {
-              const payload: ModuleRow = {
-                id: initial?.id ?? crypto.randomUUID(),
-                name: name.trim(),
-                slug: slug.trim(),
-                description: desc.trim(),
-                icon: icon.trim() || "Package",
-                active,
-              };
-              onSubmit(payload);
-              onOpenChange(false);
-            }}
-            disabled={disabled}
-          >
-            {cta}
-          </Button>
+          {!isReadOnly && (
+            <Button
+              onClick={() => {
+                const payload: ModuleRow = {
+                  id: initial?.id ?? crypto.randomUUID(),
+                  name: name.trim(),
+                  slug: slug.trim(),
+                  description: desc.trim(),
+                  icon: icon.trim() || "Package",
+                  active,
+                };
+                onSubmit(payload);
+                onOpenChange(false);
+              }}
+              disabled={disabled}
+            >
+              {cta}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

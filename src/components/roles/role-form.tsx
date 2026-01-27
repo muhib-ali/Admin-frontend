@@ -27,7 +27,7 @@ export interface RoleData {
 }
 
 export interface RoleFormProps {
-  mode: "create" | "edit" | "permissions";
+  mode: "create" | "edit" | "view" | "permissions";
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialData?: RoleData | null;
@@ -109,6 +109,12 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (mode === "view") {
+      onOpenChange(false);
+      return;
+    }
+
     const payload: RoleData = {
       id: initialData?.id,
       name: name.trim(),
@@ -178,7 +184,7 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
   if (mode === "permissions") {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="p-0 w-[95vw] max-w-none sm:w-[720px] sm:max-w-[720px] h-[80vh] max-h-[80vh] grid grid-rows-[auto,1fr,auto]">
+        <DialogContent className="p-0 w-[95vw] max-w-none sm:w-180 sm:max-w-180 h-[80vh] max-h-[80vh] grid grid-rows-[auto,1fr,auto]">
           <DialogHeader className="px-6 pt-6 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
@@ -266,6 +272,10 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
     );
   }
 
+  const isReadOnly = mode === "view";
+  const title =
+    mode === "create" ? "Create New Role" : mode === "edit" ? "Edit Role" : "View Role";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* p-0 so we can build our own sticky header/footer + scrollable body */}
@@ -274,7 +284,7 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
         <DialogHeader className="px-6 pt-6 pb-3">
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            {mode === "create" ? "Create New Role" : "Edit Role"}
+            {title}
           </DialogTitle>
         </DialogHeader>
 
@@ -292,6 +302,7 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  disabled={isReadOnly}
                 />
               </div>
               <div>
@@ -302,6 +313,7 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   required
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
@@ -315,9 +327,11 @@ export function RoleForm({ mode, open, onOpenChange, initialData, roleId, roleTi
           {/* Sticky footer (always visible) */}
           <div className="sticky flex justify-end gap-3 border-t bg-background px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {isReadOnly ? "Close" : "Cancel"}
             </Button>
-            <Button type="submit">{mode === "create" ? "Create" : "Update"}</Button>
+            {!isReadOnly && (
+              <Button type="submit">{mode === "create" ? "Create" : "Update"}</Button>
+            )}
           </div>
         </form>
       </DialogContent>

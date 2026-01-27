@@ -132,3 +132,23 @@
 .scrollbar-stable {
   scrollbar-gutter: stable both-edges;
 }
+
+ .Toastify__toast--error {
+   background: #fef2f2 !important;
+   border: 1px solid #fecaca !important;
+   color: #991b1b !important;
+ }
+
+ .Toastify__progress-bar--error {
+   background: #ef4444 !important;
+ }
+
+ .Toastify__toast--success {
+   background: #f0fdf4 !important;
+   border: 1px solid #86efac !important;
+   color: #166534 !important;
+ }
+
+ .Toastify__progress-bar--success {
+   background: #22c55e !important;
+ }

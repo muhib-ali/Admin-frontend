@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Tags,
   Plus,
+  Eye,
   Pencil,
   Trash2,
   SearchX,
@@ -409,6 +410,15 @@ export default function BrandsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
+                                {canRead && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openView(b)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdate && (
                                   <DropdownMenuItem
                                     className="gap-2"
