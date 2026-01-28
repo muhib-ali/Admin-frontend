@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   Search,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   LogOut,
   Settings,
   User2,
@@ -26,12 +24,10 @@ import { useSession, signOut } from "next-auth/react";
 
 type TopbarProps = {
   onMenuClick?: () => void;
-  onToggleSidebar?: () => void;
-  collapsed?: boolean;
   className?: string;
 };
 
-export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, className }: TopbarProps) {
+export default function Topbar({ onMenuClick, className }: TopbarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const { data: session, update } = useSession();
   const [localUser, setLocalUser] = React.useState<any>(null);
@@ -152,15 +148,6 @@ export default function Topbar({ onMenuClick, onToggleSidebar, collapsed, classN
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
-        </button>
-
-        <button
-          onClick={onToggleSidebar}
-          className={`hidden lg:grid h-10 w-10 place-items-center rounded-xl border bg-white shadow dark:bg-neutral-900 transition-[margin] duration-300 ${collapsed ? "-ml-14" : "ml-0"}`}
-          aria-label="Toggle sidebar"
-          title="Collapse / Expand sidebar"
-        >
-          {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </button>
 
         <div className="flex-1 min-w-0" />
