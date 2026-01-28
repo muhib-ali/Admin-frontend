@@ -212,13 +212,19 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
             <button
               onClick={onToggle}
               className={cn(
-                "ml-auto text-white/60 hover:text-white transition-colors",
+                "ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition-all duration-200 hover:bg-white/10 hover:text-white hover:scale-105 active:scale-95",
                 collapsed && "mx-auto"
               )}
               aria-label="Toggle sidebar"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {collapsed ? ">" : "<"}
+              <div className="relative">
+                {collapsed ? (
+                  <PanelLeftOpen className="h-4 w-4 transition-transform duration-200" />
+                ) : (
+                  <PanelLeftClose className="h-4 w-4 transition-transform duration-200" />
+                )}
+              </div>
             </button>
           )}
         </div>
