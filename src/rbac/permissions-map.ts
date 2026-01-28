@@ -133,9 +133,14 @@ export const ENTITY_PERMS = {
     update: "blogs/update",
     delete: "blogs/delete",
   },
+  dashboard: {
+    overview: "dashboard/getAll",
+  },
 } as const;
 
 export const SCREEN_PERM: Record<string, string> = {
+  "/dashboard":                         ENTITY_PERMS.dashboard.overview,
+  
   "/dashboard/modules":                 ENTITY_PERMS.modules.list,
   "/dashboard/modules/create":          ENTITY_PERMS.modules.create,
   "/dashboard/modules/[id]":            ENTITY_PERMS.modules.read,

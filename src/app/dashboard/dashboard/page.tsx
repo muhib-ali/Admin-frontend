@@ -8,7 +8,10 @@ import {
   Package,
   TrendingUp,
   ArrowUpRight,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { getDashboardOverview, type DashboardOverview } from "@/services/dashboard";
 import {
   LineChart,
   Line,
@@ -69,33 +72,36 @@ function StatsCard({ title, value, change, icon: Icon, trend = "up" }: StatsCard
   );
 }
 
-const revenueData = [
-  { month: "Jan", revenue: 45000, orders: 320 },
-  { month: "Feb", revenue: 52000, orders: 380 },
-  { month: "Mar", revenue: 48000, orders: 350 },
-  { month: "Apr", revenue: 61000, orders: 420 },
-  { month: "May", revenue: 55000, orders: 390 },
-  { month: "Jun", revenue: 67000, orders: 480 },
-  { month: "Jul", revenue: 72000, orders: 510 },
-  { month: "Aug", revenue: 68000, orders: 490 },
-  { month: "Sep", revenue: 79000, orders: 560 },
-  { month: "Oct", revenue: 85000, orders: 610 },
-  { month: "Nov", revenue: 92000, orders: 650 },
-  { month: "Dec", revenue: 98000, orders: 720 },
-];
-
-function RevenueChart() {
+function RevenueChart({
+  data,
+}: {
+  data: Array<{ day: string; revenue: number; orders: number }>;
+}) {
+  const hasAnyData = data.some((d) => (d?.revenue ?? 0) > 0 || (d?.orders ?? 0) > 0);
+  const chartData = data.map((item) => ({
+    day: new Date(item.day).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    revenue: item.revenue,
+    orders: item.orders,
+  }));
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Revenue Overview</h3>
-        <p className="mt-1 text-sm text-gray-500">Monthly revenue and order trends</p>
+        <p className="mt-1 text-sm text-gray-500">Daily revenue and order trends</p>
       </div>
-      <ResponsiveContainer width="100%" height={350}>
-        <LineChart data={revenueData}>
+      {!hasAnyData ? (
+        <div className="flex h-[350px] items-center justify-center text-sm text-gray-500">
+          No revenue/orders data for this period.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
           <XAxis
-            dataKey="month"
+            dataKey="day"
             stroke="#6B7280"
             style={{ fontSize: "12px", fontWeight: 500 }}
           />
@@ -128,22 +134,18 @@ function RevenueChart() {
             activeDot={{ r: 6 }}
             name="Orders"
           />
-        </LineChart>
-      </ResponsiveContainer>
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
 
-const salesData = [
-  { category: "Electronics", sales: 45000, profit: 12000 },
-  { category: "Clothing", sales: 38000, profit: 15000 },
-  { category: "Home & Garden", sales: 32000, profit: 9500 },
-  { category: "Sports", sales: 28000, profit: 8200 },
-  { category: "Books", sales: 22000, profit: 7800 },
-  { category: "Toys", sales: 19000, profit: 6500 },
-];
-
-function SalesChart() {
+function SalesChart({
+  data,
+}: {
+  data: Array<{ categoryName: string; revenue: number; quantity: number }>;
+}) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
       <div className="mb-6">
@@ -151,10 +153,10 @@ function SalesChart() {
         <p className="mt-1 text-sm text-gray-500">Top performing categories this month</p>
       </div>
       <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={salesData}>
+        <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
           <XAxis
-            dataKey="category"
+            dataKey="categoryName"
             stroke="#6B7280"
             style={{ fontSize: "12px", fontWeight: 500 }}
             angle={-15}
@@ -172,58 +174,24 @@ function SalesChart() {
             labelStyle={{ fontWeight: 600, color: "#111827" }}
           />
           <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
-          <Bar dataKey="sales" fill="#DC2626" radius={[8, 8, 0, 0]} name="Sales ($)" />
-          <Bar dataKey="profit" fill="#000000" radius={[8, 8, 0, 0]} name="Profit ($)" />
+          <Bar dataKey="revenue" fill="#DC2626" radius={[8, 8, 0, 0]} name="Revenue" />
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-const topProducts = [
-  {
-    id: 1,
-    name: "Wireless Headphones Pro",
-    category: "Electronics",
-    sales: 1250,
-    revenue: "$62,500",
-    trend: 12.5,
-  },
-  {
-    id: 2,
-    name: "Smart Watch Series 5",
-    category: "Electronics",
-    sales: 980,
-    revenue: "$49,000",
-    trend: 8.3,
-  },
-  {
-    id: 3,
-    name: "Premium Yoga Mat",
-    category: "Sports",
-    sales: 850,
-    revenue: "$25,500",
-    trend: 15.2,
-  },
-  {
-    id: 4,
-    name: "Designer Backpack",
-    category: "Clothing",
-    sales: 720,
-    revenue: "$43,200",
-    trend: 6.7,
-  },
-  {
-    id: 5,
-    name: "Coffee Maker Deluxe",
-    category: "Home & Garden",
-    sales: 650,
-    revenue: "$32,500",
-    trend: 10.1,
-  },
-];
-
-function TopProducts() {
+function TopProducts({
+  data,
+}: {
+  data: Array<{ productName: string; quantity: number; revenue: number }>;
+}) {
+  const topProducts = data.slice(0, 5).map((item, idx) => ({
+    id: idx + 1,
+    name: item.productName,
+    sales: item.quantity,
+    revenue: `$${item.revenue.toLocaleString()}`,
+  }));
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
       <div className="mb-6 flex items-center justify-between">
@@ -245,18 +213,11 @@ function TopProducts() {
             <div className="flex-1 min-w-0">
               <h4 className="truncate font-semibold text-gray-900">{product.name}</h4>
               <div className="mt-1 flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {product.category}
-                </Badge>
                 <span className="text-xs text-gray-500">{product.sales} sales</span>
               </div>
             </div>
             <div className="text-right">
               <p className="font-bold text-gray-900">{product.revenue}</p>
-              <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
-                <TrendingUp className="h-3 w-3" />
-                <span>+{product.trend}%</span>
-              </div>
             </div>
           </div>
         ))}
@@ -396,26 +357,28 @@ function QuickActions() {
   );
 }
 
-type OrderStatusKey = "Confirmed" | "Processing" | "Pending" | "Cancelled";
+type OrderStatusKey = "Confirmed" | "Pending" | "Cancelled";
 
 const statusPillClass: Record<OrderStatusKey, string> = {
   Confirmed: "bg-emerald-500/10 text-emerald-700",
-  Processing: "bg-sky-500/10 text-sky-700",
   Pending: "bg-amber-500/10 text-amber-700",
   Cancelled: "bg-red-500/10 text-red-700",
 };
 
-const orderStatusTrendData = [
-  { day: "Mon", Confirmed: 38, Processing: 20, Pending: 14, Cancelled: 4 },
-  { day: "Tue", Confirmed: 42, Processing: 22, Pending: 12, Cancelled: 5 },
-  { day: "Wed", Confirmed: 45, Processing: 18, Pending: 16, Cancelled: 3 },
-  { day: "Thu", Confirmed: 52, Processing: 24, Pending: 10, Cancelled: 6 },
-  { day: "Fri", Confirmed: 58, Processing: 26, Pending: 12, Cancelled: 4 },
-  { day: "Sat", Confirmed: 61, Processing: 20, Pending: 18, Cancelled: 7 },
-  { day: "Sun", Confirmed: 55, Processing: 19, Pending: 15, Cancelled: 5 },
-];
-
-function OrderStatusTrends() {
+function OrderStatusTrends({
+  data,
+}: {
+  data: Array<{ day: string; pending: number; accepted: number; rejected: number }>;
+}) {
+  const hasAnyData = data.some(
+    (d) => (d?.pending ?? 0) > 0 || (d?.accepted ?? 0) > 0 || (d?.rejected ?? 0) > 0
+  );
+  const chartData = data.map((item) => ({
+    day: new Date(item.day).toLocaleDateString("en-US", { weekday: "short" }),
+    Confirmed: item.accepted,
+    Pending: item.pending,
+    Cancelled: item.rejected,
+  }));
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
       <div className="mb-6">
@@ -431,8 +394,13 @@ function OrderStatusTrends() {
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={260}>
-        <AreaChart data={orderStatusTrendData} margin={{ left: 0, right: 10 }}>
+      {!hasAnyData ? (
+        <div className="flex h-[260px] items-center justify-center text-sm text-gray-500">
+          No order status activity for this period.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={chartData} margin={{ left: 0, right: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
           <XAxis dataKey="day" stroke="#6B7280" style={{ fontSize: "12px", fontWeight: 500 }} />
           <YAxis stroke="#6B7280" style={{ fontSize: "12px", fontWeight: 500 }} />
@@ -448,16 +416,54 @@ function OrderStatusTrends() {
           <Legend wrapperStyle={{ paddingTop: "12px" }} iconType="circle" />
 
           <Area type="monotone" dataKey="Confirmed" stackId="1" stroke="#059669" fill="#059669" fillOpacity={0.15} />
-          <Area type="monotone" dataKey="Processing" stackId="1" stroke="#0284C7" fill="#0284C7" fillOpacity={0.15} />
           <Area type="monotone" dataKey="Pending" stackId="1" stroke="#D97706" fill="#D97706" fillOpacity={0.15} />
           <Area type="monotone" dataKey="Cancelled" stackId="1" stroke="#DC2626" fill="#DC2626" fillOpacity={0.12} />
-        </AreaChart>
-      </ResponsiveContainer>
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
 
 export default function DashboardComponent() {
+  const [loading, setLoading] = React.useState(true);
+  const [dashboardData, setDashboardData] = React.useState<DashboardOverview | null>(null);
+
+  React.useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const data = await getDashboardOverview();
+        setDashboardData(data);
+      } catch (error: any) {
+        console.error("Failed to load dashboard:", error);
+        toast.error(error?.message || "Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">No dashboard data available</p>
+      </div>
+    );
+  }
+
+  const { cards, charts } = dashboardData;
+
   return (
     <div className="space-y-8 p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -469,31 +475,57 @@ export default function DashboardComponent() {
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2">
           <TrendingUp className="h-5 w-5 text-green-600" />
-          <span className="text-sm font-semibold text-green-700">Sales up 23% this month</span>
+          <span className="text-sm font-semibold text-green-700">
+            Sales {cards.salesUpPercent >= 0 ? 'up' : 'down'} {Math.abs(cards.salesUpPercent)}% this month
+          </span>
         </div>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Total Revenue" value="$98,450" change={23.5} icon={DollarSign} trend="up" />
-        <StatsCard title="Total Orders" value="1,245" change={12.3} icon={ShoppingCart} trend="up" />
-        <StatsCard title="Total Customers" value="8,542" change={8.7} icon={Users} trend="up" />
-        <StatsCard title="Total Products" value="456" change={5.2} icon={Package} trend="up" />
+        <StatsCard 
+          title="Total Revenue" 
+          value={`$${cards.revenue.current.toLocaleString()}`} 
+          change={cards.revenue.deltaPercent} 
+          icon={DollarSign} 
+          trend="up" 
+        />
+        <StatsCard 
+          title="Total Orders" 
+          value={cards.orders.current.toLocaleString()} 
+          change={cards.orders.deltaPercent} 
+          icon={ShoppingCart} 
+          trend="up" 
+        />
+        <StatsCard 
+          title="New Customers" 
+          value={cards.newCustomers.current.toLocaleString()} 
+          change={cards.newCustomers.deltaPercent} 
+          icon={Users} 
+          trend="up" 
+        />
+        <StatsCard 
+          title="New Products" 
+          value={cards.newProducts.current.toLocaleString()} 
+          change={cards.newProducts.deltaPercent} 
+          icon={Package} 
+          trend="up" 
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <RevenueChart />
-        <SalesChart />
+        <RevenueChart data={charts.revenueOverview} />
+        <SalesChart data={charts.salesByCategory} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <TopProducts />
+          <TopProducts data={charts.topProducts} />
         </div>
         <QuickActions />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <OrderStatusTrends />
+        <OrderStatusTrends data={charts.orderStatusTrends} />
         <RecentActivity />
       </div>
 
