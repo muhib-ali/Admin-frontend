@@ -13,6 +13,8 @@ import {
   Trash2,
   SearchX,
   Loader2,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ import CategoryFormDialog, {
 } from "@/components/categories/category-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { useHasPermission } from "@/hooks/use-permission";
+import { useExport } from "@/hooks/use-export";
 import {
   createCategory,
   deleteCategory,
@@ -103,6 +106,8 @@ export default function CategoriesPage() {
   const canRead = useHasPermission(ENTITY_PERMS.categories.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.categories.update);
   const canDelete = useHasPermission(ENTITY_PERMS.categories.delete);
+
+  const { isExporting, exportToCSV } = useExport();
 
   const normalizeRows = React.useCallback(
     (categories: any[]): CategoryRow[] =>
@@ -296,6 +301,65 @@ export default function CategoriesPage() {
   const pagStart = pagTotal === 0 ? 0 : (pagPage - 1) * limit + 1;
   const pagEnd = pagTotal === 0 ? 0 : Math.min(pagPage * limit, pagTotal);
 
+  const exportRows = React.useCallback(() => {
+    return rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      active: c.active,
+      created_at: c.createdAt,
+    }));
+  }, [rows]);
+
+  const handleExportCSV = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No categories to export");
+        return;
+      }
+      await exportToCSV(data, "categories");
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows, exportToCSV]);
+
+  const handleExportExcel = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No categories to export");
+        return;
+      }
+
+      const headers = Object.keys(data[0] || {});
+      const escape = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const table = `\n        <table>\n          <thead>\n            <tr>${headers
+              .map((h) => `<th>${escape(h)}</th>`)
+              .join("")}</tr>\n          </thead>\n          <tbody>\n            ${data
+              .map(
+                (row) =>
+                  `<tr>${headers
+                    .map((h) => `<td>${escape((row as any)[h])}</td>`)
+                    .join("")}</tr>`
+              )
+              .join("\n")}\n          </tbody>\n        </table>\n      `;
+
+      const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${table}</body></html>`;
+      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "categories.xls";
+      link.click();
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows]);
+
   return (
     <PermissionBoundary screen="/dashboard/categories" mode="block">
       <div className="space-y-6 scrollbar-stable">
@@ -307,14 +371,16 @@ export default function CategoriesPage() {
             </p>
           </div>
 
-          <Button
-            className="gap-2 w-full sm:w-auto"
-            onClick={openCreate}
-            disabled={!canCreate}
-          >
-            <Plus className="h-4 w-4" />
-            Add Category
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              className="gap-2 w-full sm:w-auto"
+              onClick={openCreate}
+              disabled={!canCreate}
+            >
+              <Plus className="h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-sm">
@@ -322,14 +388,39 @@ export default function CategoriesPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Categories</CardTitle>
 
-              <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="h-9 pl-9 w-full"
-                  placeholder="Search categories..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="h-9 pl-9 w-full"
+                    placeholder="Search categories..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled={!canList || isExporting}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportExcel} className="gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>

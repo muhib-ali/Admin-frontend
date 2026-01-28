@@ -13,6 +13,8 @@ import {
   Trash2,
   Eye,
   Loader2,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ import { notifyError, notifySuccess } from "@/utils/notify";
 import BlogFormDialog, { BlogFormValues } from "@/components/blogs/blog-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { useHasPermission } from "@/hooks/use-permission";
+import { useExport } from "@/hooks/use-export";
 import {
   createBlog,
   deleteBlog,
@@ -105,6 +108,8 @@ export default function BlogsPage() {
   const canRead = useHasPermission(ENTITY_PERMS.blogs.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.blogs.update);
   const canDelete = useHasPermission(ENTITY_PERMS.blogs.delete);
+
+  const { isExporting, exportToCSV } = useExport();
 
   const normalizeRows = React.useCallback(
     (blogs: any[]): BlogRow[] => {
@@ -304,6 +309,66 @@ export default function BlogsPage() {
   const hasPrev = page > 1;
   const hasNext = page < totalPages;
 
+  const exportRows = React.useCallback(() => {
+    return rows.map((b) => ({
+      id: b.id,
+      heading: b.heading,
+      paragraph: b.paragraph,
+      blog_img: b.blog_img || "",
+      active: b.active,
+      created_at: b.createdAt,
+    }));
+  }, [rows]);
+
+  const handleExportCSV = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No blogs to export");
+        return;
+      }
+      await exportToCSV(data, "blogs");
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows, exportToCSV]);
+
+  const handleExportExcel = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No blogs to export");
+        return;
+      }
+
+      const headers = Object.keys(data[0] || {});
+      const escape = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const table = `\n        <table>\n          <thead>\n            <tr>${headers
+              .map((h) => `<th>${escape(h)}</th>`)
+              .join("")}</tr>\n          </thead>\n          <tbody>\n            ${data
+              .map(
+                (row) =>
+                  `<tr>${headers
+                    .map((h) => `<td>${escape((row as any)[h])}</td>`)
+                    .join("")}</tr>`
+              )
+              .join("\n")}\n          </tbody>\n        </table>\n      `;
+
+      const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${table}</body></html>`;
+      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "blogs.xls";
+      link.click();
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows]);
+
   return (
     <PermissionBoundary screen="/dashboard/blogs" mode="block">
       <div className="space-y-6 scrollbar-stable">
@@ -327,14 +392,39 @@ export default function BlogsPage() {
                 <FileText className="h-5 w-5" />
                 Blog Posts
               </CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search blogs..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="pl-8"
-                />
+              <div className="flex items-center gap-3">
+                <div className="relative w-64">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search blogs..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled={!canList || isExporting}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportExcel} className="gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>
