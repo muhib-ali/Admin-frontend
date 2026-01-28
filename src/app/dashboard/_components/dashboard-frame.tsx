@@ -40,7 +40,7 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
           collapsed ? "w-20" : "w-72"
         )}
       >
-        <Sidebar collapsed={collapsed} />
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       </aside>
 
       <main
@@ -62,8 +62,6 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
 
         <Topbar
           onMenuClick={() => setOpen(true)}
-          onToggleSidebar={() => setCollapsed((v) => !v)}
-          collapsed={collapsed}
           className="hidden lg:block"
         />
 

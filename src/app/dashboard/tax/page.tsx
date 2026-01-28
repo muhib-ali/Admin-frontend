@@ -11,6 +11,8 @@ import {
   Pencil,
   Trash2,
   Eye,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ import { notifyError, notifySuccess } from "@/utils/notify";
 import TaxFormDialog, { TaxFormValues } from "@/components/taxes/tax-form";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { useHasPermission } from "@/hooks/use-permission";
+import { useExport } from "@/hooks/use-export";
 import {
   createTax,
   deleteTax,
@@ -100,6 +103,8 @@ export default function TaxPage() {
   const canRead = useHasPermission(ENTITY_PERMS.taxes.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.taxes.update);
   const canDelete = useHasPermission(ENTITY_PERMS.taxes.delete);
+
+  const { isExporting, exportToCSV } = useExport();
 
   const normalizeRows = React.useCallback(
     (taxes: any[]): TaxRow[] => {
@@ -336,6 +341,65 @@ export default function TaxPage() {
   const pagHasPrev = pagination?.hasPrev ?? pagPage > 1;
   const pagHasNext = pagination?.hasNext ?? pagPage < totalPages;
 
+  const exportRows = React.useCallback(() => {
+    return rows.map((t) => ({
+      id: t.id,
+      title: t.title,
+      rate: t.rate,
+      active: t.active,
+      created_at: t.createdAt,
+    }));
+  }, [rows]);
+
+  const handleExportCSV = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No taxes to export");
+        return;
+      }
+      await exportToCSV(data, "taxes");
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows, exportToCSV]);
+
+  const handleExportExcel = React.useCallback(async () => {
+    try {
+      if (!canList) return;
+      const data = exportRows();
+      if (!data.length) {
+        notifyError("No taxes to export");
+        return;
+      }
+
+      const headers = Object.keys(data[0] || {});
+      const escape = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const table = `\n        <table>\n          <thead>\n            <tr>${headers
+              .map((h) => `<th>${escape(h)}</th>`)
+              .join("")}</tr>\n          </thead>\n          <tbody>\n            ${data
+              .map(
+                (row) =>
+                  `<tr>${headers
+                    .map((h) => `<td>${escape((row as any)[h])}</td>`)
+                    .join("")}</tr>`
+              )
+              .join("\n")}\n          </tbody>\n        </table>\n      `;
+
+      const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body>${table}</body></html>`;
+      const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "taxes.xls";
+      link.click();
+    } catch (e: any) {
+      console.error(e);
+      notifyError("Export failed");
+    }
+  }, [canList, exportRows]);
+
   return (
     <PermissionBoundary screen="/dashboard/tax" mode="block">
       <div className="space-y-6 scrollbar-stable">
@@ -362,14 +426,39 @@ export default function TaxPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <CardTitle className="text-xl sm:text-2xl">All Taxes</CardTitle>
 
-              <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="h-9 pl-9 w-full"
-                  placeholder="Search taxes..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="relative w-full sm:w-65 md:w-80 lg:w-87.5 max-w-full">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="h-9 pl-9 w-full"
+                    placeholder="Search taxes..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled={!canList || isExporting}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportExcel} className="gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>
