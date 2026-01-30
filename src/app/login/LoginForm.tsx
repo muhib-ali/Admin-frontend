@@ -179,26 +179,7 @@ export default function LoginForm() {
               </div>
             </div>
 
-            {/* Remember me & Forgot password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-2 focus:ring-red-500 cursor-pointer"
-                />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900 transition">
-                  Remember me
-                </span>
-              </label>
 
-              <a
-                href="#"
-                className="text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-              >
-                Forgot Password?
-              </a>
-            </div>
 
             {/* Submit button */}
             <button

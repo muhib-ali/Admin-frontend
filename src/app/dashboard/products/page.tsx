@@ -29,6 +29,7 @@ import {
   getProductsBulkUploadState,
   resetProductsBulkUploadState,
   subscribeProductsBulkUpload,
+  startProductsBulkUploadExcel,
   deleteProduct,
   deleteProductImage,
   listProducts,
@@ -37,6 +38,7 @@ import {
   getAllBrandsDropdown,
   getAllCategoriesDropdown,
 } from "@/services/dropdowns";
+import { toast } from "react-toastify";
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -61,6 +63,7 @@ export default function ProductsPage() {
     }
   }, []);
 
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const lastBulkToastRef = React.useRef<number>(0);
   const [bulkUploadState, setBulkUploadState] = React.useState(() =>
     getProductsBulkUploadState()
@@ -310,6 +313,32 @@ export default function ProductsPage() {
     }
   }, [mounted, bulkUploadState, refetch]);
 
+    const triggerExcelPick = () => {
+    if (!canCreate) return;
+    if (bulkUploadState.status === "uploading") return;
+    fileInputRef.current?.click();
+  };
+
+  const onExcelSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = (e.target.files ?? [])[0];
+    if (!file) return;
+
+    try {
+      const name = file.name.toLowerCase();
+      if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+        throw new Error("Only .xlsx or .xls files are allowed");
+      }
+
+      startProductsBulkUploadExcel(file);
+    } catch (err: any) {
+      toast.error(err?.message || "Bulk upload failed");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    setDeleteOpen(false);
+    setDeleteTarget(null);
+  };
+
   const goToView = (p: ProductRow) => {
     if (!canRead) return;
     router.push(`/dashboard/products/view/${p.id}`);
@@ -389,13 +418,22 @@ export default function ProductsPage() {
               Manage your product catalog
             </p>
           </div>
-
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              className="gap-2 w-full sm:w-auto bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300"
+              onClick={triggerExcelPick}
+              disabled={!canCreate || bulkUploadState.status === "uploading"}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
+            </Button>
             <Button className="gap-2 w-full sm:w-auto" onClick={goToCreate} disabled={!canCreate}>
               <Plus className="h-4 w-4" />
               Add Product
             </Button>
           </div>
+
         </div>
 
         <ConfirmDialog
@@ -569,6 +607,15 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Hidden file input for Excel upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={onExcelSelected}
+        style={{ display: 'none' }}
+      />
     </PermissionBoundary>
   );
 }
