@@ -1464,7 +1464,7 @@ export default function NewProductPage() {
                                 e.stopPropagation();
                                 removeFeaturedImage(current.id);
                               }}
-                              className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                              className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                               aria-label="Remove image"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -1576,7 +1576,7 @@ export default function NewProductPage() {
                               <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/9 uploaded</div>
                               <button
                                 type="button"
-                                className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                                className="text-sm font-semibold text-neutral-900 hover:text-neutral-700 focus-visible:text-neutral-700 disabled:text-neutral-300"
                                 onClick={() => removeImageUrlFromBox(current.id)}
                               >
                                 Clear All
@@ -1604,7 +1604,7 @@ export default function NewProductPage() {
                               <button
                                 type="button"
                                 onClick={() => removeImageUrlFromBox(current.id)}
-                                className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                 aria-label="Remove image"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -1706,7 +1706,7 @@ export default function NewProductPage() {
                         <button
                           type="button"
                           onClick={removeVideoFromBox}
-                          className="shrink-0 rounded-full bg-red-600 p-1 text-white shadow-sm ring-1 ring-white/40 transition-all hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                          className="shrink-0 rounded-full bg-white/90 p-1 text-neutral-900 shadow-sm ring-1 ring-white/40 transition-all hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                           aria-label="Remove video"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -1781,7 +1781,7 @@ export default function NewProductPage() {
                           e.stopPropagation();
                           removeVideo();
                         }}
-                        className="absolute right-2 top-2 rounded-full bg-red-600 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                        className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                         aria-label="Remove video"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -1791,7 +1791,7 @@ export default function NewProductPage() {
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium text-red-600"></div>
+                  <div className="text-sm font-medium text-neutral-900"></div>
 
                   {uploadErrors.map((error, index) => (
                     <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
