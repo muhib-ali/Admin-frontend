@@ -3,19 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/utils/cn"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-sm hover:shadow-lg hover:-translate-y-0.5 active:shadow-sm active:translate-y-0",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-sm hover:shadow-md active:shadow-sm active:translate-y-px",
   {
     variants: {
       variant: {
-        default: "bg-red-600 text-white hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5",
-        destructive: "bg-red-600 text-white hover:bg-red-700 hover:shadow-lg hover:-translate-y-0.5",
-        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 hover:border-gray-400 hover:shadow-lg hover:-translate-y-0.5 active:bg-gray-100",
+        default: "bg-red-600 text-white hover:bg-red-700",
+        destructive: "bg-red-600 text-white hover:bg-red-700",
+        outline: "border-2 border-gray-300 bg-transparent hover:bg-gray-50 hover:border-gray-400 hover:shadow-md active:bg-gray-100",
         secondary:
-          "border-2 border-red-600 bg-white text-red-600 hover:bg-red-50 hover:shadow-lg hover:-translate-y-0.5 active:bg-red-100",
-        pagination: "border-2 border-red-600 bg-transparent text-red-600 hover:bg-red-50 hover:shadow-lg hover:-translate-y-0.5 active:bg-red-100",
-        ghost: "hover:bg-gray-100 hover:text-gray-900 hover:shadow-md hover:-translate-y-0.5",
-        link: "text-red-600 underline-offset-4 hover:underline hover:text-red-700 hover:shadow-sm hover:-translate-y-0.5",
-        success: "bg-green-600 text-white hover:bg-green-700 hover:shadow-lg hover:-translate-y-0.5",
+          "border-2 border-red-600 bg-white text-red-600 hover:bg-red-50 hover:shadow-md active:bg-red-100",
+        pagination: "border-2 border-red-600 bg-transparent text-red-600 hover:bg-red-50 hover:shadow-md active:bg-red-100",
+        ghost: "hover:bg-gray-100 hover:text-gray-900",
+        link: "text-red-600 underline-offset-4 hover:underline hover:text-red-700",
       },
       size: {
         default: "h-10 px-5 py-2.5",
