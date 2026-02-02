@@ -444,11 +444,11 @@ export default function BrandsPage() {
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <Button variant="pagination" clickVariant="default" size="sm" disabled={!pagHasPrev} className="gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="hidden xs:inline">Previous</span>
+                  <span className="hidden sm:inline">Previous</span>
                 </Button>
 
                 <Button variant="pagination" clickVariant="default" size="sm" disabled={!pagHasNext} className="gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                  <span className="hidden xs:inline">Next</span>
+                  <span className="hidden sm:inline">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>

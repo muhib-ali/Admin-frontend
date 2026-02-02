@@ -433,7 +433,7 @@ export default function ProductsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 gap-2"
+                      className="h-9 gap-2 bg-emerald-100 border border-emerald-200 px-3 text-xs font-medium text-emerald-700 shadow-sm transition duration-150 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-px"
                       disabled={!canList || isExporting || bulkUploadState.status === "uploading"}
                     >
                       <Download className="h-4 w-4" />
@@ -494,10 +494,7 @@ export default function ProductsPage() {
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                   <SearchX className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <div className="text-sm font-semibold text-foreground">Product not found</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Try a different search term.
-                </div>
+                <div className="text-sm font-semibold text-foreground">No Product</div>
               </div>
             ) : (
               <div className="mt-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -543,10 +540,13 @@ export default function ProductsPage() {
                         size="sm"
                         disabled={!pagHasPrev}
                         className="gap-1"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        onClick={() => {
+                          setPage((p) => Math.max(1, p - 1));
+                          (document.activeElement as HTMLElement)?.blur();
+                        }}
                       >
                         <ChevronLeft className="h-4 w-4" />
-                        <span className="hidden xs:inline">Previous</span>
+                        Previous
                       </Button>
 
                       <Button
@@ -555,9 +555,12 @@ export default function ProductsPage() {
                         size="sm"
                         disabled={!pagHasNext}
                         className="gap-1"
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        onClick={() => {
+                          setPage((p) => Math.min(totalPages, p + 1));
+                          (document.activeElement as HTMLElement)?.blur();
+                        }}
                       >
-                        <span className="hidden xs:inline">Next</span>
+                        Next
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>

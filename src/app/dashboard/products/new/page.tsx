@@ -219,7 +219,6 @@ export default function NewProductPage() {
     videoUrlInput: "",
     videoUrl: "",
   }));
-  const [urlImageCarouselIndex, setUrlImageCarouselIndex] = React.useState(0);
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
@@ -361,13 +360,6 @@ export default function NewProductPage() {
     });
   }, [featuredBoxImages.length]);
 
-  React.useEffect(() => {
-    setUrlImageCarouselIndex((prev) => {
-      if (urlMediaBox.images.length === 0) return 0;
-      return Math.min(prev, urlMediaBox.images.length - 1);
-    });
-  }, [urlMediaBox.images.length]);
-
   const handleFeaturedImage = (files: FileList | null) => {
     if (!files?.length) return;
 
@@ -380,7 +372,7 @@ export default function NewProductPage() {
 
     for (const file of Array.from(files)) {
       if (featuredBoxImages.length + next.length >= maxFeaturedBoxImages) {
-        errors.push("You cannot add more images because your image limit has been reached.");
+        errors.push("You cannot select more than 9 images.");
         break;
       }
       if (!allowedImageTypes.includes(file.type)) {
@@ -439,18 +431,6 @@ export default function NewProductPage() {
   };
 
   const setFeaturedBoxImageAsFeatured = (id: string) => {
-    // Clear featured image from URL if setting gallery image as featured
-    if (urlMediaBox.images.length > 0) {
-      setUrlMediaBox((prev) => {
-        const firstImage = prev.images[0];
-        if (firstImage) {
-          const remaining = prev.images.slice(1);
-          return { ...prev, images: [...remaining, firstImage] };
-        }
-        return prev;
-      });
-    }
-    
     const img = featuredBoxImages.find((x) => x.id === id) ?? null;
     if (!img) return;
     setFeaturedImage(img);
@@ -491,6 +471,11 @@ export default function NewProductPage() {
   const totalGalleryUrlImages = featuredBoxImages.length + urlMediaBox.images.length;
   const remainingUrlImageSlots = Math.max(0, 9 - totalGalleryUrlImages);
 
+  const isDirectVideoUrl = (url: string) => {
+    const lower = url.trim().toLowerCase();
+    return Boolean(lower && (lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".ogg")));
+  };
+
   const setUrlBoxField = (patch: Partial<UrlMediaBox>) => {
     setUrlMediaBox((prev) => ({ ...prev, ...patch }));
   };
@@ -500,7 +485,7 @@ export default function NewProductPage() {
     if (!raw) return;
 
     if (totalGalleryUrlImages >= 9) {
-      setUploadErrors(["You cannot add more images because your image limit has been reached."]);
+      setUploadErrors(["You cannot add more than 9 images."]);
       return;
     }
 
@@ -519,21 +504,6 @@ export default function NewProductPage() {
 
   const removeImageUrlFromBox = (id: string) => {
     setUrlMediaBox((prev) => ({ ...prev, images: prev.images.filter((x) => x.id !== id) }));
-  };
-
-  const setUrlImageAsFeatured = (id: string) => {
-    // Clear featured image from gallery if setting URL image as featured
-    if (featuredImage && featuredBoxImages.some(img => img.id === featuredImage.id)) {
-      setFeaturedImage(null);
-    }
-    
-    setUrlMediaBox((prev) => {
-      const index = prev.images.findIndex((x) => x.id === id);
-      if (index === -1) return prev;
-      const selected = prev.images[index];
-      const remaining = prev.images.filter((x) => x.id !== id);
-      return { ...prev, images: [selected, ...remaining] };
-    });
   };
 
   const addVideoUrlToBox = () => {
@@ -1375,9 +1345,8 @@ export default function NewProductPage() {
             <CardTitle className="text-lg">Media</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 bg-gray-100">
-            <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-              <div className="flex h-full flex-col rounded-2xl border bg-white p-4 shadow-sm">
-
+            <div className="grid gap-5 lg:grid-cols-3">
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
@@ -1425,16 +1394,17 @@ export default function NewProductPage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/9 uploaded</div>
-                        <button
+                        <Button
                           type="button"
-                          className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                          variant="outline"
+                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             removeFeaturedImage();
                           }}
                         >
                           Clear All
-                        </button>
+                        </Button>
                       </div>
 
                       {(() => {
@@ -1470,7 +1440,7 @@ export default function NewProductPage() {
                                 e.stopPropagation();
                                 setFeaturedBoxImageAsFeatured(current.id);
                               }}
-                              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
+                              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-3 py-1.5 text-xs font-medium text-neutral-900 opacity-0 transition-opacity group-hover:opacity-100"
                             >
                               Set as Featured
                             </button>
@@ -1481,10 +1451,10 @@ export default function NewProductPage() {
                                 e.stopPropagation();
                                 removeFeaturedImage(current.id);
                               }}
-                              className="absolute right-2 top-2 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:text-red-500 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                              className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white shadow-sm ring-1 ring-white/40 transition-all hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                               aria-label="Remove image"
                             >
-                              <X className="h-3.5 w-3.5" />
+                              <X className="h-4 w-4" />
                             </button>
 
                             <button
@@ -1517,7 +1487,7 @@ export default function NewProductPage() {
                               <span className="text-sm">›</span>
                             </button>
 
-                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-0.5 text-[10px] text-white">
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
                               {featuredBoxCarouselIndex + 1} / {featuredBoxImages.length}
                             </div>
                           </div>
@@ -1531,220 +1501,8 @@ export default function NewProductPage() {
               <div className="rounded-2xl border bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-neutral-900">URL Images & Video</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Add URL links for images/videos; image links share the 9-image limit.
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => urlImageInputRef.current?.focus()}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload
-                  </Button>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Images URLs (remaining {remainingUrlImageSlots})
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        ref={urlImageInputRef}
-                        value={urlMediaBox.imageUrlInput}
-                        onChange={(e) => setUrlBoxField({ imageUrlInput: e.target.value })}
-                        placeholder="https://..."
-                        disabled={remainingUrlImageSlots <= 0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addImageUrlToBox();
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addImageUrlToBox}
-                        disabled={remainingUrlImageSlots <= 0}
-                      >
-                        Add
-                      </Button>
-                    </div>
-
-                    {urlMediaBox.images.length > 0 ? (
-                      (() => {
-                        const current = urlMediaBox.images[urlImageCarouselIndex];
-                        const canGoPrev = urlMediaBox.images.length > 1;
-                        const canGoNext = urlMediaBox.images.length > 1;
-                        const isFeaturedUrlImage = urlMediaBox.images[0]?.id === current?.id;
-
-                        if (!current) return null;
-
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/9 uploaded</div>
-                              <button
-                                type="button"
-                                className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
-                                onClick={() => removeImageUrlFromBox(current.id)}
-                              >
-                                Clear All
-                              </button>
-                            </div>
-
-                            <div className="relative mx-auto h-32 w-full overflow-hidden rounded-xl border bg-muted group">
-                              <Image
-                                src={current.url}
-                                alt="URL image"
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, 33vw"
-                              />
-
-                              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
-
-                              {isFeaturedUrlImage ? (
-                                <div className="absolute left-2 top-2 rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-medium text-white flex items-center gap-1">
-                                  <Star className="h-3 w-3 fill-current" />
-                                  Featured
-                                </div>
-                              ) : null}
-
-                              <button
-                                type="button"
-                                onClick={() => removeImageUrlFromBox(current.id)}
-                                className="absolute right-2 top-2 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:text-red-500 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                                aria-label="Remove image"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setUrlImageAsFeatured(current.id);
-                                }}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
-                              >
-                                Set as Featured
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUrlImageCarouselIndex((prev) =>
-                                    prev === 0 ? urlMediaBox.images.length - 1 : prev - 1
-                                  )
-                                }
-                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
-                                disabled={!canGoPrev}
-                                aria-label="Previous"
-                              >
-                                <span className="text-sm">‹</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUrlImageCarouselIndex((prev) =>
-                                    prev === urlMediaBox.images.length - 1 ? 0 : prev + 1
-                                  )
-                                }
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
-                                disabled={!canGoNext}
-                                aria-label="Next"
-                              >
-                                <span className="text-sm">›</span>
-                              </button>
-
-                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
-                                {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
-                        <div className="text-xs text-neutral-500">
-                          Paste image URLs above; they will appear here.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Videos URL</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={urlMediaBox.videoUrlInput}
-                        onChange={(e) => setUrlBoxField({ videoUrlInput: e.target.value })}
-                        placeholder="https://..."
-                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
-                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addVideoUrlToBox();
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addVideoUrlToBox}
-                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                    {videoFile ? (
-                      <p className="text-xs text-amber-600 mt-1">
-                        A file upload already exists, so you cannot add a video URL.
-                      </p>
-                    ) : null}
-
-                    {urlMediaBox.videoUrl.trim() ? (
-                      <div className="flex items-center justify-between gap-3 rounded-xl border bg-neutral-50 px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="text-[11px] text-neutral-500">Saved video URL</div>
-                          <div className="truncate text-xs text-neutral-700">
-                            {urlMediaBox.videoUrl}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={removeVideoFromBox}
-                          className="shrink-0 p-1.5 text-white shadow-sm ring-1 ring-white/40 transition-all hover:text-red-500 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                          aria-label="Remove video"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
-                        <div className="text-xs text-neutral-500">Paste a video URL above</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
                     <div className="text-sm font-semibold text-neutral-900">Video</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Upload one MP4/WebM/OGG/QuickTime clip (max 50MB).
-                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">Upload one MP4/WebM/OGG/QuickTime clip (max 50MB).</div>
                   </div>
 
                   <Button
@@ -1783,7 +1541,7 @@ export default function NewProductPage() {
                       <div className="text-xs text-neutral-500">Keep it short and clear (recommended)</div>
                     </div>
                   ) : (
-                    <div className="relative h-72 w-full overflow-hidden rounded-xl border bg-muted group">
+                    <div className="relative h-72 w-full overflow-hidden rounded-xl border bg-muted">
                       <video
                         src={videoFile.url}
                         className="h-full w-full object-cover"
@@ -1798,31 +1556,182 @@ export default function NewProductPage() {
                           e.stopPropagation();
                           removeVideo();
                         }}
-                        className="absolute right-2 top-2 p-1.5 text-white shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:text-red-500 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white shadow-sm ring-1 ring-white/40 transition-all hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                         aria-label="Remove video"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                   )}
                 </div>
+              </div>
 
-                <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium text-red-600"></div>
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-900">URL Images & Video</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Add URL links for images/videos; image links share the 9-image limit.</div>
+                  </div>
 
-                  {uploadErrors.map((error, index) => (
-                    <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                      {error}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => urlImageInputRef.current?.focus()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload
+                  </Button>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Images URLs (remaining {remainingUrlImageSlots})</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        ref={urlImageInputRef}
+                        value={urlMediaBox.imageUrlInput}
+                        onChange={(e) => setUrlBoxField({ imageUrlInput: e.target.value })}
+                        placeholder="https://..."
+                        disabled={remainingUrlImageSlots <= 0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addImageUrlToBox();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addImageUrlToBox}
+                        disabled={remainingUrlImageSlots <= 0}
+                      >
+                        Add
+                      </Button>
                     </div>
-                  ))}
-                  {createdProductId && (
-                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                      Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
+
+                    {urlMediaBox.images.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {urlMediaBox.images.map((img) => (
+                          <div key={img.id} className="relative h-24 overflow-hidden rounded-lg border bg-muted">
+                            <Image
+                              src={img.url}
+                              alt="URL image"
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 33vw, 10vw"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImageUrlFromBox(img.id)}
+                              className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white shadow-sm ring-1 ring-white/40 transition-all hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                              aria-label="Remove image"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                        <div className="text-xs text-neutral-500">Paste image URLs above; they will appear here.</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Videos URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={urlMediaBox.videoUrlInput}
+                        onChange={(e) => setUrlBoxField({ videoUrlInput: e.target.value })}
+                        placeholder="https://..."
+                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addVideoUrlToBox();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addVideoUrlToBox}
+                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
+                      >
+                        Add
+                      </Button>
                     </div>
-                  )}
+                    {videoFile ? (
+                      <p className="text-xs text-amber-600 mt-1">
+                        A file upload already exists, so you cannot add a video URL.
+                      </p>
+                    ) : null}
+
+                    {urlMediaBox.videoUrl.trim() ? (
+                      <div className="relative h-36 overflow-hidden rounded-xl border bg-muted">
+                        {isDirectVideoUrl(urlMediaBox.videoUrl) ? (
+                          <video
+                            src={urlMediaBox.videoUrl}
+                            className="h-full w-full object-cover"
+                            muted
+                            preload="metadata"
+                          />
+                        ) : (
+                          <iframe
+                            src={urlMediaBox.videoUrl}
+                            className="h-full w-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title="Video preview"
+                          />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-neutral-900">
+                            <Play className="h-5 w-5" />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeVideoFromBox}
+                          className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white shadow-sm ring-1 ring-white/40 transition-all hover:bg-red-700 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                          aria-label="Remove video"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                        <div className="text-xs text-neutral-500">Paste a video URL above</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Upload Progress */}
+            {isUploading && null}
+
+            {/* Upload Errors */}
+            {uploadErrors.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-sm font-medium text-red-600">Upload Errors:</div>
+                {uploadErrors.map((error, index) => (
+                  <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                    {error}
+                  </div>
+                ))}
+                {createdProductId && (
+                  <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                    Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1831,11 +1740,10 @@ export default function NewProductPage() {
             <CardTitle className="text-lg">Inventory and shipping</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 bg-gray-100">
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="stockQty" className="font-semibold">
-                  Stock quantity <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="stockQty" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
                 <Input
                   id="stockQty"
                   inputMode="numeric"
@@ -1877,7 +1785,9 @@ export default function NewProductPage() {
                 <Input
                   id="length"
                   value={values.length}
-                  onChange={(e) => setValues((p) => ({ ...p, length: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, length: e.target.value }))
+                  }
                   placeholder="e.g. 10"
                 />
               </div>
@@ -1889,7 +1799,9 @@ export default function NewProductPage() {
                 <Input
                   id="weight"
                   value={values.weight}
-                  onChange={(e) => setValues((p) => ({ ...p, weight: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, weight: e.target.value }))
+                  }
                   placeholder="e.g. 1.2"
                 />
               </div>
@@ -1899,7 +1811,9 @@ export default function NewProductPage() {
                 <Input
                   id="height"
                   value={values.height}
-                  onChange={(e) => setValues((p) => ({ ...p, height: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, height: e.target.value }))
+                  }
                   placeholder="e.g. 3"
                 />
               </div>
@@ -1911,15 +1825,16 @@ export default function NewProductPage() {
                 <Input
                   id="width"
                   value={values.width}
-                  onChange={(e) => setValues((p) => ({ ...p, width: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, width: e.target.value }))
+                  }
                   placeholder="e.g. 5"
                 />
               </div>
             </div>
           </CardContent>
         </Card>
-
-          </div>
-        </PermissionBoundary>
-      );
-    }
+      </div>
+    </PermissionBoundary>
+  );
+}
