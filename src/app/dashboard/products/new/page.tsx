@@ -549,7 +549,7 @@ export default function NewProductPage() {
     // Total price with tax included
     const totalPriceWithTax = basePrice + taxAmount;
     
-    // Apply discount on total price (including tax)
+    // Apply discount on total price (including tax) 
     const priceAfterDiscount = discountPercent > 0
       ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
       : totalPriceWithTax;
