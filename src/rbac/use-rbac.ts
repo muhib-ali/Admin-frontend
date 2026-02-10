@@ -10,9 +10,9 @@ export function useEntityPerms(entity: EntityKey) {
   const PERM = ENTITY_PERMS[entity];
 
   return {
-    canList:   !!hasPermission(PERM.list),
+    canList:   !!('list' in PERM && hasPermission(PERM.list)),
     canCreate: !!('create' in PERM && hasPermission(PERM.create)),
-    canRead:   !!hasPermission(PERM.read),
+    canRead:   !!('read' in PERM && hasPermission(PERM.read)),
     canUpdate: !!('update' in PERM && hasPermission(PERM.update)),
     canDelete: !!('delete' in PERM && hasPermission(PERM.delete)),
     canViewRolePerms:   entity === "roles" ? !!hasPermission(ENTITY_PERMS.roles.extras.getRolePerms) : false,

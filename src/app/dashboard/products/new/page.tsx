@@ -586,7 +586,7 @@ export default function NewProductPage() {
 
   const pricing = React.useMemo(() => {
     const selling = Number(values.selling_price) || 0;
-    const freight = Number(values.freight) || 0;
+    const freight = Number(values.freight) || 0
     const discountPercent = Number(values.discount) || 0;
 
     const baseForTax = selling + freight;
