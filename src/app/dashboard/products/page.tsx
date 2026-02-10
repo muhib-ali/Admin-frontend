@@ -425,7 +425,7 @@ export default function ProductsPage() {
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
-              className="gap-2 w-full sm:w-auto bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300"
+              className="gap-2 w-full sm:w-auto bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
               onClick={triggerExcelPick}
               disabled={!canCreate || bulkUploadState.status === "uploading"}
             >
