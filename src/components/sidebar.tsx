@@ -25,6 +25,8 @@ import {
   Shield,
   LogOut,
   Coins,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import PermissionGate from "@/components/permission-gate";
@@ -48,6 +50,8 @@ const ICONS = {
   ShieldCheck,
   Shield,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } as const;
 
 type IconName = keyof typeof ICONS;
@@ -87,9 +91,12 @@ function IconByName({ name, className }: { name: IconName; className?: string })
   return <I className={className} />;
 }
 
-type Props = { collapsed?: boolean };
+type Props = { 
+  collapsed?: boolean; 
+  onToggle?: () => void;
+};
 
-export default function Sidebar({ collapsed = false }: Props) {
+export default function Sidebar({ collapsed = false, onToggle }: Props) {
   const pathname = usePathname();
   const { hasUnsavedChanges } = useUnsavedChanges();
   const { data: session } = useSession();
@@ -201,6 +208,25 @@ export default function Sidebar({ collapsed = false }: Props) {
           <div className={cn("text-2xl font-bold text-white tracking-tight", collapsed && "text-lg")}>
             {!collapsed ? "Admin Dashboard" : "AD"}
           </div>
+          {onToggle && (
+            <button
+              onClick={onToggle}
+              className={cn(
+                "ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition-all duration-200 hover:bg-white/10 hover:text-white hover:scale-105 active:scale-95",
+                collapsed && "mx-auto"
+              )}
+              aria-label="Toggle sidebar"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <div className="relative">
+                {collapsed ? (
+                  <PanelLeftOpen className="h-4 w-4 transition-transform duration-200" />
+                ) : (
+                  <PanelLeftClose className="h-4 w-4 transition-transform duration-200" />
+                )}
+              </div>
+            </button>
+          )}
         </div>
       </div>
 

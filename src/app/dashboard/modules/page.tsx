@@ -68,7 +68,7 @@ export default function ModulesPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [mode, setMode] = useState<"create" | "edit" | "view">("create");
   const [current, setCurrent] = useState<ModuleRow | undefined>(undefined);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -77,6 +77,7 @@ export default function ModulesPage() {
 
   const canList = useHasPermission(ENTITY_PERMS.modules.list);
   const canCreate = useHasPermission(ENTITY_PERMS.modules.create);
+  const canRead = useHasPermission(ENTITY_PERMS.modules.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.modules.update);
   const canDelete = useHasPermission(ENTITY_PERMS.modules.delete);
 
@@ -153,6 +154,26 @@ export default function ModulesPage() {
     try {
       const m = await getModuleById(row.id);
       setMode("edit");
+      setCurrent({
+        id: m.id,
+        name: m.title,
+        slug: m.slug ?? "",
+        description: m.description ?? "",
+        icon: row.icon || "Package",
+        active: m.is_active ?? false,
+      });
+      setOpen(true);
+    } catch (e: any) {
+      console.error(e);
+      notifyError(e?.response?.data?.message || "Failed to open module");
+    }
+  };
+
+  const openView = async (row: ModuleRow) => {
+    if (!canRead) return;
+    try {
+      const m = await getModuleById(row.id);
+      setMode("view");
       setCurrent({
         id: m.id,
         name: m.title,
@@ -252,10 +273,12 @@ export default function ModulesPage() {
   const Plus = (Icons as any).Plus;
   const Pencil = (Icons as any).Pencil;
   const Trash2 = (Icons as any).Trash2;
+  const Eye = (Icons as any).Eye;
   const Search = (Icons as any).Search;
   const ChevronLeft = (Icons as any).ChevronLeft;
   const ChevronRight = (Icons as any).ChevronRight;
   const MoreHorizontal = (Icons as any).MoreHorizontal;
+  const Loader2 = (Icons as any).Loader2;
 
   const pagTotal = pagination?.total ?? filtered.length;
   const pagPage = pagination?.page ?? page;
@@ -325,7 +348,10 @@ export default function ModulesPage() {
                         colSpan={4}
                         className="p-8 text-center text-muted-foreground"
                       >
-                        Loading modules…
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading modules…
+                        </div>
                       </td>
                     </tr>
                   ) : !canList ? (
@@ -391,6 +417,15 @@ export default function ModulesPage() {
                                     align="end"
                                     className="w-40"
                                   >
+                                    {canRead && (
+                                      <DropdownMenuItem
+                                        className="gap-2"
+                                        onClick={() => openView(m)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        View
+                                      </DropdownMenuItem>
+                                    )}
                                     {canUpdate && (
                                       <DropdownMenuItem
                                         className="gap-2"

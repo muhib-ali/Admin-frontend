@@ -6,12 +6,14 @@ import {
   Shield,
   Plus,
   Trash2,
+  Eye,
   Pencil,
   Search,
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
   FileX2,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -71,7 +73,9 @@ export default function PermissionsPage() {
   const [q, setQ] = React.useState("");
 
   const [openForm, setOpenForm] = React.useState(false);
-  const [formMode, setFormMode] = React.useState<"create" | "edit">("create");
+  const [formMode, setFormMode] = React.useState<"create" | "edit" | "view">(
+    "create"
+  );
   const [editing, setEditing] = React.useState<GeneratedPermission | null>(null);
 
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -81,6 +85,7 @@ export default function PermissionsPage() {
 
   const canList = useHasPermission(ENTITY_PERMS.permissions.list);
   const canCreate = useHasPermission(ENTITY_PERMS.permissions.create);
+  const canRead = useHasPermission(ENTITY_PERMS.permissions.read);
   const canUpdate = useHasPermission(ENTITY_PERMS.permissions.update);
   const canDelete = useHasPermission(ENTITY_PERMS.permissions.delete);
 
@@ -220,6 +225,19 @@ export default function PermissionsPage() {
     }
   };
 
+  const openView = async (row: GeneratedPermission) => {
+    try {
+      if (!canRead) return;
+      const p = await getPermissionById(row.id);
+      setEditing(toRow(p, moduleNameById));
+      setFormMode("view");
+      setOpenForm(true);
+    } catch (e: any) {
+      console.error(e);
+      notifyError(e?.response?.data?.message || "Failed to open permission");
+    }
+  };
+
   const saveEdit = async (p: GeneratedPermission) => {
     try {
       if (!canUpdate) return;
@@ -329,7 +347,10 @@ export default function PermissionsPage() {
                         colSpan={6}
                         className="p-8 text-center text-muted-foreground"
                       >
-                        Loading permissions…
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading permissions…
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : !canList ? (
@@ -420,6 +441,15 @@ export default function PermissionsPage() {
                                 align="end"
                                 className="w-40"
                               >
+                                {canRead && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => openView(row)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                )}
                                 {canUpdate && (
                                   <DropdownMenuItem
                                     className="gap-2"
@@ -483,12 +513,19 @@ export default function PermissionsPage() {
 
         <PermissionForm
           open={openForm}
-          onOpenChange={setOpenForm}
+          onOpenChange={(v) => {
+            setOpenForm(v);
+            if (!v) {
+              setEditing(null);
+              setFormMode("create");
+            }
+          }}
           modules={modules}
           onCreate={addGenerated}
-          editMode={formMode === "edit"}
+          editMode={formMode === "edit" || formMode === "view"}
           editValue={editing}
           onSave={saveEdit}
+          readOnly={formMode === "view"}
         />
       </div>
     </PermissionBoundary>

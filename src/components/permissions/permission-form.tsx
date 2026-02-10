@@ -48,6 +48,7 @@ type Props = {
   editMode?: boolean;
   editValue?: GeneratedPermission | null;
   onSave?: (p: GeneratedPermission) => void;
+  readOnly?: boolean;
 };
 
 const CRUD = ["create", "read", "update", "delete", "readAll"] as const;
@@ -60,6 +61,7 @@ export function PermissionForm({
   editMode = false,
   editValue = null,
   onSave,
+  readOnly = false,
 }: Props) {
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
   const [crud, setCrud] = React.useState<
@@ -160,9 +162,13 @@ export function PermissionForm({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Permission</DialogTitle>
+            <DialogTitle>
+              {readOnly ? "View Permission" : "Edit Permission"}
+            </DialogTitle>
             <DialogDescription>
-              Update permission information.
+              {readOnly
+                ? "Permission information (read-only)."
+                : "Update permission information."}
             </DialogDescription>
           </DialogHeader>
 
@@ -174,6 +180,7 @@ export function PermissionForm({
                 onChange={(e) =>
                   setDraft({ ...draft, name: e.target.value })
                 }
+                disabled={readOnly}
               />
             </div>
 
@@ -189,6 +196,7 @@ export function PermissionForm({
                     moduleName: mod.name,
                   });
                 }}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose module" />
@@ -211,6 +219,7 @@ export function PermissionForm({
                   setDraft({ ...draft, action: e.target.value })
                 }
                 placeholder="create / read / update / delete / readAll / custom_key"
+                disabled={readOnly}
               />
             </div>
 
@@ -222,15 +231,16 @@ export function PermissionForm({
                   setDraft({ ...draft, description: e.target.value })
                 }
                 rows={3}
+                disabled={readOnly}
               />
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {readOnly ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={handleSaveEdit}>Save changes</Button>
+            {!readOnly && <Button onClick={handleSaveEdit}>Save changes</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

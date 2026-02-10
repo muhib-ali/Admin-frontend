@@ -19,7 +19,7 @@ export interface UserData {
 }
 
 export interface UserFormProps {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "view";
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialData?: UserData | null;
@@ -49,13 +49,18 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    if (mode === "view") {
+      onOpenChange(false);
+      return;
+    }
+
     const nextErrors: Errors = {};
     if (!name.trim()) nextErrors.name = "Name is required";
     if (!email.trim()) nextErrors.email = "Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(email.trim())) nextErrors.email = "Enter a valid email";
     if (!roleId) nextErrors.roleId = "Role is required";
     if (mode === "create" && !password) nextErrors.password = "Password is required";
-    else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{8,}/.test(password)) nextErrors.password = "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character";
+    else if (password && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{8,}/.test(password)) nextErrors.password = "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character";
     if (mode === "create" && password !== confirmPassword) nextErrors.confirmPassword = "Passwords do not match";
 
     setErrors(nextErrors);
@@ -74,7 +79,14 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
     onOpenChange(false);
   }
 
-  const isValid = name.trim() && email.trim() && roleId && (mode === "edit" || (password && password === confirmPassword));
+  const isReadOnly = mode === "view";
+
+  const isValid =
+    isReadOnly ||
+    (name.trim() &&
+      email.trim() &&
+      roleId &&
+      (mode === "edit" || (password && password === confirmPassword)));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,7 +94,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            {mode === "create" ? "Create New User" : "Edit User"}
+            {mode === "create" ? "Create New User" : mode === "edit" ? "Edit User" : "View User"}
           </DialogTitle>
         </DialogHeader>
 
@@ -95,6 +107,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={isReadOnly}
             />
             {errors.name ? <p className="text-xs text-red-600">{errors.name}</p> : null}
           </div>
@@ -108,6 +121,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isReadOnly}
             />
             {errors.email ? <p className="text-xs text-red-600">{errors.email}</p> : null}
           </div>
@@ -123,6 +137,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required={mode === "create"}
+                disabled={isReadOnly}
               />
               {errors.password ? (
                 <p className="text-xs text-red-600">{errors.password}</p>
@@ -158,6 +173,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  disabled={isReadOnly}
                 />
                 {errors.confirmPassword ? <p className="text-xs text-red-600">{errors.confirmPassword}</p> : null}
               </div>
@@ -166,7 +182,7 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
 
           <div className="space-y-2 col-span-2">
             <Label>Role *</Label>
-            <Select value={roleId} onValueChange={setRoleId}>
+            <Select value={roleId} onValueChange={setRoleId} disabled={isReadOnly}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
@@ -183,11 +199,13 @@ export function UserForm({ mode, open, onOpenChange, initialData, roles, onSubmi
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {isReadOnly ? "Close" : "Cancel"}
             </Button>
-            <Button type="submit" disabled={!isValid}>
-              {mode === "create" ? "Create" : "Update"}
-            </Button>
+            {!isReadOnly && (
+              <Button type="submit" disabled={!isValid}>
+                {mode === "create" ? "Create" : "Update"}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

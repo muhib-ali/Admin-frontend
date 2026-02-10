@@ -597,7 +597,7 @@ export default function NewProductPage() {
     return {
       taxAmount,
       totalCost,
-      priceAfterDiscount,
+      priceAfterDiscount
     };
   }, [
     values.selling_price,

@@ -1,6 +1,7 @@
 import { ENTITY_PERMS } from "./permissions-map";
 
 export const ADMIN_LINK_PERM: Record<string, string> = {
+  "/dashboard":              ENTITY_PERMS.dashboard.overview,
   "/dashboard/invoices":     ENTITY_PERMS.invoices.list,
   "/dashboard/quotations":   ENTITY_PERMS.quotations.list,
   "/dashboard/clients":      ENTITY_PERMS.clients.list,

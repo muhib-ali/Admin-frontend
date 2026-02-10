@@ -11,18 +11,56 @@ function TopLineLoader() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
 
+  // Start loader immediately on navigation start
   useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(() => setLoading(false), 2000);
+    const handleStart = () => {
+      setLoading(true);
+      setPageLoading(true);
+    };
+    
+    const handleComplete = () => {
+      setLoading(false);
+      setPageLoading(false);
+    };
+
+    // Start immediately when pathname changes
+    handleStart();
+    
+    // Complete when page is ready
+    const t = setTimeout(() => {
+      handleComplete();
+    }, 1500);
+    
     return () => clearTimeout(t);
   }, [pathname, searchParams]);
+
+  // Also listen to browser navigation events
+  useEffect(() => {
+    const handleNavigationStart = () => {
+      setLoading(true);
+      setPageLoading(true);
+    };
+
+    // Listen for link clicks
+    const handleLinkClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+      if (link && link.href && !link.target && !link.hasAttribute('download')) {
+        handleNavigationStart();
+      }
+    };
+
+    document.addEventListener('click', handleLinkClick);
+    return () => document.removeEventListener('click', handleLinkClick);
+  }, []);
 
   if (!loading) return null;
 
   return (
-    <div className="fixed left-0 top-0 z-[60] h-[5px] w-full bg-emerald-600">
-      <div className="h-full w-full origin-left animate-[dashboardTopLoader_2000ms_ease-in-out_infinite] bg-emerald-600" />
+    <div className="fixed left-0 top-0 z-60 h-1.25 w-full bg-gray-200">
+      <div className="h-full origin-left animate-[dashboardTopLoader_1500ms_ease-out] bg-red-600" />
     </div>
   );
 }
@@ -40,7 +78,7 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
           collapsed ? "w-20" : "w-72"
         )}
       >
-        <Sidebar collapsed={collapsed} />
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       </aside>
 
       <main
@@ -62,8 +100,6 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
 
         <Topbar
           onMenuClick={() => setOpen(true)}
-          onToggleSidebar={() => setCollapsed((v) => !v)}
-          collapsed={collapsed}
           className="hidden lg:block"
         />
 
@@ -96,16 +132,16 @@ export default function DashboardFrame({ children }: { children: React.ReactNode
       <style jsx global>{`
         @keyframes dashboardTopLoader {
           0% {
-            transform: scaleX(0.08);
-            opacity: 0.9;
+            transform: scaleX(0);
+            opacity: 1;
           }
           50% {
             transform: scaleX(0.6);
             opacity: 1;
           }
           100% {
-            transform: scaleX(0.98);
-            opacity: 0.9;
+            transform: scaleX(1);
+            opacity: 1;
           }
         }
       `}</style>
