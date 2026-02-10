@@ -45,8 +45,11 @@ export type ProductsBulkUploadResult = {
   totalRows: number;
   processedRows: number;
   createdCount: number;
+  updatedCount?: number;
   failedCount: number;
   failures: ProductsBulkUploadFailure[];
+  createdSkus?: string[];
+  updatedSkus?: string[];
 };
 
 export type ProductsBulkUploadResponse = {
