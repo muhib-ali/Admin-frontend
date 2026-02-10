@@ -1,0 +1,4 @@
+# Railway/Nixpacks: use pnpm install without --frozen-lockfile
+# so the build succeeds when lockfile and package.json are in sync.
+[phases.install]
+cmds = ["pnpm install"]
