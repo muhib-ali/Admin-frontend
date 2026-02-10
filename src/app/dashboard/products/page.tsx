@@ -283,14 +283,18 @@ export default function ProductsPage() {
       if (bulkUploadState.finishedAt <= lastBulkToastRef.current) return;
       lastBulkToastRef.current = bulkUploadState.finishedAt;
 
-      const { createdCount, failedCount } = bulkUploadState.result;
-      if (createdCount > 0) {
+      const { createdCount, updatedCount = 0, failedCount } = bulkUploadState.result;
+      const parts: string[] = [];
+      if (createdCount > 0) parts.push(`${createdCount} created`);
+      if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+      const summary = parts.length ? parts.join(", ") : "0 created";
+      if (createdCount > 0 || updatedCount > 0) {
         notifySuccess(
-          `Bulk upload successful: ${createdCount} created${failedCount ? `, ${failedCount} failed` : ""}`
+          `Bulk upload successful: ${summary}${failedCount ? `, ${failedCount} failed` : ""}`
         );
       } else {
         notifyError(
-          `Bulk upload completed: 0 created${failedCount ? `, ${failedCount} failed` : ""}`
+          `Bulk upload completed: ${summary}${failedCount ? `, ${failedCount} failed` : ""}`
         );
       }
 
