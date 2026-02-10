@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Upload, X, Video } from "lucide-react";
+import { ImageIcon, Play, Upload, Video, Star, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import type { DateRange } from "react-day-picker";
 
-import featuredImageLogo from "../../../../../logos/featured image logo.png";
 import galleryImageLogo from "../../../../../logos/gallery image logo.png";
-import videoUploadLogo from "../../../../../logos/video upload logo.png";
 
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import type { DateRange } from "react-day-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
@@ -38,12 +36,22 @@ type TaxRecord = { id: string; title: string; rate: number };
 
 type BulkPricingRow = { id: string; quantity: string; price: string };
 
+type UrlImageItem = { id: string; url: string };
+
+type UrlMediaBox = {
+  imageUrlInput: string;
+  images: UrlImageItem[];
+  videoUrlInput: string;
+  videoUrl: string;
+};
+
 type MediaItem =
   | { id: string; kind: "image"; file: File; url: string }
   | { id: string; kind: "video"; file: File; url: string };
 
 type StoredMediaItem = {
   id: string;
+
   kind: "image" | "video";
   name: string;
   type: string;
@@ -195,25 +203,35 @@ export default function NewProductPage() {
   });
   const [newVariantName, setNewVariantName] = React.useState("");
 
-  const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null); // Single featured image
-  const [galleryImages, setGalleryImages] = React.useState<MediaItem[]>([]); // Gallery images (max 10)
+  const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null);
+  const [featuredBoxImages, setFeaturedBoxImages] = React.useState<MediaItem[]>([]);
+  const [featuredBoxCarouselIndex, setFeaturedBoxCarouselIndex] = React.useState(0);
+  const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const [videoFile, setVideoFile] = React.useState<MediaItem | null>(null);
+  const videoInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const urlImageInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const [urlMediaBox, setUrlMediaBox] = React.useState<UrlMediaBox>(() => ({
+    imageUrlInput: "",
+    images: [],
+    videoUrlInput: "",
+    videoUrl: "",
+  }));
+  const [urlImageCarouselIndex, setUrlImageCarouselIndex] = React.useState(0);
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
-  const [uploadProgress, setUploadProgress] = React.useState<{ featured: number; gallery: number; video: number }>({ featured: 0, gallery: 0, video: 0 });
-  const imageProgress = Math.max(uploadProgress.featured, uploadProgress.gallery);
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
-  const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
-  const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
-  const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Date range state for discount dates
-  const [discountDateRange, setDiscountDateRange] = React.useState<DateRange>();
+  const [discountDateRange, setDiscountDateRange] = React.useState<DateRange | undefined>();
 
   // Helper functions to convert between date range and string values
-  const dateRangeToStrings = (range: { from?: Date; to?: Date } | undefined) => {
+  const dateRangeToStrings = (range: DateRange | undefined) => {
     if (!range) return { start: "", end: "" };
     return {
       start: range.from ? range.from.toISOString().split('T')[0] : "",
@@ -247,29 +265,10 @@ export default function NewProductPage() {
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
         setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
-        // Create a unified tax mapping that works for both dropdown and calculations
-        const unifiedTaxMap = new Map<string, { id: string; title: string; rate: number }>();
-        
-        // Map dropdown taxes (for the select dropdown)
-        setTaxes((tax ?? []).map((t: any) => {
-          const taxInfo = { id: t.value, name: t.label };
-          // Also map to tax rate data if available
-          const matchingTaxRate = (taxData?.rows ?? []).find((tr: any) => tr.id === t.value);
-          if (matchingTaxRate) {
-            unifiedTaxMap.set(t.value, {
-              id: matchingTaxRate.id,
-              title: matchingTaxRate.title,
-              rate: matchingTaxRate.rate
-            });
-          }
-          return taxInfo;
-        }));
-        
+        setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
-        
-        // Set tax rows using the unified map
-        setTaxRows(Array.from(unifiedTaxMap.values()));
+        setTaxRows(taxData?.rows ?? []);
         // Load default variant types from API (size, model, year)
         const defaultVariantTypesData = defaultVTypes?.data ?? [];
         setVariantTypes(defaultVariantTypesData.map((vt: any) => ({ id: vt.id, name: vt.name })));
@@ -346,67 +345,42 @@ export default function NewProductPage() {
   // Cleanup blob URLs
   React.useEffect(() => {
     return () => {
-      if (featuredImage?.url.startsWith("blob:")) {
-        URL.revokeObjectURL(featuredImage.url);
-      }
-      galleryImages.forEach((m) => {
+      featuredBoxImages.forEach((m) => {
         if (m.url.startsWith("blob:")) URL.revokeObjectURL(m.url);
       });
+      if (videoFile?.url?.startsWith("blob:")) {
+        URL.revokeObjectURL(videoFile.url);
+      }
     };
-  }, [featuredImage, galleryImages]);
+  }, [featuredBoxImages, videoFile]);
 
-  // Handle featured image (single)
+  React.useEffect(() => {
+    setFeaturedBoxCarouselIndex((prev) => {
+      if (featuredBoxImages.length === 0) return 0;
+      return Math.min(prev, featuredBoxImages.length - 1);
+    });
+  }, [featuredBoxImages.length]);
+
+  React.useEffect(() => {
+    setUrlImageCarouselIndex((prev) => {
+      if (urlMediaBox.images.length === 0) return 0;
+      return Math.min(prev, urlMediaBox.images.length - 1);
+    });
+  }, [urlMediaBox.images.length]);
+
   const handleFeaturedImage = (files: FileList | null) => {
     if (!files?.length) return;
-    const file = files[0]; // Only take first file
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-    const maxImageSize = 5 * 1024 * 1024; // 5MB
-
-    if (!allowedImageTypes.includes(file.type)) {
-      setUploadErrors([`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`]);
-      return;
-    }
-    if (file.size > maxImageSize) {
-      setUploadErrors([`Image ${file.name} is too large. Maximum size is 5MB`]);
-      return;
-    }
-
-    // Cleanup previous featured image
-    if (featuredImage?.url.startsWith("blob:")) {
-      URL.revokeObjectURL(featuredImage.url);
-    }
-
-    setFeaturedImage({
-      id: crypto.randomUUID(),
-      kind: "image",
-      file,
-      url: URL.createObjectURL(file),
-    });
-    setUploadErrors([]);
-  };
-
-  const removeFeaturedImage = () => {
-    if (featuredImage?.url.startsWith("blob:")) {
-      URL.revokeObjectURL(featuredImage.url);
-    }
-    setFeaturedImage(null);
-  };
-
-  // Handle gallery images (multiple, max 10)
-  const handleGalleryImages = (files: FileList | null) => {
-    if (!files?.length) return;
-
-    const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-    const maxImageSize = 5 * 1024 * 1024; // 5MB
-    const maxGalleryImages = 10;
+    const maxImageSize = 5 * 1024 * 1024;
+    const maxFeaturedBoxImages = 9;
 
     const next: MediaItem[] = [];
     const errors: string[] = [];
 
     for (const file of Array.from(files)) {
-      if (galleryImages.length + next.length >= maxGalleryImages) {
-        errors.push(`Maximum ${maxGalleryImages} gallery images allowed`);
+      if (featuredBoxImages.length + next.length >= maxFeaturedBoxImages) {
+        errors.push("You cannot select more than 9 images.");
         break;
       }
       if (!allowedImageTypes.includes(file.type)) {
@@ -423,43 +397,60 @@ export default function NewProductPage() {
         kind: "image",
         file,
         url: URL.createObjectURL(file),
-      } as MediaItem);
+      });
     }
 
-    if (errors.length > 0) {
-      setUploadErrors(errors);
-    }
+    if (errors.length > 0) setUploadErrors(errors);
 
     if (next.length > 0) {
-      setGalleryImages((p) => [...p, ...next]);
+      setFeaturedBoxImages((prev) => {
+        const merged = [...prev, ...next];
+        if (!featuredImage && merged.length > 0) {
+          setFeaturedImage(merged[0]);
+        }
+        return merged;
+      });
       setUploadErrors([]);
     }
   };
 
-  const removeGalleryImage = (id: string) => {
-    setGalleryImages((p) => {
-      const target = p.find((x) => x.id === id);
-      if (target?.url.startsWith("blob:")) {
-        URL.revokeObjectURL(target.url);
+  const removeFeaturedImage = (id?: string) => {
+    if (!id) {
+      setFeaturedBoxImages((prev) => {
+        prev.forEach((m) => {
+          if (m.url.startsWith("blob:")) URL.revokeObjectURL(m.url);
+        });
+        return [];
+      });
+      setFeaturedImage(null);
+      setFeaturedBoxCarouselIndex(0);
+      return;
+    }
+
+    setFeaturedBoxImages((prev) => {
+      const target = prev.find((x) => x.id === id);
+      if (target?.url.startsWith("blob:")) URL.revokeObjectURL(target.url);
+      const next = prev.filter((x) => x.id !== id);
+      if (featuredImage?.id === id) {
+        setFeaturedImage(next[0] ?? null);
       }
-      return p.filter((x) => x.id !== id);
+      return next;
     });
   };
 
-  // Handle video (single)
-  const [videoFile, setVideoFile] = React.useState<MediaItem | null>(null);
+  const setFeaturedBoxImageAsFeatured = (id: string) => {
+    const img = featuredBoxImages.find((x) => x.id === id) ?? null;
+    if (!img) return;
+    setFeaturedImage(img);
+  };
 
   const handleVideo = (files: FileList | null) => {
     if (!files?.length) return;
-    const file = files[0]; // Only take first file
+    const file = files[0];
 
     const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
-    const maxVideoSize = 50 * 1024 * 1024; // 50MB
+    const maxVideoSize = 50 * 1024 * 1024;
 
-    if (videoFile) {
-      setUploadErrors(["Only one video is allowed per product"]);
-      return;
-    }
     if (!allowedVideoTypes.includes(file.type)) {
       setUploadErrors([`Invalid video type: ${file.name}. Only MP4, WebM, OGG, and QuickTime are allowed`]);
       return;
@@ -468,6 +459,8 @@ export default function NewProductPage() {
       setUploadErrors([`Video ${file.name} is too large. Maximum size is 50MB`]);
       return;
     }
+
+    if (videoFile?.url?.startsWith("blob:")) URL.revokeObjectURL(videoFile.url);
 
     setVideoFile({
       id: crypto.randomUUID(),
@@ -479,10 +472,67 @@ export default function NewProductPage() {
   };
 
   const removeVideo = () => {
-    if (videoFile?.url.startsWith("blob:")) {
-      URL.revokeObjectURL(videoFile.url);
-    }
+    if (videoFile?.url?.startsWith("blob:")) URL.revokeObjectURL(videoFile.url);
     setVideoFile(null);
+  };
+
+  const totalGalleryUrlImages = featuredBoxImages.length + urlMediaBox.images.length;
+  const remainingUrlImageSlots = Math.max(0, 9 - totalGalleryUrlImages);
+
+  const setUrlBoxField = (patch: Partial<UrlMediaBox>) => {
+    setUrlMediaBox((prev) => ({ ...prev, ...patch }));
+  };
+
+  const addImageUrlToBox = () => {
+    const raw = urlMediaBox.imageUrlInput.trim();
+    if (!raw) return;
+
+    if (totalGalleryUrlImages >= 9) {
+      setUploadErrors(["You cannot add more than 9 images."]);
+      return;
+    }
+
+    if (!/^https?:\/\//i.test(raw)) {
+      setUploadErrors(["Please enter a valid image URL."]);
+      return;
+    }
+
+    setUrlMediaBox((prev) => ({
+      ...prev,
+      images: [...prev.images, { id: crypto.randomUUID(), url: raw }],
+      imageUrlInput: "",
+    }));
+    setUploadErrors([]);
+  };
+
+  const removeImageUrlFromBox = (id: string) => {
+    setUrlMediaBox((prev) => ({ ...prev, images: prev.images.filter((x) => x.id !== id) }));
+  };
+
+  const setUrlImageAsFeatured = (id: string) => {
+    setUrlMediaBox((prev) => {
+      const index = prev.images.findIndex((x) => x.id === id);
+      if (index === -1) return prev;
+      const selected = prev.images[index];
+      const remaining = prev.images.filter((x) => x.id !== id);
+      return { ...prev, images: [selected, ...remaining] };
+    });
+  };
+
+  const addVideoUrlToBox = () => {
+    const raw = urlMediaBox.videoUrlInput.trim();
+    if (!raw) return;
+    if (!/^https?:\/\//i.test(raw)) {
+      setUploadErrors(["Please enter a valid video URL."]);
+      return;
+    }
+
+    setUrlMediaBox((prev) => ({ ...prev, videoUrl: raw }));
+    setUploadErrors([]);
+  };
+
+  const removeVideoFromBox = () => {
+    setUrlMediaBox((prev) => ({ ...prev, videoUrl: "", videoUrlInput: "" }));
   };
 
   // Note: Custom variants cannot be deleted on new product page since product doesn't exist yet
@@ -537,34 +587,21 @@ export default function NewProductPage() {
   const pricing = React.useMemo(() => {
     const selling = Number(values.selling_price) || 0;
     const freight = Number(values.freight) || 0;
-    const cost = Number(values.cost) || 0;
     const discountPercent = Number(values.discount) || 0;
 
-    // Base price includes selling price + cost + freight
-    const basePrice = selling + cost + freight;
-    
-    // Calculate tax on base price
-    const taxAmount = basePrice * (selectedTaxRate / 100);
-    
-    // Total price with tax included
-    const totalPriceWithTax = basePrice + taxAmount;
-    
-    // Apply discount on total price (including tax)
-    const priceAfterDiscount = discountPercent > 0
-      ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
-      : totalPriceWithTax;
+    const baseForTax = selling + freight;
+    const taxAmount = baseForTax * (selectedTaxRate / 100);
+    const totalCost = baseForTax + taxAmount;
+    const priceAfterDiscount = totalCost - (totalCost * discountPercent) / 100;
 
     return {
       taxAmount,
-      basePrice,
-      totalPriceWithTax,
-      priceAfterDiscount,
-      totalCost: totalPriceWithTax,
+      totalCost,
+      priceAfterDiscount
     };
   }, [
     values.selling_price,
     values.freight,
-    values.cost,
     values.discount,
     selectedTaxRate,
   ]);
@@ -586,42 +623,27 @@ export default function NewProductPage() {
     setUploadErrors([]);
 
     try {
-      // Use the same pricing calculation as the UI
-      const selling = Number(values.selling_price) || 0;
-      const freight = Number(values.freight) || 0;
+      const firstUrlImage = urlMediaBox.images.map((x) => x.url).find(Boolean);
+      const videoUrl = urlMediaBox.videoUrl.trim();
+
+      // Calculate total_price as price after discount
+      const basePrice = Number(values.selling_price) || 0;
       const cost = Number(values.cost) || 0;
+      const freight = Number(values.freight) || 0;
       const discountPercent = Number(values.discount) || 0;
 
-      console.log("=== PRICE CALCULATION DEBUG ===");
-      console.log("Selling Price:", selling);
-      console.log("Cost:", cost);
-      console.log("Freight:", freight);
-      console.log("Discount %:", discountPercent);
-      console.log("Selected Tax Rate:", selectedTaxRate);
-
-      // Base price includes selling price + cost + freight
-      const basePrice = selling + cost + freight;
-      console.log("Base Price (Selling + Cost + Freight):", basePrice);
-      
-      // Calculate tax on base price
-      const taxAmount = basePrice * (selectedTaxRate / 100);
-      console.log("Tax Amount:", taxAmount);
-      
-      // Total price with tax included
-      const totalPriceWithTax = basePrice + taxAmount;
-      console.log("Total Price with Tax:", totalPriceWithTax);
-      
-      // Apply discount on total price (including tax)
+      const subtotal = basePrice + cost + freight;
+      const taxAmount = subtotal * (selectedTaxRate / 100);
+      const totalCost = subtotal + taxAmount;
       const priceAfterDiscount = discountPercent > 0
-        ? totalPriceWithTax - (totalPriceWithTax * discountPercent) / 100
-        : totalPriceWithTax;
-      console.log("Final Price After Discount:", priceAfterDiscount);
+        ? totalCost - (totalCost * discountPercent) / 100
+        : totalCost;
 
       // Convert prices to USD for backend storage
       const sourceCurrency = getCurrencyCode();
       const targetCurrency = 'USD';
 
-      let convertedPrice = selling;
+      let convertedPrice = basePrice;
       let convertedCost = cost;
       let convertedFreight = freight;
       let convertedTotalPrice = priceAfterDiscount;
@@ -629,24 +651,16 @@ export default function NewProductPage() {
       if (sourceCurrency !== targetCurrency) {
         try {
           [convertedPrice, convertedCost, convertedFreight, convertedTotalPrice] = await Promise.all([
-            convertAmount(selling, sourceCurrency, targetCurrency),
+            convertAmount(basePrice, sourceCurrency, targetCurrency),
             convertAmount(cost, sourceCurrency, targetCurrency),
             convertAmount(freight, sourceCurrency, targetCurrency),
             convertAmount(priceAfterDiscount, sourceCurrency, targetCurrency),
           ]);
-          console.log("=== AFTER CURRENCY CONVERSION ===");
-          console.log("Converted Price:", convertedPrice);
-          console.log("Converted Cost:", convertedCost);
-          console.log("Converted Freight:", convertedFreight);
-          console.log("Converted Total Price:", convertedTotalPrice);
         } catch (error) {
           console.error('Currency conversion failed:', error);
           setUploadErrors(prev => [...prev, 'Currency conversion failed. Please try again.']);
           return;
         }
-      } else {
-        console.log("=== NO CURRENCY CONVERSION NEEDED ===");
-        console.log("Total Price to be sent:", convertedTotalPrice);
       }
 
       // Separate default variants (have vtype_id) from custom variants (need to be created)
@@ -696,6 +710,8 @@ export default function NewProductPage() {
         freight: convertedFreight > 0 ? convertedFreight : undefined,
         customer_groups: values.customer_groups.length > 0 ? { cvg_ids: values.customer_groups } : undefined,
         variants: defaultVariants.length > 0 ? defaultVariants : undefined,
+        product_img_url: featuredImage ? undefined : (firstUrlImage ? String(firstUrlImage).trim() : undefined),
+        product_video_url: videoFile ? undefined : (videoUrl ? String(videoUrl).trim() : undefined),
         bulk_prices: await Promise.all(
           bulkPricing
             .filter(row => row.quantity && row.price)
@@ -721,67 +737,36 @@ export default function NewProductPage() {
       // Create custom variant types and update product with all variants
       if (customVariantNames.length > 0) {
         try {
-          // Create each custom variant type via API and track the mapping
-          const customVariantTypeMap = new Map<string, { id: string; name: string }>();
+          const customVariantTypes: { id: string; name: string }[] = [];
 
+          // Create each custom variant type via API
           for (const customName of customVariantNames) {
             const response = await productsService.createCustomVariantType(productId, customName);
             if (response?.data?.id && response?.data?.name) {
-              // Map the original normalized key to the API response
-              customVariantTypeMap.set(customName, { id: response.data.id, name: response.data.name });
+              customVariantTypes.push({ id: response.data.id, name: response.data.name });
             }
           }
 
           // Now update product with all variants (default + custom)
-          console.log("Custom variant values before update:", variantValues);
-          console.log("Custom variant type map:", Array.from(customVariantTypeMap.entries()));
-          
           const allVariants = [
             ...defaultVariants,
-            ...Array.from(customVariantTypeMap.entries()).map(([originalKey, cvt]) => {
-              const variantValue = String(variantValues[originalKey] ?? "").trim();
-              console.log(`Processing variant ${originalKey}: value="${variantValue}"`);
-              return {
-                vtype_id: cvt.id,
-                value: variantValue,
-              };
-            }),
+            ...customVariantTypes.map((cvt) => ({
+              vtype_id: cvt.id,
+              value: String(variantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
+            })),
           ];
-          
-          console.log("Final allVariants array:", allVariants);
 
-          // Only update if we have custom variants to add
-          if (allVariants.length > defaultVariants.length) {
-            console.log("Updating product with custom variants:", {
+          if (allVariants.length > 0) {
+            await productsService.updateProduct({
               id: productId,
               title: values.title.trim(),
-              description: values.description.trim(),
               price: convertedPrice,
               stock_quantity: Number(values.stock_quantity) || 0,
               category_id: values.category_id,
               brand_id: values.brand_id,
               currency: targetCurrency,
-              total_price: convertedTotalPrice,
               variants: allVariants,
             });
-            
-            try {
-              await productsService.updateProduct({
-                id: productId,
-                title: values.title.trim(),
-                description: values.description.trim(),
-                price: convertedPrice,
-                stock_quantity: Number(values.stock_quantity) || 0,
-                category_id: values.category_id,
-                brand_id: values.brand_id,
-                currency: targetCurrency,
-                total_price: convertedTotalPrice,
-                variants: allVariants,
-              });
-            } catch (updateError: any) {
-              console.error("Update product error:", updateError?.response?.data);
-              throw updateError;
-            }
           }
         } catch (error: any) {
           console.error("Failed to create custom variants:", error);
@@ -793,37 +778,17 @@ export default function NewProductPage() {
         }
       }
 
-      // Upload featured image if any
       if (featuredImage) {
         try {
-          setUploadProgress(prev => ({ ...prev, featured: 1 }));
-          const featuredResponse = await productsService.uploadFeaturedImage(productId, featuredImage.file);
-          setUploadProgress(prev => ({ ...prev, featured: 100 }));
-          // Backend already updates product_img_url automatically, no need for extra update
+          await productsService.uploadFeaturedImage(productId, featuredImage.file);
         } catch (error: any) {
           setUploadErrors(prev => [...prev, `Featured image upload failed: ${error.message}`]);
         }
       }
 
-      // Upload gallery images if any
-      if (galleryImages.length > 0) {
-        try {
-          setUploadProgress(prev => ({ ...prev, gallery: 1 }));
-          const galleryFiles = galleryImages.map(m => m.file);
-          await productsService.uploadProductImages(productId, galleryFiles);
-          setUploadProgress(prev => ({ ...prev, gallery: 100 }));
-        } catch (error: any) {
-          setUploadErrors(prev => [...prev, `Gallery images upload failed: ${error.message}`]);
-        }
-      }
-
-      // Upload video if any
       if (videoFile) {
         try {
-          setUploadProgress(prev => ({ ...prev, video: 1 }));
           await productsService.uploadProductVideo(productId, videoFile.file);
-          // Backend already updates product_video_url in database
-          setUploadProgress(prev => ({ ...prev, video: 100 }));
         } catch (error: any) {
           setUploadErrors(prev => [...prev, `Video upload failed: ${error.message}`]);
         }
@@ -924,8 +889,6 @@ export default function NewProductPage() {
                   </SelectContent>
                 </Select>
               </div>
-
-
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1130,9 +1093,6 @@ export default function NewProductPage() {
                   className="bg-gray-100 cursor-not-allowed"
                   placeholder="Currency will be set based on your selection"
                 />
-                {/* <p className="text-xs text-gray-500">
-                  Currency is automatically set based on your global selection
-                </p> */}
               </div>
 
               <div className="grid gap-2">
@@ -1297,8 +1257,8 @@ export default function NewProductPage() {
               <div className="text-base font-semibold">Bulk pricing</div>
               <div className="space-y-2">
                 {bulkPricing.map((row, idx) => (
-                  <div key={row.id} className="grid gap-3 sm:grid-cols-5 sm:items-end">
-                    <div className="grid gap-2 sm:col-span-2">
+                  <div key={row.id} className="grid gap-3 sm:grid-cols-2 sm:items-end">
+                    <div className="grid gap-2">
                       <Label htmlFor={`bulkQty-${row.id}`} className="font-semibold">Quantity</Label>
                       <Input
                         id={`bulkQty-${row.id}`}
@@ -1334,54 +1294,57 @@ export default function NewProductPage() {
                       />
                     </div>
 
-                    <div className="grid gap-2 sm:col-span-2">
+                    <div className="grid gap-2">
                       <Label htmlFor={`bulkPrice-${row.id}`} className="font-semibold">Price per product</Label>
-                      <Input
-                        id={`bulkPrice-${row.id}`}
-                        inputMode="decimal"
-                        value={row.price}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (!(v === "" || /^\d*\.?\d*$/.test(v))) return;
-                          setBulkPricing((p) =>
-                            p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
-                          );
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.ctrlKey || e.metaKey || e.altKey) return;
-                          const allowed = [
-                            "Backspace",
-                            "Delete",
-                            "Tab",
-                            "Enter",
-                            "Escape",
-                            "ArrowLeft",
-                            "ArrowRight",
-                            "ArrowUp",
-                            "ArrowDown",
-                            "Home",
-                            "End",
-                          ];
-                          if (allowed.includes(e.key)) return;
-                          if (/^[0-9.]$/.test(e.key)) return;
-                          e.preventDefault();
-                        }}
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={addBulkRow}>
-                        +
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => removeBulkRow(row.id)}
-                        disabled={bulkPricing.length <= 1 || idx === 0}
-                      >
-                        -
-                      </Button>
+                      <div className="flex items-end gap-2">
+                        <Input
+                          id={`bulkPrice-${row.id}`}
+                          className="flex-1 min-w-0"
+                          inputMode="decimal"
+                          value={row.price}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!(v === "" || /^\d*\.?\d*$/.test(v))) return;
+                            setBulkPricing((p) =>
+                              p.map((r) => (r.id === row.id ? { ...r, price: v } : r))
+                            );
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.ctrlKey || e.metaKey || e.altKey) return;
+                            const allowed = [
+                              "Backspace",
+                              "Delete",
+                              "Tab",
+                              "Enter",
+                              "Escape",
+                              "ArrowLeft",
+                              "ArrowRight",
+                              "ArrowUp",
+                              "ArrowDown",
+                              "Home",
+                              "End",
+                            ];
+                            if (allowed.includes(e.key)) return;
+                            if (/^[0-9.]$/.test(e.key)) return;
+                            e.preventDefault();
+                          }}
+                          placeholder="0"
+                        />
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={addBulkRow}>
+                            +
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeBulkRow(row.id)}
+                            disabled={bulkPricing.length <= 1 || idx === 0}
+                          >
+                            -
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1395,14 +1358,13 @@ export default function NewProductPage() {
             <CardTitle className="text-lg">Media</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 bg-gray-100">
-            <div className="grid gap-5 lg:grid-cols-3">
-              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              <div className="flex h-full flex-col rounded-2xl border bg-white p-4 shadow-sm">
+
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-neutral-900">Featured Image</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Primary image for product listing (JPEG/PNG/WebP, max 5MB)
-                    </div>
+                    <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Select up to 9 images; the first becomes featured.</div>
                   </div>
 
                   <Button
@@ -1411,9 +1373,10 @@ export default function NewProductPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() => featuredImageInputRef.current?.click()}
+                    disabled={featuredBoxImages.length >= 9}
                   >
                     <Upload className="h-4 w-4" />
-                    {featuredImage ? "Change" : "Upload"}
+                    Upload
                   </Button>
                 </div>
 
@@ -1421,6 +1384,7 @@ export default function NewProductPage() {
                   ref={featuredImageInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
                     handleFeaturedImage(e.target.files);
@@ -1432,42 +1396,116 @@ export default function NewProductPage() {
                   className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
                   onClick={() => featuredImageInputRef.current?.click()}
                 >
-                  {!featuredImage ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                      <Image
-                        src={featuredImageLogo}
-                        alt="Featured upload"
-                        width={90}
-                        height={90}
-                        className="opacity-90"
-                      />
-                      <div className="text-sm font-medium text-neutral-800">
-                        Click to upload featured image
+                  {featuredBoxImages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200">
+                        <ImageIcon className="h-6 w-6 text-neutral-700" />
                       </div>
-                      <div className="text-xs text-neutral-500">
-                        Recommended: square image, high quality
-                      </div>
+                      <div className="text-sm font-medium text-neutral-800">Click to upload images</div>
+                      <div className="text-xs text-neutral-500">Recommended: square image, high quality</div>
                     </div>
                   ) : (
-                    <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
-                      <Image
-                        src={featuredImage.url}
-                        alt={featuredImage.file.name}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFeaturedImage();
-                        }}
-                        className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
-                        aria-label="Remove featured image"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/9 uploaded</div>
+                        <button
+                          type="button"
+                          className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFeaturedImage();
+                          }}
+                        >
+                          Clear All
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const current = featuredBoxImages[featuredBoxCarouselIndex];
+                        const isFeatured = Boolean(current && featuredImage?.id === current.id);
+                        const canGoPrev = featuredBoxImages.length > 1;
+                        const canGoNext = featuredBoxImages.length > 1;
+
+                        if (!current) return null;
+
+                        return (
+                          <div className="relative mx-auto h-72 w-full max-w-md overflow-hidden rounded-xl border bg-muted group">
+                            <Image
+                              src={current.url}
+                              alt={current.file.name}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 33vw"
+                            />
+
+                            <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
+
+                            {isFeatured ? (
+                              <div className="absolute left-2 top-2 rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-medium text-white flex items-center gap-1">
+                                <Star className="h-3 w-3 fill-current" />
+                                Featured
+                              </div>
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFeaturedBoxImageAsFeatured(current.id);
+                              }}
+                               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
+                            >
+                              Set as Featured
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFeaturedImage(current.id);
+                              }}
+                              className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                              aria-label="Remove image"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFeaturedBoxCarouselIndex((prev) =>
+                                  prev === 0 ? featuredBoxImages.length - 1 : prev - 1
+                                );
+                              }}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
+                              disabled={!canGoPrev}
+                              aria-label="Previous"
+                            >
+                              <span className="text-sm">‹</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFeaturedBoxCarouselIndex((prev) =>
+                                  prev === featuredBoxImages.length - 1 ? 0 : prev + 1
+                                );
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
+                              disabled={!canGoNext}
+                              aria-label="Next"
+                            >
+                              <span className="text-sm">›</span>
+                            </button>
+
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
+                              {featuredBoxCarouselIndex + 1} / {featuredBoxImages.length}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1476,9 +1514,9 @@ export default function NewProductPage() {
               <div className="rounded-2xl border bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
+                    <div className="text-sm font-semibold text-neutral-900">URL Images & Video</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Up to 4 images for the product detail page
+                      Add URL links for images/videos; image links share the 9-image limit.
                     </div>
                   </div>
 
@@ -1487,75 +1525,199 @@ export default function NewProductPage() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() => galleryImagesInputRef.current?.click()}
-                    disabled={galleryImages.length >= 4}
+                    onClick={() => urlImageInputRef.current?.focus()}
                   >
                     <Upload className="h-4 w-4" />
-                    Add ({galleryImages.length}/4)
+                    Upload
                   </Button>
                 </div>
 
-                <input
-                  ref={galleryImagesInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    handleGalleryImages(e.target.files);
-                    if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
-                  }}
-                />
-
-                <div
-                  className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
-                  onClick={() => galleryImagesInputRef.current?.click()}
-                >
-                  {galleryImages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                      <Image
-                        src={galleryImageLogo}
-                        alt="Gallery upload"
-                        width={90}
-                        height={90}
-                        className="opacity-90"
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Images URLs (remaining {remainingUrlImageSlots})
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        ref={urlImageInputRef}
+                        value={urlMediaBox.imageUrlInput}
+                        onChange={(e) => setUrlBoxField({ imageUrlInput: e.target.value })}
+                        placeholder="https://..."
+                        disabled={remainingUrlImageSlots <= 0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addImageUrlToBox();
+                          }
+                        }}
                       />
-                      <div className="text-sm font-medium text-neutral-800">
-                        Click to upload gallery images
-                      </div>
-                      <div className="text-xs text-neutral-500">
-                        You can select multiple files at once
-                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addImageUrlToBox}
+                        disabled={remainingUrlImageSlots <= 0}
+                      >
+                        Add
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {galleryImages.map((m) => (
-                        <div
-                          key={m.id}
-                          className="relative h-28 overflow-hidden rounded-xl border bg-muted"
-                        >
-                          <Image
-                            src={m.url}
-                            alt={m.file.name}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 50vw, 16vw"
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeGalleryImage(m.id);
-                            }}
-                            className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                            aria-label="Remove gallery image"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+
+                    {urlMediaBox.images.length > 0 ? (
+                      (() => {
+                        const current = urlMediaBox.images[urlImageCarouselIndex];
+                        const canGoPrev = urlMediaBox.images.length > 1;
+                        const canGoNext = urlMediaBox.images.length > 1;
+                        const isFeaturedUrlImage = urlMediaBox.images[0]?.id === current?.id;
+
+                        if (!current) return null;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/9 uploaded</div>
+                              <button
+                                type="button"
+                                className="text-sm font-semibold text-neutral-900 hover:text-neutral-700 focus-visible:text-neutral-700 disabled:text-neutral-300"
+                                onClick={() => removeImageUrlFromBox(current.id)}
+                              >
+                                Clear All
+                              </button>
+                            </div>
+
+                            <div className="relative mx-auto h-32 w-full overflow-hidden rounded-xl border bg-muted group">
+                              <Image
+                                src={current.url}
+                                alt="URL image"
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, 33vw"
+                              />
+
+                              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
+
+                              {isFeaturedUrlImage ? (
+                                <div className="absolute left-2 top-2 rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-medium text-white flex items-center gap-1">
+                                  <Star className="h-3 w-3 fill-current" />
+                                  Featured
+                                </div>
+                              ) : null}
+
+                              <button
+                                type="button"
+                                onClick={() => removeImageUrlFromBox(current.id)}
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                aria-label="Remove image"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setUrlImageAsFeatured(current.id);
+                                }}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
+                              >
+                                Set as Featured
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUrlImageCarouselIndex((prev) =>
+                                    prev === 0 ? urlMediaBox.images.length - 1 : prev - 1
+                                  )
+                                }
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                disabled={!canGoPrev}
+                                aria-label="Previous"
+                              >
+                                <span className="text-sm">‹</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUrlImageCarouselIndex((prev) =>
+                                    prev === urlMediaBox.images.length - 1 ? 0 : prev + 1
+                                  )
+                                }
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                disabled={!canGoNext}
+                                aria-label="Next"
+                              >
+                                <span className="text-sm">›</span>
+                              </button>
+
+                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                                {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                        <div className="text-xs text-neutral-500">
+                          Paste image URLs above; they will appear here.
                         </div>
-                      ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Videos URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={urlMediaBox.videoUrlInput}
+                        onChange={(e) => setUrlBoxField({ videoUrlInput: e.target.value })}
+                        placeholder="https://..."
+                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addVideoUrlToBox();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addVideoUrlToBox}
+                        disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(videoFile)}
+                      >
+                        Add
+                      </Button>
                     </div>
-                  )}
+                    {videoFile ? (
+                      <p className="text-xs text-amber-600 mt-1">
+                        A file upload already exists, so you cannot add a video URL.
+                      </p>
+                    ) : null}
+
+                    {urlMediaBox.videoUrl.trim() ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border bg-neutral-50 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="text-[11px] text-neutral-500">Saved video URL</div>
+                          <div className="truncate text-xs text-neutral-700">
+                            {urlMediaBox.videoUrl}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeVideoFromBox}
+                          className="shrink-0 rounded-full bg-white/90 p-1 text-neutral-900 shadow-sm ring-1 ring-white/40 transition-all hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                          aria-label="Remove video"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                        <div className="text-xs text-neutral-500">Paste a video URL above</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1564,7 +1726,7 @@ export default function NewProductPage() {
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">Video</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      One video (MP4/WebM/OGG/QuickTime, max 50MB)
+                      Upload one MP4/WebM/OGG/QuickTime clip (max 50MB).
                     </div>
                   </div>
 
@@ -1596,29 +1758,22 @@ export default function NewProductPage() {
                   onClick={() => videoInputRef.current?.click()}
                 >
                   {!videoFile ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                      <Image
-                        src={videoUploadLogo}
-                        alt="Video upload"
-                        width={120}
-                        height={120}
-                        className="opacity-90"
-                      />
-                      <div className="text-sm font-medium text-neutral-800">
-                        Click to upload product video
+                    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200">
+                        <Video className="h-6 w-6 text-neutral-700" />
                       </div>
-                      <div className="text-xs text-neutral-500">
-                        Keep it short and clear (recommended)
-                      </div>
+                      <div className="text-sm font-medium text-neutral-800">Click to upload product video</div>
+                      <div className="text-xs text-neutral-500">Keep it short and clear (recommended)</div>
                     </div>
                   ) : (
-                    <div className="relative h-56 w-full overflow-hidden rounded-xl border bg-muted">
+                    <div className="relative h-72 w-full overflow-hidden rounded-xl border bg-muted group">
                       <video
                         src={videoFile.url}
                         className="h-full w-full object-cover"
                         controls
                         muted
                         preload="metadata"
+                        key={videoFile.url}
                       />
                       <button
                         type="button"
@@ -1626,67 +1781,31 @@ export default function NewProductPage() {
                           e.stopPropagation();
                           removeVideo();
                         }}
-                        className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                        className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                         aria-label="Remove video"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm font-medium text-neutral-900"></div>
+
+                  {uploadErrors.map((error, index) => (
+                    <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                      {error}
+                    </div>
+                  ))}
+                  {createdProductId && (
+                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
                     </div>
                   )}
                 </div>
               </div>
             </div>
-
-            {/* Upload Progress */}
-            {isUploading && (
-              <div className="mt-4 space-y-2">
-                {uploadProgress.gallery > 0 && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>Uploading images...</span>
-                      <span>{uploadProgress.gallery}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress.gallery}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-                {uploadProgress.video > 0 && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>Uploading video...</span>
-                      <span>{uploadProgress.video}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress.video}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Upload Errors */}
-            {uploadErrors.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <div className="text-sm font-medium text-red-600">Upload Errors:</div>
-                {uploadErrors.map((error, index) => (
-                  <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                    {error}
-                  </div>
-                ))}
-                {createdProductId && (
-                  <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                    Product was created but some media failed to upload. You can try uploading the media again from the product edit page.
-                  </div>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -1695,10 +1814,11 @@ export default function NewProductPage() {
             <CardTitle className="text-lg">Inventory and shipping</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 bg-gray-100">
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="stockQty" className="font-semibold">Stock quantity <span className="text-red-500">*</span></Label>
+                <Label htmlFor="stockQty" className="font-semibold">
+                  Stock quantity <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="stockQty"
                   inputMode="numeric"
@@ -1733,7 +1853,16 @@ export default function NewProductPage() {
                   }}
                   placeholder="0"
                 />
+              </div>
 
+              <div className="grid gap-2">
+                <Label htmlFor="length" className="font-semibold">Length</Label>
+                <Input
+                  id="length"
+                  value={values.length}
+                  onChange={(e) => setValues((p) => ({ ...p, length: e.target.value }))}
+                  placeholder="e.g. 10"
+                />
               </div>
             </div>
 
@@ -1743,34 +1872,8 @@ export default function NewProductPage() {
                 <Input
                   id="weight"
                   value={values.weight}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, weight: e.target.value }))
-                  }
+                  onChange={(e) => setValues((p) => ({ ...p, weight: e.target.value }))}
                   placeholder="e.g. 1.2"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="length" className="font-semibold">Length</Label>
-                <Input
-                  id="length"
-                  value={values.length}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, length: e.target.value }))
-                  }
-                  placeholder="e.g. 10"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="width" className="font-semibold">Width</Label>
-                <Input
-                  id="width"
-                  value={values.width}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, width: e.target.value }))
-                  }
-                  placeholder="e.g. 5"
                 />
               </div>
 
@@ -1779,16 +1882,27 @@ export default function NewProductPage() {
                 <Input
                   id="height"
                   value={values.height}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, height: e.target.value }))
-                  }
+                  onChange={(e) => setValues((p) => ({ ...p, height: e.target.value }))}
                   placeholder="e.g. 3"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="width" className="font-semibold">Width</Label>
+                <Input
+                  id="width"
+                  value={values.width}
+                  onChange={(e) => setValues((p) => ({ ...p, width: e.target.value }))}
+                  placeholder="e.g. 5"
                 />
               </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-    </PermissionBoundary>
-  );
-}
+
+          </div>
+        </PermissionBoundary>
+      );
+    }

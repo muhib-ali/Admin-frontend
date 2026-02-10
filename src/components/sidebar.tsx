@@ -607,7 +607,7 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
           collapsed && "text-center px-0"
         )}
       >
-        {!collapsed ? "© 2025 All Rights Reserved" : "© 2025"}
+        {!collapsed ? `© ${new Date().getFullYear()} All Rights Reserved` : `© ${new Date().getFullYear()}`}
       </div>
     </div>
     </TooltipProvider>

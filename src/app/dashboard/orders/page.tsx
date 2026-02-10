@@ -332,29 +332,29 @@ export default function OrdersPage() {
               <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <Button
-                  variant="pagination"
-                  clickVariant="default"
-                  size="sm"
-                  disabled={pagPage <= 1}
-                  className="gap-1"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="hidden xs:inline">Previous</span>
-                </Button>
+                  <Button
+                    variant="pagination"
+                    clickVariant="default"
+                    size="sm"
+                    disabled={pagPage <= 1}
+                    className="gap-1"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Previous</span>
+                  </Button>
 
-                <Button
-                  variant="pagination"
-                  clickVariant="default"
-                  size="sm"
-                  disabled={pagPage >= totalPages}
-                  className="gap-1"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  <span className="hidden xs:inline">Next</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                  <Button
+                    variant="pagination"
+                    clickVariant="default"
+                    size="sm"
+                    disabled={pagPage >= totalPages}
+                    className="gap-1"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
               </div>
             </div>
           </CardContent>

@@ -613,7 +613,7 @@ export default function WarehousesPage() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="hidden xs:inline">Previous</span>
+                  <span className="hidden sm:inline">Previous</span>
                 </Button>
 
                 <Button
@@ -624,7 +624,7 @@ export default function WarehousesPage() {
                   className="gap-1"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  <span className="hidden xs:inline">Next</span>
+                  <span className="hidden sm:inline">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
