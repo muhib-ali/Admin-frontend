@@ -210,18 +210,23 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
           // For rate limiting, we'll use a simple approximate conversion
           const commonRates: { [key: string]: number } = {
             'PKR': 280,    // Approximate PKR to USD
-            'EUR': 0.85,   // Approximate EUR to USD  
+            'EUR': 0.85,   // Approximate EUR to USD
             'GBP': 0.73,   // Approximate GBP to USD
             'INR': 83,     // Approximate INR to USD
             'CAD': 1.25,   // Approximate CAD to USD
             'AUD': 1.35,   // Approximate AUD to USD
+            'NOK': 10.5,   // Approximate NOK to USD (1 USD ≈ 10.5 NOK)
           };
-          
+
           let fallbackAmount = amount;
           if (fromCurrency === 'USD' && commonRates[toCurrency]) {
             fallbackAmount = amount * commonRates[toCurrency];
           } else if (toCurrency === 'USD' && commonRates[fromCurrency]) {
             fallbackAmount = amount / commonRates[fromCurrency];
+          } else if (fromCurrency === 'NOK' && toCurrency === 'USD') {
+            fallbackAmount = amount / commonRates['NOK'];
+          } else if (fromCurrency === 'USD' && toCurrency === 'NOK') {
+            fallbackAmount = amount * commonRates['NOK'];
           }
           
           // Cache the fallback result
@@ -279,14 +284,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, [loadExchangeRates]);
 
   const getCurrencySymbol = useCallback((): string => {
-    if (!selectedCountry) return '$';
+    if (!selectedCountry) return 'kr';
     const currencies = Object.values(selectedCountry.currencies);
-    return currencies.length > 0 ? currencies[0].symbol : '$';
+    return currencies.length > 0 ? currencies[0].symbol : 'kr';
   }, [selectedCountry]);
 
   const getCurrencyCode = useCallback((): string => {
-    if (!selectedCountry) return 'USD';
-    return Object.keys(selectedCountry.currencies)[0] || 'USD';
+    if (!selectedCountry) return 'NOK';
+    return Object.keys(selectedCountry.currencies)[0] || 'NOK';
   }, [selectedCountry]);
 
   const value: CurrencyContextType = useMemo(() => ({

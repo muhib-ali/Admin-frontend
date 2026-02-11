@@ -667,9 +667,9 @@ export default function NewProductPage() {
         ? totalCost - (totalCost * discountPercent) / 100
         : totalCost;
 
-      // Convert prices to USD for backend storage
+      // Convert prices to NOK for backend storage (standard currency)
       const sourceCurrency = getCurrencyCode();
-      const targetCurrency = 'USD';
+      const targetCurrency = 'NOK';
 
       let convertedPrice = basePrice;
       let convertedCost = cost;

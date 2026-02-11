@@ -108,7 +108,7 @@ export default function OrdersPage() {
             let convertedTotal: number | undefined;
             
             try {
-              convertedTotal = await convertAmount(total, 'USD', targetCurrency);
+              convertedTotal = await convertAmount(total, 'NOK', targetCurrency);
             } catch (error) {
               console.warn('Currency conversion failed:', error);
             }

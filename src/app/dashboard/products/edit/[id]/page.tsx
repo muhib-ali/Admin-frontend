@@ -372,15 +372,15 @@ export default function ProductEditPage() {
         // Backend entity uses bulkPrices (camelCase), DTO uses bulk_prices (snake_case)
         const bulkPrices = productData?.bulk_prices || productData?.bulkPrices || [];
 
-        // Convert prices from USD to selected currency for display
+        // Convert prices from NOK (storage currency) to selected currency for display
         const convertPriceForDisplay = async (price: number): Promise<string> => {
           if (!selectedCountry || price === 0) return String(price);
           
           try {
             const targetCurrency = Object.keys(selectedCountry.currencies)[0];
-            if (targetCurrency === 'USD') return String(price);
+            if (targetCurrency === 'NOK') return String(price);
             
-            const converted = await convertAmount(price, 'USD', targetCurrency);
+            const converted = await convertAmount(price, 'NOK', targetCurrency);
             return String(converted);
           } catch (error) {
             return String(price);
@@ -855,7 +855,7 @@ export default function ProductEditPage() {
         stock_quantity: product.stock_quantity || values.stock_quantity || 0,
         category_id: product.category_id || values.category_id || "",
         brand_id: product.brand_id || values.brand_id || "",
-        currency: product.currency || values.currency || "USD",
+        currency: product.currency || values.currency || "NOK",
         total_price: priceAfterDiscount,
       };
       
@@ -1016,9 +1016,9 @@ export default function ProductEditPage() {
         ? totalCost - (totalCost * discountPercent) / 100 
         : totalCost;
 
-      // Convert prices to USD for backend storage
+      // Convert prices to NOK for backend storage (standard currency)
       const sourceCurrency = getCurrencyCode();
-      const targetCurrency = 'USD';
+      const targetCurrency = 'NOK';
       
       let convertedPrice = basePrice;
       let convertedCost = cost;
@@ -1040,7 +1040,7 @@ export default function ProductEditPage() {
         }
       }
 
-      // Prepare product update data
+      // Prepare product update data (prices and currency stored in NOK)
       const productUpdateData: any = {
         id: id,
         title: values.title.trim(),
@@ -1049,7 +1049,7 @@ export default function ProductEditPage() {
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
         brand_id: values.brand_id,
-        currency: values.currency,
+        currency: targetCurrency,
         is_active: (product as any)?.is_active ?? true,
         supplier_id: values.supplier_id || undefined,
         tax_id: values.tax_id || undefined,
@@ -1180,7 +1180,7 @@ export default function ProductEditPage() {
             stock_quantity: product.stock_quantity || values.stock_quantity || 0,
             category_id: product.category_id || values.category_id || "",
             brand_id: product.brand_id || values.brand_id || "",
-            currency: product.currency || values.currency || "USD",
+            currency: product.currency || values.currency || "NOK",
             total_price: priceAfterDiscount,
           };
           
@@ -2208,7 +2208,7 @@ export default function ProductEditPage() {
                                     stock_quantity: product.stock_quantity || values.stock_quantity || 0,
                                     category_id: product.category_id || values.category_id || "",
                                     brand_id: product.brand_id || values.brand_id || "",
-                                    currency: product.currency || values.currency || "USD",
+                                    currency: product.currency || values.currency || "NOK",
                                     total_price: priceAfterDiscount,
                                   };
                                   

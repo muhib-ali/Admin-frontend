@@ -70,10 +70,10 @@ export default function CurrencySelector() {
 
   const currentCurrency = selectedCountry 
     ? Object.keys(selectedCountry.currencies)[0] 
-    : 'USD';
+    : 'NOK';
   const currentSymbol = selectedCountry 
     ? Object.values(selectedCountry.currencies)[0]?.symbol 
-    : '$';
+    : 'kr';
 
   const handleClick = () => {
     console.log('💱 Globe icon clicked!');

@@ -178,7 +178,7 @@ export default function ProductsPage() {
       stock_quantity: Number(p.stock_quantity ?? 0),
       category_id: p.category_id,
       brand_id: p.brand_id,
-      currency: p.currency ?? "USD",
+      currency: p.currency ?? "NOK",
       product_img_url: p.product_img_url ?? null,
       sku: p.sku ?? null,
       is_active: Boolean(p.is_active),

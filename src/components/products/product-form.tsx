@@ -120,7 +120,7 @@ export function ProductForm({
     stock_quantity: initial?.stock_quantity ?? "",
     category_id: initial?.category_id ?? "",
     brand_id: initial?.brand_id ?? "",
-    currency: initial?.currency ?? "USD",
+    currency: initial?.currency ?? "NOK",
     is_active: initial?.is_active ?? true,
     product_img_url: initial?.product_img_url ?? null,
     product_img_fileName: initial?.product_img_fileName ?? null,
@@ -140,7 +140,7 @@ export function ProductForm({
       stock_quantity: initial?.stock_quantity ?? "",
       category_id: initial?.category_id ?? "",
       brand_id: initial?.brand_id ?? "",
-      currency: initial?.currency ?? "USD",
+      currency: initial?.currency ?? "NOK",
       is_active: initial?.is_active ?? true,
       product_img_url: initial?.product_img_url ?? null,
       product_img_fileName: initial?.product_img_fileName ?? null,
@@ -583,6 +583,7 @@ export function ProductForm({
                   <SelectValue placeholder="Choose currency" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="NOK">NOK</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="PKR">PKR</SelectItem>
                   <SelectItem value="AED">AED</SelectItem>
