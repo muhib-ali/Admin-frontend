@@ -762,7 +762,7 @@ export default function RolesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 gap-1.5 border-muted-foreground/30 bg-background/60 px-3 text-xs font-medium text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-primary/5 hover:text-primary self-end sm:self-auto"
+                          className="h-9 gap-1.5 bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 px-3 text-xs font-medium shadow-sm self-end sm:self-auto"
                         >
                           <Download className="h-4 w-4" />
                           <span className="hidden sm:inline">Export</span>
@@ -810,12 +810,12 @@ export default function RolesPage() {
                       <Table className="min-w-160">
                         <TableHeader>
                           <TableRow className="bg-gray-200">
-                            <TableHead className="rounded-tl-xl pl-14 ">
+                            <TableHead className="rounded-tl-xl pl-14 items-center justify-center">
                               Role
                             </TableHead>
-                            <TableHead>Created At</TableHead>
-                            <TableHead className="text-center">Permissions</TableHead>
-                            <TableHead className="text-right rounded-tr-xl">
+                            <TableHead className="items-center justify-center">Created At</TableHead>
+                            <TableHead className="text-center items-center justify-center">Permissions</TableHead>
+                            <TableHead className="text-right rounded-tr-xl items-center justify-center">
                               Actions
                             </TableHead>
                           </TableRow>
@@ -875,10 +875,10 @@ export default function RolesPage() {
                                     {renderCreatedAt(r.created_at)}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="flex items-center justify-center">
                                     <Badge
                                       variant="secondary"
-                                      className="bg-primary text-primary-foreground hover:bg-primary"
+                                      className="bg-red-100 text-red-700 border-red-200 hover:bg-red-200"
                                     >
                                       {displayPermCount(r)}
                                     </Badge>
