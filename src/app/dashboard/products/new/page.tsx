@@ -382,10 +382,10 @@ export default function NewProductPage() {
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024;
-    const remainingSlots = Math.max(0, 9 - (featuredBoxImages.length + urlMediaBox.images.length));
+    const remainingSlots = Math.max(0, 10 - (featuredBoxImages.length + urlMediaBox.images.length));
 
     if (remainingSlots <= 0) {
-      notifyError("Image limit reached", "You cannot add more than 9 images total.");
+      notifyError("Image limit reached", "You cannot add more than 10 images total.");
       return;
     }
 
@@ -394,7 +394,7 @@ export default function NewProductPage() {
 
     for (const file of Array.from(files)) {
       if (next.length >= remainingSlots) {
-        errors.push("You cannot select more than 9 images.");
+        errors.push("You cannot select more than 10 images.");
         break;
       }
       if (!allowedImageTypes.includes(file.type)) {
@@ -416,8 +416,8 @@ export default function NewProductPage() {
 
     if (errors.length > 0) setUploadErrors(errors);
 
-    if (errors.some((e) => e.includes("cannot select") || e.includes("cannot add") || e.includes("more than 9"))) {
-      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
+    if (errors.some((e) => e.includes("cannot select") || e.includes("cannot add") || e.includes("more than 10"))) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images).");
     }
 
     if (next.length > 0) {
@@ -502,7 +502,7 @@ export default function NewProductPage() {
   };
 
   const totalGalleryUrlImages = featuredBoxImages.length + urlMediaBox.images.length;
-  const remainingUrlImageSlots = Math.max(0, 9 - totalGalleryUrlImages);
+  const remainingUrlImageSlots = Math.max(0, 10 - totalGalleryUrlImages);
 
   const setUrlBoxField = (patch: Partial<UrlMediaBox>) => {
     setUrlMediaBox((prev) => ({ ...prev, ...patch }));
@@ -512,9 +512,9 @@ export default function NewProductPage() {
     const raw = urlMediaBox.imageUrlInput.trim();
     if (!raw) return;
 
-    if (totalGalleryUrlImages >= 9) {
-      setUploadErrors(["You cannot add more than 9 images."]);
-      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
+    if (totalGalleryUrlImages >= 10) {
+      setUploadErrors(["You cannot add more than 10 images."]);
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images).");
       return;
     }
 
@@ -603,9 +603,26 @@ export default function NewProductPage() {
       values.title.trim() &&
       values.description.trim() &&
       values.category_id &&
-      values.brand_id
+      values.brand_id &&
+      values.supplier_id &&
+      values.selling_price.trim() &&
+      values.cost.trim() &&
+      values.currency &&
+      values.stock_quantity.trim() &&
+      totalGalleryUrlImages > 0
     );
-  }, [values.title, values.description, values.category_id, values.brand_id]);
+  }, [
+    values.title,
+    values.description,
+    values.category_id,
+    values.brand_id,
+    values.supplier_id,
+    values.selling_price,
+    values.cost,
+    values.currency,
+    values.stock_quantity,
+    totalGalleryUrlImages,
+  ]);
 
   const selectedTaxRate = React.useMemo(() => {
     const tax = taxRows.find((t) => t.id === values.tax_id);
@@ -644,8 +661,46 @@ export default function NewProductPage() {
 
   const canSave = canCreate && productDetailsComplete;
 
+  const validateRequiredFields = React.useCallback(() => {
+    const missing: string[] = [];
+
+    if (!values.title.trim()) missing.push("Product Name");
+    if (!values.description.trim()) missing.push("Description");
+    if (!values.category_id) missing.push("Category");
+    if (!values.brand_id) missing.push("Brand");
+    if (!values.supplier_id) missing.push("Supplier");
+    if (!values.selling_price.trim()) missing.push("Selling Price");
+    if (!values.cost.trim()) missing.push("Cost");
+    if (!values.currency) missing.push("Currency");
+    if (!values.stock_quantity.trim()) missing.push("Stock Quantity");
+    if (totalGalleryUrlImages <= 0) missing.push("Featured Image");
+
+    return missing;
+  }, [
+    values.title,
+    values.description,
+    values.category_id,
+    values.brand_id,
+    values.supplier_id,
+    values.selling_price,
+    values.cost,
+    values.currency,
+    values.stock_quantity,
+    totalGalleryUrlImages,
+  ]);
+
   const saveProduct = async () => {
     if (!canSave || isUploading) return; // Prevent double submission
+
+    const missing = validateRequiredFields();
+    if (missing.length > 0) {
+      setUploadErrors([`Please fill in: ${missing.join(", ")}`]);
+      notifyError(
+        "Missing required fields",
+        `Please fill in: ${missing.join(", ")}`
+      );
+      return;
+    }
 
     setIsUploading(true);
     setUploadErrors([]);
@@ -1392,7 +1447,7 @@ export default function NewProductPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
-                    <div className="mt-1 text-xs text-muted-foreground">Select up to 9 images; the first becomes featured.</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; the first becomes featured.</div>
                   </div>
 
                   <Button
@@ -1401,7 +1456,7 @@ export default function NewProductPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() => featuredImageInputRef.current?.click()}
-                    disabled={totalGalleryUrlImages >= 9}
+                    disabled={totalGalleryUrlImages >= 10}
                   >
                     <Upload className="h-4 w-4" />
                     Upload
@@ -1435,7 +1490,7 @@ export default function NewProductPage() {
                   ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/9 uploaded</div>
+                        <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/10 uploaded</div>
                         <button
                           type="button"
                           className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
@@ -1458,13 +1513,12 @@ export default function NewProductPage() {
                         if (!current) return null;
 
                         return (
-                          <div className="relative mx-auto h-72 w-full max-w-md overflow-hidden rounded-xl border bg-muted group">
-                            <Image
+                          <div className="relative mx-auto h-72 w-full overflow-hidden rounded-xl border bg-muted group">
+                            <img
                               src={current.url}
                               alt={current.file.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
                             />
 
                             <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -1546,7 +1600,7 @@ export default function NewProductPage() {
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">URL Images & Video</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Add URL links for images/videos; image links share the 9-image limit.
+                      Add URL links for images/videos; image links share the 10-image limit.
                     </div>
                   </div>
 
@@ -1594,33 +1648,42 @@ export default function NewProductPage() {
                     {urlMediaBox.images.length > 0 ? (
                       (() => {
                         const current = urlMediaBox.images[urlImageCarouselIndex];
-                        const canGoPrev = urlMediaBox.images.length > 1;
-                        const canGoNext = urlMediaBox.images.length > 1;
                         const isFeaturedUrlImage =
                           featuredSource === "url" && urlMediaBox.images[0]?.id === current?.id;
+                        const canGoPrev = urlMediaBox.images.length > 1;
+                        const canGoNext = urlMediaBox.images.length > 1;
 
                         if (!current) return null;
 
                         return (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/9 uploaded</div>
+                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/10 uploaded</div>
                               <button
                                 type="button"
-                                className="text-sm font-semibold text-neutral-900 hover:text-neutral-700 focus-visible:text-neutral-700 disabled:text-neutral-300"
-                                onClick={() => removeImageUrlFromBox(current.id)}
+                                className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                                onClick={() => setUrlBoxField({ images: [] })}
+                                disabled={isUploading}
                               >
                                 Clear All
                               </button>
                             </div>
 
                             <div className="relative mx-auto h-32 w-full overflow-hidden rounded-xl border bg-muted group">
-                              <Image
+                              <img
                                 src={current.url}
                                 alt="URL image"
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, 33vw"
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  // Fallback: try without crossOrigin if it fails
+                                  if (target.crossOrigin === "anonymous") {
+                                    target.crossOrigin = "";
+                                    target.src = current.url;
+                                  }
+                                }}
                               />
 
                               <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
