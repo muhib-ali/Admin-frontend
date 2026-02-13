@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
-import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllSubcategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -153,11 +153,14 @@ export default function NewProductPage() {
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
   const [customerVisibilityGroups, setCustomerVisibilityGroups] = React.useState<Option[]>([]);
+  const [subcategories, setSubcategories] = React.useState<Option[]>([]);
+  const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
   const [values, setValues] = React.useState(() => ({
     title: "",
     description: "",
     category_id: "",
+    subcategory_id: "",
     brand_id: "",
     supplier_id: "",
     tax_id: "",
@@ -202,6 +205,8 @@ export default function NewProductPage() {
     model: "",
     year: "",
   });
+  const variantValuesRef = React.useRef(variantValues);
+  variantValuesRef.current = variantValues;
   const [newVariantName, setNewVariantName] = React.useState("");
 
   const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null);
@@ -284,6 +289,27 @@ export default function NewProductPage() {
 
     return () => ac.abort();
   }, []);
+
+  // Load subcategories when category is selected
+  React.useEffect(() => {
+    if (!values.category_id) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    setSubcategoriesLoading(true);
+    getAllSubcategoriesDropdown(values.category_id)
+      .then((list) => {
+        if (!cancelled) setSubcategories((list ?? []).map((s: { label: string; value: string }) => ({ id: s.value, name: s.label })));
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSubcategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [values.category_id]);
 
   // Update form values when selected country changes
   React.useEffect(() => {
@@ -647,6 +673,9 @@ export default function NewProductPage() {
   const saveProduct = async () => {
     if (!canSave || isUploading) return; // Prevent double submission
 
+    // Capture latest variant values so custom variant values are sent correctly after async steps
+    variantValuesRef.current = variantValues;
+
     setIsUploading(true);
     setUploadErrors([]);
 
@@ -695,6 +724,7 @@ export default function NewProductPage() {
       const defaultVariants: { vtype_id: string; value: string }[] = [];
       const customVariantNames: string[] = [];
 
+      const currentVariantValues = variantValuesRef.current;
       selectedVariantKeys.forEach((key) => {
         const normalizedKey = normalizeVariantKey(key);
         const variantType = variantTypes.find(
@@ -705,7 +735,7 @@ export default function NewProductPage() {
           // This is a default variant (size, model, year)
           defaultVariants.push({
             vtype_id: variantType.id,
-            value: String(variantValues[normalizedKey] ?? "").trim(),
+            value: String(currentVariantValues[normalizedKey] ?? "").trim(),
           });
         } else {
           // This is a custom variant that needs to be created
@@ -720,6 +750,7 @@ export default function NewProductPage() {
         price: convertedPrice,
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
+        subcategory_id: values.subcategory_id || undefined,
         brand_id: values.brand_id,
         currency: targetCurrency,
         is_active: Boolean(values.is_active),
@@ -775,12 +806,13 @@ export default function NewProductPage() {
             }
           }
 
-          // Now update product with all variants (default + custom)
+          // Now update product with all variants (default + custom); use ref for latest values
+          const latestVariantValues = variantValuesRef.current;
           const allVariants = [
             ...defaultVariants,
             ...customVariantTypes.map((cvt) => ({
               vtype_id: cvt.id,
-              value: String(variantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
+              value: String(latestVariantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
             })),
           ];
 
@@ -789,8 +821,10 @@ export default function NewProductPage() {
               id: productId,
               title: values.title.trim(),
               price: convertedPrice,
+              total_price: convertedTotalPrice,
               stock_quantity: Number(values.stock_quantity) || 0,
               category_id: values.category_id,
+              subcategory_id: values.subcategory_id || undefined,
               brand_id: values.brand_id,
               currency: targetCurrency,
               variants: allVariants,
@@ -884,7 +918,7 @@ export default function NewProductPage() {
                 <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.category_id}
-                  onValueChange={(v) => setValues((p) => ({ ...p, category_id: v }))}
+                  onValueChange={(v) => setValues((p) => ({ ...p, category_id: v, subcategory_id: "" }))}
                 >
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select" />
@@ -893,6 +927,26 @@ export default function NewProductPage() {
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-semibold">Subcategory</Label>
+                <Select
+                  value={values.subcategory_id}
+                  onValueChange={(v) => setValues((p) => ({ ...p, subcategory_id: v }))}
+                  disabled={!values.category_id || subcategoriesLoading}
+                >
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue placeholder={!values.category_id ? "Select category first" : subcategoriesLoading ? "Loading..." : "Optional"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcategories.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

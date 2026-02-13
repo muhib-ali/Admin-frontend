@@ -9,6 +9,7 @@ export const ADMIN_LINK_PERM: Record<string, string> = {
   "/dashboard/products":     ENTITY_PERMS.products.list,
   "/dashboard/brands":       ENTITY_PERMS.brands.list,
   "/dashboard/categories":   ENTITY_PERMS.categories.list,
+  "/dashboard/subcategories": ENTITY_PERMS.subcategories.list,
   "/dashboard/warehouses":   ENTITY_PERMS.warehouses.list,
   "/dashboard/jobFiles":     ENTITY_PERMS.jobFiles.list,
   "/dashboard/tax":          ENTITY_PERMS.taxes.list,
