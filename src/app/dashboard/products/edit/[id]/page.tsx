@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllSubcategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import { listTaxes } from "@/services/taxes";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
@@ -142,11 +142,14 @@ export default function ProductEditPage() {
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
   const [customerVisibilityGroups, setCustomerVisibilityGroups] = React.useState<Option[]>([]);
+  const [subcategories, setSubcategories] = React.useState<Option[]>([]);
+  const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
   const [values, setValues] = React.useState(() => ({
     title: "",
     description: "",
     category_id: "",
+    subcategory_id: "",
     brand_id: "",
     supplier_id: "",
     tax_id: "",
@@ -280,6 +283,27 @@ export default function ProductEditPage() {
     return () => ac.abort();
   }, []);
 
+  // Load subcategories when category is selected
+  React.useEffect(() => {
+    if (!values.category_id) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    setSubcategoriesLoading(true);
+    getAllSubcategoriesDropdown(values.category_id)
+      .then((list) => {
+        if (!cancelled) setSubcategories((list ?? []).map((s: { label: string; value: string }) => ({ id: s.value, name: s.label })));
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSubcategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [values.category_id]);
+
   React.useEffect(() => {
     const ac = new AbortController();
 
@@ -407,6 +431,7 @@ export default function ProductEditPage() {
           title: productData?.title ?? "",
           description: productData?.description ?? "",
           category_id: productData?.category_id ?? "",
+          subcategory_id: productData?.subcategory_id ?? productData?.subcategory?.id ?? "",
           brand_id: productData?.brand_id ?? "",
           supplier_id: productData?.supplier_id ?? "",
           tax_id: productData?.tax_id ?? "",
@@ -854,6 +879,7 @@ export default function ProductEditPage() {
         price: basePrice,
         stock_quantity: product.stock_quantity || values.stock_quantity || 0,
         category_id: product.category_id || values.category_id || "",
+        subcategory_id: (values.subcategory_id || (product as any)?.subcategory_id) || undefined,
         brand_id: product.brand_id || values.brand_id || "",
         currency: product.currency || values.currency || "NOK",
         total_price: priceAfterDiscount,
@@ -1048,6 +1074,7 @@ export default function ProductEditPage() {
         price: convertedPrice,
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
+        subcategory_id: values.subcategory_id || undefined,
         brand_id: values.brand_id,
         currency: targetCurrency,
         is_active: (product as any)?.is_active ?? true,
@@ -1492,7 +1519,7 @@ export default function ProductEditPage() {
                     <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
                     <Select
                       value={values.category_id}
-                      onValueChange={(v) => setValues((p) => ({ ...p, category_id: v }))}
+                      onValueChange={(v) => setValues((p) => ({ ...p, category_id: v, subcategory_id: "" }))}
                     >
                       <SelectTrigger className="h-10 w-full">
                         <SelectValue placeholder="Select" />
@@ -1501,6 +1528,26 @@ export default function ProductEditPage() {
                         {categories.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="font-semibold">Subcategory</Label>
+                    <Select
+                      value={values.subcategory_id}
+                      onValueChange={(v) => setValues((p) => ({ ...p, subcategory_id: v }))}
+                      disabled={!values.category_id || subcategoriesLoading}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder={!values.category_id ? "Select category first" : subcategoriesLoading ? "Loading..." : "Optional"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subcategories.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

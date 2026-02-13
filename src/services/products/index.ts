@@ -365,6 +365,7 @@ export async function createProduct(payload: {
   price: number;
   stock_quantity: number;
   category_id: string;
+  subcategory_id?: string | null;
   brand_id: string;
   currency: string;
   product_img_url?: string | null;
@@ -416,6 +417,7 @@ export async function updateProduct(payload: {
   price?: number;
   stock_quantity?: number;
   category_id?: string;
+  subcategory_id?: string | null;
   brand_id?: string;
   currency?: string;
   product_img_url?: string | null;
