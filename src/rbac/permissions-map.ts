@@ -73,6 +73,13 @@ export const ENTITY_PERMS = {
     update: "categories/update",
     delete: "categories/delete",
   },
+  subcategories: {
+    list:   "subcategories/getAll",
+    create: "subcategories/create",
+    read:   "subcategories/getById",
+    update: "subcategories/update",
+    delete: "subcategories/delete",
+  },
   warehouses: {
     list:   "warehouses/getAll",
     create: "warehouses/create",
@@ -148,6 +155,7 @@ export const SCREEN_PERM: Record<string, string> = {
 
   "/dashboard/brands":                  ENTITY_PERMS.brands.list,
   "/dashboard/categories":              ENTITY_PERMS.categories.list,
+  "/dashboard/subcategories":           ENTITY_PERMS.subcategories.list,
   "/dashboard/warehouses":              ENTITY_PERMS.warehouses.list,
 
   "/dashboard/permissions":             ENTITY_PERMS.permissions.list,

@@ -21,6 +21,10 @@ type CategoriesDropdownData = {
   categoriesDropdown: DropdownItem[];
 };
 
+type SubcategoriesDropdownData = {
+  subcategoriesDropdown: DropdownItem[];
+};
+
 type TaxesDropdownData = {
   taxesDropdown: DropdownItem[];
 };
@@ -115,6 +119,20 @@ export async function getAllCategoriesDropdown(opts?: { signal?: AbortSignal }) 
     )
   );
   return data?.data?.categoriesDropdown ?? [];
+}
+
+export async function getAllSubcategoriesDropdown(
+  categoryId: string | undefined,
+  opts?: { signal?: AbortSignal }
+): Promise<DropdownItem[]> {
+  if (!categoryId) return [];
+  const { data } = await with429Retry(() =>
+    api.get<DropdownsResponse<SubcategoriesDropdownData>>(
+      "/dropdowns/getAllSubcategories",
+      { params: { categoryId }, signal: opts?.signal }
+    )
+  );
+  return data?.data?.subcategoriesDropdown ?? [];
 }
 
 export async function getAllTaxesDropdown(opts?: { signal?: AbortSignal }) {

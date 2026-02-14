@@ -104,6 +104,7 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
   const productMgmtPerms = React.useMemo(
     () => ({
       categories: ADMIN_LINK_PERM["/dashboard/categories"],
+      subcategories: ADMIN_LINK_PERM["/dashboard/subcategories"],
       brands: ADMIN_LINK_PERM["/dashboard/brands"],
       products: ADMIN_LINK_PERM["/dashboard/products"],
     }),
@@ -120,10 +121,11 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
   );
 
   const canSeeCategories = useHasPermission(productMgmtPerms.categories);
+  const canSeeSubcategories = useHasPermission(productMgmtPerms.subcategories);
   const canSeeBrands = useHasPermission(productMgmtPerms.brands);
   const canSeeProducts = useHasPermission(productMgmtPerms.products);
   const canSeeProductMgmt =
-    canSeeCategories || canSeeBrands || canSeeProducts;
+    canSeeCategories || canSeeSubcategories || canSeeBrands || canSeeProducts;
 
   const canSeeOrders = useHasPermission(orderMgmtPerms.orders);
   const canSeeBulkOrders = useHasPermission(orderMgmtPerms.bulkOrders);
@@ -168,6 +170,7 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
 
     if (
       pathname.startsWith("/dashboard/categories") ||
+      pathname.startsWith("/dashboard/subcategories") ||
       pathname.startsWith("/dashboard/brands") ||
       pathname.startsWith("/dashboard/products")
     ) {
@@ -390,6 +393,7 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
                   className={cn(
                     "group relative flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all",
                     (pathname?.startsWith("/dashboard/categories") ||
+                      pathname?.startsWith("/dashboard/subcategories") ||
                       pathname?.startsWith("/dashboard/brands") ||
                       pathname?.startsWith("/dashboard/products"))
                       ? "bg-zinc-900 text-white before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-red-600 before:rounded-r"
@@ -401,6 +405,7 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
                       className={cn(
                         "h-5 w-5 shrink-0 transition-colors",
                         pathname?.startsWith("/dashboard/categories") ||
+                          pathname?.startsWith("/dashboard/subcategories") ||
                           pathname?.startsWith("/dashboard/brands") ||
                           pathname?.startsWith("/dashboard/products")
                           ? "text-red-600"
@@ -439,6 +444,29 @@ export default function Sidebar({ collapsed = false, onToggle }: Props) {
                           )}
                         />
                         <span className="truncate">Categories</span>
+                      </Link>
+                    </PermissionGate>
+
+                    <PermissionGate route={productMgmtPerms.subcategories} fallback={null}>
+                      <Link
+                        href="/dashboard/subcategories"
+                        onClick={(e) => handleNavigation(e, "/dashboard/subcategories")}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                          pathname?.startsWith("/dashboard/subcategories")
+                            ? "bg-zinc-900 text-white"
+                            : "text-gray-500 hover:bg-zinc-900 hover:text-white"
+                        )}
+                      >
+                        <FolderTree
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors",
+                            pathname?.startsWith("/dashboard/subcategories")
+                              ? "text-red-600"
+                              : "text-gray-500 group-hover:text-red-600"
+                          )}
+                        />
+                        <span className="truncate">Subcategories</span>
                       </Link>
                     </PermissionGate>
 
