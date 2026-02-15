@@ -189,3 +189,71 @@ export const useProductFormStore = create<ProductFormStoreState>((set, get) => (
     });
   },
 }));
+
+// Separate store for Add Product page
+export const useAddProductFormStore = create<ProductFormStoreState>((set, get) => ({
+  values: initialValues("NOK"),
+  media: initialMediaState(),
+
+  setValues: (patch) => set((s) => ({ values: { ...s.values, ...patch } })),
+  updateValues: (updater) =>
+    set((s) => {
+      const next = updater(s.values);
+      const patch = (next ?? {}) as Partial<ProductFormValues>;
+      const isFullReplace =
+        typeof (next as any)?.title === "string" &&
+        typeof (next as any)?.description === "string" &&
+        typeof (next as any)?.currency === "string";
+      return {
+        values: isFullReplace ? (next as ProductFormValues) : { ...s.values, ...patch },
+      };
+    }),
+  replaceValues: (next) => set({ values: next }),
+  setField: (key, value) => set((s) => ({ values: { ...s.values, [key]: value } })),
+
+  setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
+  updateMedia: (updater) => set((s) => ({ media: updater(s.media) })),
+  replaceMedia: (next) => set({ media: next }),
+
+  reset: (next) => {
+    const currency = next?.values?.currency ?? get().values.currency ?? "NOK";
+    set({
+      values: { ...initialValues(currency), ...(next?.values ?? {}) },
+      media: { ...initialMediaState(), ...(next?.media ?? {}) },
+    });
+  },
+}));
+
+// Separate store for Edit Product page
+export const useEditProductFormStore = create<ProductFormStoreState>((set, get) => ({
+  values: initialValues("NOK"),
+  media: initialMediaState(),
+
+  setValues: (patch) => set((s) => ({ values: { ...s.values, ...patch } })),
+  updateValues: (updater) =>
+    set((s) => {
+      const next = updater(s.values);
+      const patch = (next ?? {}) as Partial<ProductFormValues>;
+      const isFullReplace =
+        typeof (next as any)?.title === "string" &&
+        typeof (next as any)?.description === "string" &&
+        typeof (next as any)?.currency === "string";
+      return {
+        values: isFullReplace ? (next as ProductFormValues) : { ...s.values, ...patch },
+      };
+    }),
+  replaceValues: (next) => set({ values: next }),
+  setField: (key, value) => set((s) => ({ values: { ...s.values, [key]: value } })),
+
+  setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
+  updateMedia: (updater) => set((s) => ({ media: updater(s.media) })),
+  replaceMedia: (next) => set({ media: next }),
+
+  reset: (next) => {
+    const currency = next?.values?.currency ?? get().values.currency ?? "NOK";
+    set({
+      values: { ...initialValues(currency), ...(next?.values ?? {}) },
+      media: { ...initialMediaState(), ...(next?.media ?? {}) },
+    });
+  },
+}));

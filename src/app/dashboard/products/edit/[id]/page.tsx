@@ -8,11 +8,12 @@ import { listTaxes } from "@/services/taxes";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
+import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { notifyError, notifySuccess, notifyInfo } from "@/utils/notify";
 import { Upload, X, Video, Loader2, SearchX, ImageIcon, Star } from "lucide-react";
 import Image from "next/image";
-import { useProductFormStore } from "@/stores/product-form-store";
+import { useEditProductFormStore } from "@/stores/product-form-store";
 import type { ProductFormValues } from "@/stores/product-form-store";
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
@@ -134,14 +135,30 @@ export default function ProductEditPage() {
   const id = String(params?.id ?? "");
   const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
-  const values = useProductFormStore((s) => s.values);
-  const updateValues = useProductFormStore((s) => s.updateValues);
-  const storeSetValues = useProductFormStore((s) => s.setValues);
-  const resetProductForm = useProductFormStore((s) => s.reset);
+  // Set refresh flag on page load to detect actual refreshes
+  React.useEffect(() => {
+    // Set flag to detect if this is a refresh (not initial load)
+    if (performance.getEntriesByType && performance.getEntriesByType('navigation').length > 0) {
+      const navigationEntries = performance.getEntriesByType('navigation');
+      const lastNavigation = navigationEntries[navigationEntries.length - 1] as PerformanceNavigationTiming;
+      if (lastNavigation.type === 'reload' || sessionStorage.getItem('productFormVisited') === 'true') {
+        sessionStorage.setItem('productFormRefresh', 'true');
+      }
+    } else if (sessionStorage.getItem('productFormVisited') === 'true') {
+      sessionStorage.setItem('productFormRefresh', 'true');
+    }
+    // Mark page as visited
+    sessionStorage.setItem('productFormVisited', 'true');
+  }, []);
 
-  const media = useProductFormStore((s) => s.media);
-  const setMedia = useProductFormStore((s) => s.setMedia);
-  const updateMedia = useProductFormStore((s) => s.updateMedia);
+  const values = useEditProductFormStore((s) => s.values);
+  const updateValues = useEditProductFormStore((s) => s.updateValues);
+  const storeSetValues = useEditProductFormStore((s) => s.setValues);
+  const resetProductForm = useEditProductFormStore((s) => s.reset);
+
+  const media = useEditProductFormStore((s) => s.media);
+  const setMedia = useEditProductFormStore((s) => s.setMedia);
+  const updateMedia = useEditProductFormStore((s) => s.updateMedia);
 
   const canUpdate = useHasPermission(ENTITY_PERMS.products.update);
 
@@ -174,6 +191,9 @@ export default function ProductEditPage() {
   const [variantValues, setVariantValues] = React.useState<Record<string, string>>({});
   const [newVariantName, setNewVariantName] = React.useState("");
   const [recentlyAddedVariantTypes, setRecentlyAddedVariantTypes] = React.useState<Set<string>>(new Set());
+  
+  // Use global unsaved changes context
+  const { setHasUnsavedChanges } = useUnsavedChanges();
   const featuredImage = media.editFeaturedImage as StoredMediaItem | null; // Featured image (product_img_url)
   const galleryImages = media.editGalleryImages as StoredMediaItem[]; // Gallery images
   const existingVideo = media.editExistingVideo as StoredMediaItem | null; // Existing video
@@ -211,11 +231,13 @@ export default function ProductEditPage() {
     (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
       if (typeof next === "function") {
         updateValues(next);
+        setHasUnsavedChanges(true);
         return;
       }
       storeSetValues(next);
+      setHasUnsavedChanges(true);
     },
-    [storeSetValues, updateValues]
+    [storeSetValues, updateValues, setHasUnsavedChanges]
   );
 
   const setFeaturedImage = React.useCallback(
@@ -225,11 +247,13 @@ export default function ProductEditPage() {
           ...prev,
           editFeaturedImage: next(prev.editFeaturedImage as unknown as StoredMediaItem | null),
         }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ editFeaturedImage: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   const setGalleryImages = React.useCallback(
@@ -239,11 +263,13 @@ export default function ProductEditPage() {
           ...prev,
           editGalleryImages: next(prev.editGalleryImages as unknown as StoredMediaItem[]),
         }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ editGalleryImages: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   const setExistingVideo = React.useCallback(
@@ -253,67 +279,63 @@ export default function ProductEditPage() {
           ...prev,
           editExistingVideo: next(prev.editExistingVideo as unknown as StoredMediaItem | null),
         }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ editExistingVideo: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   const setPendingFeaturedImage = React.useCallback(
     (next: MediaUpload | null | ((prev: MediaUpload | null) => MediaUpload | null)) => {
       if (typeof next === "function") {
         updateMedia((prev) => ({ ...prev, pendingFeaturedImage: next(prev.pendingFeaturedImage) }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ pendingFeaturedImage: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   const setPendingGalleryImages = React.useCallback(
     (next: MediaUpload[] | ((prev: MediaUpload[]) => MediaUpload[])) => {
       if (typeof next === "function") {
         updateMedia((prev) => ({ ...prev, pendingGalleryImages: next(prev.pendingGalleryImages) }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ pendingGalleryImages: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   const setPendingVideo = React.useCallback(
     (next: MediaUpload | null | ((prev: MediaUpload | null) => MediaUpload | null)) => {
       if (typeof next === "function") {
         updateMedia((prev) => ({ ...prev, pendingVideo: next(prev.pendingVideo) }));
+        setHasUnsavedChanges(true);
         return;
       }
       setMedia({ pendingVideo: next });
+      setHasUnsavedChanges(true);
     },
-    [setMedia, updateMedia]
+    [setMedia, updateMedia, setHasUnsavedChanges]
   );
 
   React.useEffect(() => {
-    resetProductForm({
-      values: { currency: getCurrencyCode() },
-      media: {
-        editFeaturedImage: null,
-        editGalleryImages: [],
-        editExistingVideo: null,
-        pendingFeaturedImage: null,
-        pendingGalleryImages: [],
-        pendingVideo: null,
-        featuredSource: null,
-        featuredBoxImages: [],
-        featuredImage: null,
-        featuredBoxCarouselIndex: 0,
-        urlMediaBox: { imageUrlInput: "", images: [], videoUrlInput: "", videoUrl: "" },
-        urlImageCarouselIndex: 0,
-        videoFile: null,
-      },
-    });
-
-    return () => {
+    // Only reset on explicit page refresh, not on navigation
+    const isPageRefresh = sessionStorage.getItem('productFormRefresh') === 'true';
+    
+    if (isPageRefresh) {
+      // Clear user data flag on page refresh
+      const userFormDataKey = `editProduct_${id}_userData`;
+      sessionStorage.removeItem(userFormDataKey);
+      
       resetProductForm({
         values: { currency: getCurrencyCode() },
         media: {
@@ -323,17 +345,24 @@ export default function ProductEditPage() {
           pendingFeaturedImage: null,
           pendingGalleryImages: [],
           pendingVideo: null,
-          featuredSource: null,
-          featuredBoxImages: [],
-          featuredImage: null,
+          urlMediaBox: {
+            imageUrlInput: "",
+            images: [],
+            videoUrlInput: "",
+            videoUrl: "",
+          },
           featuredBoxCarouselIndex: 0,
-          urlMediaBox: { imageUrlInput: "", images: [], videoUrlInput: "", videoUrl: "" },
           urlImageCarouselIndex: 0,
-          videoFile: null,
         },
       });
+      // Clear the refresh flag after using it
+      sessionStorage.removeItem('productFormRefresh');
+    }
+    
+    return () => {
+      // Don't reset on unmount to preserve state during navigation
     };
-  }, [getCurrencyCode, id, resetProductForm]);
+  }, [getCurrencyCode, resetProductForm, id]);
 
   const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -554,44 +583,59 @@ export default function ProductEditPage() {
             }))
           ) : [];
 
-        setValues({
-          title: productData?.title ?? "",
-          description: productData?.description ?? "",
-          category_id: productData?.category_id ?? "",
-          subcategory_id: productData?.subcategory_id ?? productData?.subcategory?.id ?? "",
-          brand_id: productData?.brand_id ?? "",
-          supplier_id: productData?.supplier_id ?? "",
-          tax_id: productData?.tax_id ?? "",
-          warehouse_id: productData?.warehouse_id ?? "",
-          customer_groups: customerGroupIds,
-          currency: getCurrencyCode(),
-          selling_price: displaySellingPrice,
-          cost: displayCost,
-          freight: displayFreight,
-          discount: productData?.discount ? String(productData.discount) : "",
-          start_discount_date: formatDateForInput(productData?.start_discount_date),
-          end_discount_date: formatDateForInput(productData?.end_discount_date),
-          total_price: displayTotalPrice,
-          stock_quantity: String(productData?.stock_quantity ?? ""),
-          weight: productData?.weight ? String(productData.weight) : "",
-          length: productData?.length ? String(productData.length) : "",
-          width: productData?.width ? String(productData.width) : "",
-          height: productData?.height ? String(productData.height) : "",
-          visibility_wholesale: productData?.visibility_wholesale ?? true,
-          visibility_retail: productData?.visibility_retail ?? true,
-          is_active: productData?.is_active ?? true,
-        });
+        // Check if user has entered data in this specific product form
+        const userFormDataKey = `editProduct_${id}_userData`;
+        const hasUserEnteredData = sessionStorage.getItem(userFormDataKey) === 'true';
+        
+        // Check if current form has any user-entered data
+        const currentFormData = values.title || values.description || values.category_id;
+        
+        if (currentFormData) {
+          // Mark that user has entered data for this product
+          sessionStorage.setItem(userFormDataKey, 'true');
+        }
+        
+        // Only load API data if user hasn't entered data yet
+        if (!hasUserEnteredData) {
+          setValues({
+            title: productData?.title ?? "",
+            description: productData?.description ?? "",
+            category_id: productData?.category_id ?? "",
+            subcategory_id: productData?.subcategory_id ?? productData?.subcategory?.id ?? "",
+            brand_id: productData?.brand_id ?? "",
+            supplier_id: productData?.supplier_id ?? "",
+            tax_id: productData?.tax_id ?? "",
+            warehouse_id: productData?.warehouse_id ?? "",
+            customer_groups: customerGroupIds,
+            currency: getCurrencyCode(),
+            selling_price: displaySellingPrice,
+            cost: displayCost,
+            freight: displayFreight,
+            discount: productData?.discount ? String(productData.discount) : "",
+            start_discount_date: formatDateForInput(productData?.start_discount_date),
+            end_discount_date: formatDateForInput(productData?.end_discount_date),
+            total_price: displayTotalPrice,
+            stock_quantity: String(productData?.stock_quantity ?? ""),
+            weight: productData?.weight ? String(productData.weight) : "",
+            length: productData?.length ? String(productData.length) : "",
+            width: productData?.width ? String(productData.width) : "",
+            height: productData?.height ? String(productData.height) : "",
+            visibility_wholesale: productData?.visibility_wholesale ?? true,
+            visibility_retail: productData?.visibility_retail ?? true,
+            is_active: productData?.is_active ?? true,
+          });
 
-        // Sync date range with values
-        const dateRange = stringsToDateRange(
-          formatDateForInput(productData?.start_discount_date),
-          formatDateForInput(productData?.end_discount_date)
-        );
-        setDiscountDateRange(dateRange);
+          // Sync date range with values
+          const dateRange = stringsToDateRange(
+            formatDateForInput(productData?.start_discount_date),
+            formatDateForInput(productData?.end_discount_date)
+          );
+          setDiscountDateRange(dateRange);
 
-        // Load bulk pricing
-        if (convertedBulkPricing.length > 0) {
-          setBulkPricing(convertedBulkPricing);
+          // Load bulk pricing
+          if (convertedBulkPricing.length > 0) {
+            setBulkPricing(convertedBulkPricing);
+          }
         } else {
           setBulkPricing([]);
         }
@@ -698,12 +742,19 @@ export default function ProductEditPage() {
         
         setVariantSelected(selected);
         setVariantValues(variantValuesMap);
-        setFeaturedImage(featuredImageItem);
-        setGalleryImages(galleryImagesItems);
-        setExistingVideo(videoItem);
-        setPendingFeaturedImage(null);
-        setPendingGalleryImages([]);
-        setPendingVideo(null);
+        
+        // Only load media if user hasn't entered data yet
+        if (!hasUserEnteredData) {
+          setFeaturedImage(featuredImageItem);
+          setGalleryImages(galleryImagesItems);
+          setExistingVideo(videoItem);
+          setPendingFeaturedImage(null);
+          setPendingGalleryImages([]);
+          setPendingVideo(null);
+        }
+        
+        // Reset unsaved changes state after loading product data
+        setHasUnsavedChanges(false);
       } catch (error: any) {
         notifyError(error?.message || "Failed to load product");
       } finally {
@@ -1698,6 +1749,13 @@ export default function ProductEditPage() {
         }
         
         notifySuccess("Product updated successfully!");
+        // Reset unsaved changes state after successful save
+        setHasUnsavedChanges(false);
+        
+        // Clear user data flag after successful save
+        const userFormDataKey = `editProduct_${id}_userData`;
+        sessionStorage.removeItem(userFormDataKey);
+        
         // Redirect to products list after successful update
         setTimeout(() => {
           router.push("/dashboard/products");
@@ -1724,7 +1782,7 @@ export default function ProductEditPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/dashboard/products`)}>
+            <Button variant="outline" onClick={() => router.push('/dashboard/products')}>
               Cancel
             </Button>
             <Button onClick={save} disabled={!product || !values.title.trim() || !hasAtLeastOneImage || totalEditImages > 10 || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800">

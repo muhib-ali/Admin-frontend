@@ -5,7 +5,7 @@ import { ImageIcon, Play, Upload, Video, Star, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { DateRange } from "react-day-picker";
 
-import { useProductFormStore } from "@/stores/product-form-store";
+import { useAddProductFormStore } from "@/stores/product-form-store";
 import type { ProductFormValues } from "@/stores/product-form-store";
 
 import galleryImageLogo from "../../../../../logos/gallery image logo.png";
@@ -26,12 +26,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllSubcategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
+import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
 import { notifyError } from "@/utils/notify";
 
 type Option = { id: string; name: string };
@@ -137,14 +139,30 @@ export default function NewProductPage() {
   const canCreate = useHasPermission(ENTITY_PERMS.products.create);
   const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
-  const values = useProductFormStore((s) => s.values);
-  const updateValues = useProductFormStore((s) => s.updateValues);
-  const storeSetValues = useProductFormStore((s) => s.setValues);
-  const resetProductForm = useProductFormStore((s) => s.reset);
+  // Set refresh flag on page load to detect actual refreshes
+  React.useEffect(() => {
+    // Set flag to detect if this is a refresh (not initial load)
+    if (performance.getEntriesByType && performance.getEntriesByType('navigation').length > 0) {
+      const navigationEntries = performance.getEntriesByType('navigation');
+      const lastNavigation = navigationEntries[navigationEntries.length - 1] as PerformanceNavigationTiming;
+      if (lastNavigation.type === 'reload' || sessionStorage.getItem('productFormVisited') === 'true') {
+        sessionStorage.setItem('productFormRefresh', 'true');
+      }
+    } else if (sessionStorage.getItem('productFormVisited') === 'true') {
+      sessionStorage.setItem('productFormRefresh', 'true');
+    }
+    // Mark page as visited
+    sessionStorage.setItem('productFormVisited', 'true');
+  }, []);
 
-  const media = useProductFormStore((s) => s.media);
-  const updateMedia = useProductFormStore((s) => s.updateMedia);
-  const setMedia = useProductFormStore((s) => s.setMedia);
+  const values = useAddProductFormStore((s) => s.values);
+  const updateValues = useAddProductFormStore((s) => s.updateValues);
+  const storeSetValues = useAddProductFormStore((s) => s.setValues);
+  const resetProductForm = useAddProductFormStore((s) => s.reset);
+
+  const media = useAddProductFormStore((s) => s.media);
+  const updateMedia = useAddProductFormStore((s) => s.updateMedia);
+  const setMedia = useAddProductFormStore((s) => s.setMedia);
 
   const normalizeVariantKey = React.useCallback((name: string) => {
     return String(name || "")
@@ -164,15 +182,20 @@ export default function NewProductPage() {
   const [subcategories, setSubcategories] = React.useState<Option[]>([]);
   const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
+  // Use global unsaved changes context
+  const { setHasUnsavedChanges } = useUnsavedChanges();
+
   const setValues = React.useCallback(
     (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
       if (typeof next === "function") {
         updateValues(next);
+        setHasUnsavedChanges(true);
         return;
       }
       storeSetValues(next);
+      setHasUnsavedChanges(true);
     },
-    [storeSetValues, updateValues]
+    [storeSetValues, updateValues, setHasUnsavedChanges]
   );
 
   const [variantsOpen, setVariantsOpen] = React.useState(false);
@@ -278,9 +301,17 @@ export default function NewProductPage() {
   }, []);
 
   React.useEffect(() => {
-    resetProductForm({ values: { currency: getCurrencyCode() } });
-    return () => {
+    // Only reset on explicit page refresh, not on navigation
+    const isPageRefresh = sessionStorage.getItem('productFormRefresh') === 'true';
+    
+    if (isPageRefresh) {
       resetProductForm({ values: { currency: getCurrencyCode() } });
+      // Clear the refresh flag after using it
+      sessionStorage.removeItem('productFormRefresh');
+    }
+    
+    return () => {
+      // Don't reset on unmount to preserve state during navigation
     };
   }, [getCurrencyCode, resetProductForm]);
 
