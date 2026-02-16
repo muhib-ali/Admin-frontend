@@ -50,24 +50,24 @@ export function ProductCard({
   React.useEffect(() => {
     const convertPrice = async () => {
       if (!selectedCountry) {
-        setConvertedPrice({ amount: displayPriceValue, symbol: '$' });
+        setConvertedPrice({ amount: displayPriceValue, symbol: 'kr' });
         return;
       }
 
       try {
         const targetCurrency = Object.keys(selectedCountry.currencies)[0];
-        const targetSymbol = Object.values(selectedCountry.currencies)[0]?.symbol || '$';
+        const targetSymbol = Object.values(selectedCountry.currencies)[0]?.symbol || 'kr';
         
-        if (targetCurrency === 'USD') {
+        if (targetCurrency === 'NOK') {
           setConvertedPrice({ amount: displayPriceValue, symbol: targetSymbol });
           return;
         }
 
-        const converted = await convertAmount(displayPriceValue, 'USD', targetCurrency);
+        const converted = await convertAmount(displayPriceValue, 'NOK', targetCurrency);
         setConvertedPrice({ amount: converted, symbol: targetSymbol });
       } catch (error) {
         console.error('Error converting price in ProductCard:', error);
-        setConvertedPrice({ amount: displayPriceValue, symbol: '$' });
+        setConvertedPrice({ amount: displayPriceValue, symbol: 'kr' });
       }
     };
 
@@ -144,7 +144,7 @@ export function ProductCard({
           </div>
           <div className="text-right shrink-0">
             <div className="text-base font-bold text-gray-900">
-              {convertedPrice ? `${convertedPrice.symbol} ${convertedPrice.amount.toFixed(2)}` : `$${product.price.toFixed(2)}`}
+              {convertedPrice ? `${convertedPrice.symbol} ${convertedPrice.amount.toFixed(2)}` : `kr ${product.price.toFixed(2)}`}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               Stock: {product.stock_quantity}

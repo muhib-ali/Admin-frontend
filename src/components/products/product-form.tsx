@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteProductImage, uploadProductImage } from "@/services/products";
+import { getAllSubcategoriesDropdown } from "@/services/dropdowns";
 
 export type CategoryOption = {
   id: string;
@@ -59,6 +60,7 @@ export type ProductFormValues = {
   price: string;
   stock_quantity: string;
   category_id: string;
+  subcategory_id?: string | null;
   brand_id: string;
   currency: string;
   is_active: boolean;
@@ -101,6 +103,9 @@ export function ProductForm({
     >
   >;
 
+  const [subcategories, setSubcategories] = React.useState<{ label: string; value: string }[]>([]);
+  const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
+
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [uploadedThisSessionFileName, setUploadedThisSessionFileName] =
@@ -119,8 +124,9 @@ export function ProductForm({
     price: initial?.price ?? "",
     stock_quantity: initial?.stock_quantity ?? "",
     category_id: initial?.category_id ?? "",
+    subcategory_id: initial?.subcategory_id ?? null,
     brand_id: initial?.brand_id ?? "",
-    currency: initial?.currency ?? "USD",
+    currency: initial?.currency ?? "NOK",
     is_active: initial?.is_active ?? true,
     product_img_url: initial?.product_img_url ?? null,
     product_img_fileName: initial?.product_img_fileName ?? null,
@@ -139,8 +145,9 @@ export function ProductForm({
       price: initial?.price ?? "",
       stock_quantity: initial?.stock_quantity ?? "",
       category_id: initial?.category_id ?? "",
+      subcategory_id: initial?.subcategory_id ?? null,
       brand_id: initial?.brand_id ?? "",
-      currency: initial?.currency ?? "USD",
+      currency: initial?.currency ?? "NOK",
       is_active: initial?.is_active ?? true,
       product_img_url: initial?.product_img_url ?? null,
       product_img_fileName: initial?.product_img_fileName ?? null,
@@ -148,6 +155,27 @@ export function ProductForm({
     setUploadedThisSessionFileName(null);
     setUploadedThisSessionUrl(null);
   }, [open, initial]);
+
+  // Load subcategories when category is selected
+  React.useEffect(() => {
+    if (!values.category_id) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    setSubcategoriesLoading(true);
+    getAllSubcategoriesDropdown(values.category_id)
+      .then((list) => {
+        if (!cancelled) setSubcategories(list);
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSubcategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [values.category_id]);
 
   const isDirty = React.useMemo(() => {
     const i = initialRef.current;
@@ -162,6 +190,7 @@ export function ProductForm({
           values.price.trim() ||
           values.stock_quantity.trim() ||
           values.category_id ||
+          (values.subcategory_id ?? "") ||
           values.brand_id ||
           values.currency ||
           imgUrl ||
@@ -175,6 +204,7 @@ export function ProductForm({
       values.price !== i.price ||
       values.stock_quantity !== i.stock_quantity ||
       values.category_id !== i.category_id ||
+      (values.subcategory_id ?? null) !== (i.subcategory_id ?? null) ||
       values.brand_id !== i.brand_id ||
       values.currency !== i.currency ||
       values.is_active !== i.is_active ||
@@ -207,6 +237,10 @@ export function ProductForm({
 
     setConfirmCloseOpen(false);
     onOpenChange(false);
+  };
+
+  const handleCategoryChange = (v: string) => {
+    setValues((p) => ({ ...p, category_id: v, subcategory_id: null }));
   };
 
   const handleOpenChange = async (v: boolean) => {
@@ -335,6 +369,7 @@ export function ProductForm({
         ...values,
         title,
         description,
+        subcategory_id: values.subcategory_id || null,
         product_img_url: uploadedThisSessionUrl ?? values.product_img_url ?? null,
         product_img_fileName:
           uploadedThisSessionFileName ?? values.product_img_fileName ?? null,
@@ -450,9 +485,7 @@ export function ProductForm({
               <Label>Category</Label>
               <Select
                 value={values.category_id}
-                onValueChange={(v) =>
-                  setValues((p) => ({ ...p, category_id: v }))
-                }
+                onValueChange={handleCategoryChange}
               >
                 <SelectTrigger className="h-10 w-full">
                   <SelectValue placeholder="Choose category" />
@@ -468,6 +501,28 @@ export function ProductForm({
               {errors.category_id ? (
                 <p className="text-xs text-red-600">{errors.category_id}</p>
               ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Subcategory</Label>
+              <Select
+                value={values.subcategory_id ?? ""}
+                onValueChange={(v) =>
+                  setValues((p) => ({ ...p, subcategory_id: v || null }))
+                }
+                disabled={!values.category_id || subcategoriesLoading}
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder={!values.category_id ? "Select category first" : subcategoriesLoading ? "Loading..." : "Choose subcategory (optional)"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
@@ -583,6 +638,7 @@ export function ProductForm({
                   <SelectValue placeholder="Choose currency" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="NOK">NOK</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="PKR">PKR</SelectItem>
                   <SelectItem value="AED">AED</SelectItem>

@@ -25,11 +25,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
-import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
+import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllSubcategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
+import { notifyError } from "@/utils/notify";
 
 type Option = { id: string; name: string };
 type TaxRecord = { id: string; title: string; rate: number };
@@ -152,11 +153,14 @@ export default function NewProductPage() {
   const [warehouses, setWarehouses] = React.useState<Option[]>([]);
   const [variantTypes, setVariantTypes] = React.useState<Option[]>([]);
   const [customerVisibilityGroups, setCustomerVisibilityGroups] = React.useState<Option[]>([]);
+  const [subcategories, setSubcategories] = React.useState<Option[]>([]);
+  const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
   const [values, setValues] = React.useState(() => ({
     title: "",
     description: "",
     category_id: "",
+    subcategory_id: "",
     brand_id: "",
     supplier_id: "",
     tax_id: "",
@@ -201,6 +205,8 @@ export default function NewProductPage() {
     model: "",
     year: "",
   });
+  const variantValuesRef = React.useRef(variantValues);
+  variantValuesRef.current = variantValues;
   const [newVariantName, setNewVariantName] = React.useState("");
 
   const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null);
@@ -226,6 +232,8 @@ export default function NewProductPage() {
   const [uploadErrors, setUploadErrors] = React.useState<string[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
+
+  const [featuredSource, setFeaturedSource] = React.useState<"upload" | "url" | null>(null);
 
   // Date range state for discount dates
   const [discountDateRange, setDiscountDateRange] = React.useState<DateRange | undefined>();
@@ -281,6 +289,27 @@ export default function NewProductPage() {
 
     return () => ac.abort();
   }, []);
+
+  // Load subcategories when category is selected
+  React.useEffect(() => {
+    if (!values.category_id) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    setSubcategoriesLoading(true);
+    getAllSubcategoriesDropdown(values.category_id)
+      .then((list) => {
+        if (!cancelled) setSubcategories((list ?? []).map((s: { label: string; value: string }) => ({ id: s.value, name: s.label })));
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSubcategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [values.category_id]);
 
   // Update form values when selected country changes
   React.useEffect(() => {
@@ -368,18 +397,29 @@ export default function NewProductPage() {
     });
   }, [urlMediaBox.images.length]);
 
+  React.useEffect(() => {
+    if (featuredSource === "url" && urlMediaBox.images.length === 0) {
+      setFeaturedSource(null);
+    }
+  }, [featuredSource, urlMediaBox.images.length]);
+
   const handleFeaturedImage = (files: FileList | null) => {
     if (!files?.length) return;
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024;
-    const maxFeaturedBoxImages = 9;
+    const remainingSlots = Math.max(0, 9 - (featuredBoxImages.length + urlMediaBox.images.length));
+
+    if (remainingSlots <= 0) {
+      notifyError("Image limit reached", "You cannot add more than 9 images total.");
+      return;
+    }
 
     const next: MediaItem[] = [];
     const errors: string[] = [];
 
     for (const file of Array.from(files)) {
-      if (featuredBoxImages.length + next.length >= maxFeaturedBoxImages) {
+      if (next.length >= remainingSlots) {
         errors.push("You cannot select more than 9 images.");
         break;
       }
@@ -402,6 +442,10 @@ export default function NewProductPage() {
 
     if (errors.length > 0) setUploadErrors(errors);
 
+    if (errors.some((e) => e.includes("cannot select") || e.includes("cannot add") || e.includes("more than 9"))) {
+      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
+    }
+
     if (next.length > 0) {
       setFeaturedBoxImages((prev) => {
         const merged = [...prev, ...next];
@@ -410,6 +454,8 @@ export default function NewProductPage() {
         }
         return merged;
       });
+      setFeaturedSource("upload");
+      setUrlMediaBox((prev) => prev);
       setUploadErrors([]);
     }
   };
@@ -423,6 +469,7 @@ export default function NewProductPage() {
         return [];
       });
       setFeaturedImage(null);
+      setFeaturedSource((prev) => (prev === "upload" ? null : prev));
       setFeaturedBoxCarouselIndex(0);
       return;
     }
@@ -434,6 +481,9 @@ export default function NewProductPage() {
       if (featuredImage?.id === id) {
         setFeaturedImage(next[0] ?? null);
       }
+      if (next.length === 0) {
+        setFeaturedSource((prevSource) => (prevSource === "upload" ? null : prevSource));
+      }
       return next;
     });
   };
@@ -442,6 +492,7 @@ export default function NewProductPage() {
     const img = featuredBoxImages.find((x) => x.id === id) ?? null;
     if (!img) return;
     setFeaturedImage(img);
+    setFeaturedSource("upload");
   };
 
   const handleVideo = (files: FileList | null) => {
@@ -489,6 +540,7 @@ export default function NewProductPage() {
 
     if (totalGalleryUrlImages >= 9) {
       setUploadErrors(["You cannot add more than 9 images."]);
+      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
       return;
     }
 
@@ -510,6 +562,8 @@ export default function NewProductPage() {
   };
 
   const setUrlImageAsFeatured = (id: string) => {
+    setFeaturedSource("url");
+    setFeaturedImage(null);
     setUrlMediaBox((prev) => {
       const index = prev.images.findIndex((x) => x.id === id);
       if (index === -1) return prev;
@@ -619,6 +673,9 @@ export default function NewProductPage() {
   const saveProduct = async () => {
     if (!canSave || isUploading) return; // Prevent double submission
 
+    // Capture latest variant values so custom variant values are sent correctly after async steps
+    variantValuesRef.current = variantValues;
+
     setIsUploading(true);
     setUploadErrors([]);
 
@@ -639,9 +696,9 @@ export default function NewProductPage() {
         ? totalCost - (totalCost * discountPercent) / 100
         : totalCost;
 
-      // Convert prices to USD for backend storage
+      // Convert prices to NOK for backend storage (standard currency)
       const sourceCurrency = getCurrencyCode();
-      const targetCurrency = 'USD';
+      const targetCurrency = 'NOK';
 
       let convertedPrice = basePrice;
       let convertedCost = cost;
@@ -667,6 +724,7 @@ export default function NewProductPage() {
       const defaultVariants: { vtype_id: string; value: string }[] = [];
       const customVariantNames: string[] = [];
 
+      const currentVariantValues = variantValuesRef.current;
       selectedVariantKeys.forEach((key) => {
         const normalizedKey = normalizeVariantKey(key);
         const variantType = variantTypes.find(
@@ -677,7 +735,7 @@ export default function NewProductPage() {
           // This is a default variant (size, model, year)
           defaultVariants.push({
             vtype_id: variantType.id,
-            value: String(variantValues[normalizedKey] ?? "").trim(),
+            value: String(currentVariantValues[normalizedKey] ?? "").trim(),
           });
         } else {
           // This is a custom variant that needs to be created
@@ -692,6 +750,7 @@ export default function NewProductPage() {
         price: convertedPrice,
         stock_quantity: Number(values.stock_quantity) || 0,
         category_id: values.category_id,
+        subcategory_id: values.subcategory_id || undefined,
         brand_id: values.brand_id,
         currency: targetCurrency,
         is_active: Boolean(values.is_active),
@@ -747,12 +806,13 @@ export default function NewProductPage() {
             }
           }
 
-          // Now update product with all variants (default + custom)
+          // Now update product with all variants (default + custom); use ref for latest values
+          const latestVariantValues = variantValuesRef.current;
           const allVariants = [
             ...defaultVariants,
             ...customVariantTypes.map((cvt) => ({
               vtype_id: cvt.id,
-              value: String(variantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
+              value: String(latestVariantValues[normalizeVariantKey(cvt.name)] ?? "").trim(),
             })),
           ];
 
@@ -761,8 +821,10 @@ export default function NewProductPage() {
               id: productId,
               title: values.title.trim(),
               price: convertedPrice,
+              total_price: convertedTotalPrice,
               stock_quantity: Number(values.stock_quantity) || 0,
               category_id: values.category_id,
+              subcategory_id: values.subcategory_id || undefined,
               brand_id: values.brand_id,
               currency: targetCurrency,
               variants: allVariants,
@@ -856,7 +918,7 @@ export default function NewProductPage() {
                 <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
                 <Select
                   value={values.category_id}
-                  onValueChange={(v) => setValues((p) => ({ ...p, category_id: v }))}
+                  onValueChange={(v) => setValues((p) => ({ ...p, category_id: v, subcategory_id: "" }))}
                 >
                   <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select" />
@@ -865,6 +927,26 @@ export default function NewProductPage() {
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-semibold">Subcategory</Label>
+                <Select
+                  value={values.subcategory_id}
+                  onValueChange={(v) => setValues((p) => ({ ...p, subcategory_id: v }))}
+                  disabled={!values.category_id || subcategoriesLoading}
+                >
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue placeholder={!values.category_id ? "Select category first" : subcategoriesLoading ? "Loading..." : "Optional"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcategories.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1373,7 +1455,7 @@ export default function NewProductPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() => featuredImageInputRef.current?.click()}
-                    disabled={featuredBoxImages.length >= 9}
+                    disabled={totalGalleryUrlImages >= 9}
                   >
                     <Upload className="h-4 w-4" />
                     Upload
@@ -1422,7 +1504,8 @@ export default function NewProductPage() {
 
                       {(() => {
                         const current = featuredBoxImages[featuredBoxCarouselIndex];
-                        const isFeatured = Boolean(current && featuredImage?.id === current.id);
+                        const isFeatured =
+                          featuredSource === "upload" && Boolean(current && featuredImage?.id === current.id);
                         const canGoPrev = featuredBoxImages.length > 1;
                         const canGoNext = featuredBoxImages.length > 1;
 
@@ -1453,7 +1536,8 @@ export default function NewProductPage() {
                                 e.stopPropagation();
                                 setFeaturedBoxImageAsFeatured(current.id);
                               }}
-                               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
+                              disabled={featuredSource === "url"}
+                              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
                             >
                               Set as Featured
                             </button>
@@ -1566,7 +1650,8 @@ export default function NewProductPage() {
                         const current = urlMediaBox.images[urlImageCarouselIndex];
                         const canGoPrev = urlMediaBox.images.length > 1;
                         const canGoNext = urlMediaBox.images.length > 1;
-                        const isFeaturedUrlImage = urlMediaBox.images[0]?.id === current?.id;
+                        const isFeaturedUrlImage =
+                          featuredSource === "url" && urlMediaBox.images[0]?.id === current?.id;
 
                         if (!current) return null;
 
@@ -1603,22 +1688,26 @@ export default function NewProductPage() {
 
                               <button
                                 type="button"
-                                onClick={() => removeImageUrlFromBox(current.id)}
-                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-                                aria-label="Remove image"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setUrlImageAsFeatured(current.id);
+                                }}
+                                disabled={featuredSource === "upload"}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
                               >
-                                <X className="h-3.5 w-3.5" />
+                                Set as Featured
                               </button>
 
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setUrlImageAsFeatured(current.id);
+                                  removeImageUrlFromBox(current.id);
                                 }}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                aria-label="Remove image"
                               >
-                                Set as Featured
+                                <X className="h-3.5 w-3.5" />
                               </button>
 
                               <button

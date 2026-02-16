@@ -124,12 +124,12 @@ export default function ProductViewPage() {
   const [taxRows, setTaxRows] = React.useState<{ id: string; title: string; rate: number }[]>([]);
 
   const displayPrice = React.useCallback(
-    async (price: number, fromCurrency: string = "USD") => {
-      if (!selectedCountry) return { amount: price, symbol: "$" };
+    async (price: number, fromCurrency: string = "NOK") => {
+      if (!selectedCountry) return { amount: price, symbol: "kr" };
 
       const targetCurrency = Object.keys(selectedCountry.currencies)[0];
       const targetSymbol =
-        Object.values(selectedCountry.currencies)[0]?.symbol || "$";
+        Object.values(selectedCountry.currencies)[0]?.symbol || "kr";
 
       if (fromCurrency === targetCurrency) {
         return { amount: price, symbol: targetSymbol };
@@ -144,7 +144,7 @@ export default function ProductViewPage() {
         return { amount: convertedAmount, symbol: targetSymbol };
       } catch (error) {
         console.error("Error converting price:", error);
-        return { amount: price, symbol: "$" };
+        return { amount: price, symbol: "kr" };
       }
     },
     [selectedCountry, convertAmount]
@@ -205,11 +205,11 @@ export default function ProductViewPage() {
 
         const [sellingPrice, costPrice, freightPrice, totalCostPrice, priceAfterDiscountPrice] =
           await Promise.all([
-            displayPrice(selling, product.currency || "USD"),
-            displayPrice(cost, product.currency || "USD"),
-            displayPrice(freight, product.currency || "USD"),
-            displayPrice(totalPriceWithTax, product.currency || "USD"), // Updated to include tax
-            displayPrice(priceAfterDiscount, product.currency || "USD"),
+            displayPrice(selling, product.currency || "NOK"),
+            displayPrice(cost, product.currency || "NOK"),
+            displayPrice(freight, product.currency || "NOK"),
+            displayPrice(totalPriceWithTax, product.currency || "NOK"), // Updated to include tax
+            displayPrice(priceAfterDiscount, product.currency || "NOK"),
           ]);
 
         setConvertedPrices({

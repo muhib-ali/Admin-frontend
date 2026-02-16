@@ -14,6 +14,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProductCard } from "@/components/products/product-card";
 import { svgCardImage } from "@/components/products/product-utils";
 import type {
@@ -64,10 +70,15 @@ export default function ProductsPage() {
   }, []);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const uploadButtonRef = React.useRef<HTMLSpanElement | null>(null);
   const lastBulkToastRef = React.useRef<number>(0);
   const [bulkUploadState, setBulkUploadState] = React.useState(() =>
     getProductsBulkUploadState()
   );
+  const [completionPopup, setCompletionPopup] = React.useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const [rows, setRows] = React.useState<ProductRow[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -178,7 +189,7 @@ export default function ProductsPage() {
       stock_quantity: Number(p.stock_quantity ?? 0),
       category_id: p.category_id,
       brand_id: p.brand_id,
-      currency: p.currency ?? "USD",
+      currency: p.currency ?? "NOK",
       product_img_url: p.product_img_url ?? null,
       sku: p.sku ?? null,
       is_active: Boolean(p.is_active),
@@ -288,14 +299,13 @@ export default function ProductsPage() {
       if (createdCount > 0) parts.push(`${createdCount} created`);
       if (updatedCount > 0) parts.push(`${updatedCount} updated`);
       const summary = parts.length ? parts.join(", ") : "0 created";
+      const message = `${summary}${failedCount ? `, ${failedCount} failed` : ""}`;
       if (createdCount > 0 || updatedCount > 0) {
-        notifySuccess(
-          `Bulk upload successful: ${summary}${failedCount ? `, ${failedCount} failed` : ""}`
-        );
+        notifySuccess(`Bulk upload successful: ${message}`);
+        setCompletionPopup({ message: `Upload done: ${message}`, type: "success" });
       } else {
-        notifyError(
-          `Bulk upload completed: ${summary}${failedCount ? `, ${failedCount} failed` : ""}`
-        );
+        notifyError(`Bulk upload completed: ${message}`);
+        setCompletionPopup({ message: `Upload completed: ${message}`, type: "error" });
       }
 
       (async () => {
@@ -312,10 +322,33 @@ export default function ProductsPage() {
     if (bulkUploadState.status === "error") {
       if (bulkUploadState.finishedAt <= lastBulkToastRef.current) return;
       lastBulkToastRef.current = bulkUploadState.finishedAt;
-      notifyError(bulkUploadState.error || "Bulk upload failed");
+      const errMsg = bulkUploadState.error || "Bulk upload failed";
+      notifyError(errMsg);
+      setCompletionPopup({ message: errMsg, type: "error" });
       resetProductsBulkUploadState();
     }
   }, [mounted, bulkUploadState, refetch]);
+
+  // Auto-hide completion popup after a few seconds
+  React.useEffect(() => {
+    if (!completionPopup) return;
+    const t = setTimeout(() => setCompletionPopup(null), 4000);
+    return () => clearTimeout(t);
+  }, [completionPopup]);
+
+  const [popupPosition, setPopupPosition] = React.useState<{ top: number; left: number } | null>(null);
+  React.useLayoutEffect(() => {
+    if (!completionPopup) {
+      setPopupPosition(null);
+      return;
+    }
+    if (!uploadButtonRef.current) return;
+    const rect = uploadButtonRef.current.getBoundingClientRect();
+    setPopupPosition({
+      top: rect.top,
+      left: rect.left,
+    });
+  }, [completionPopup]);
 
     const triggerExcelPick = () => {
     if (!canCreate) return;
@@ -422,17 +455,72 @@ export default function ProductsPage() {
               Manage your product catalog
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto flex-wrap relative">
+            {completionPopup && popupPosition && (
+              <div
+                className="fixed z-50 animate-in fade-in-0 zoom-in-95 duration-200"
+                style={{
+                  top: popupPosition.top - 8,
+                  left: popupPosition.left,
+                  transform: "translateY(-100%)",
+                }}
+              >
+                <div className="relative overflow-visible rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm">
+                  <span
+                    className="absolute right-4 bottom-0 block h-0 w-0 translate-y-full border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[10px] border-t-slate-50"
+                    aria-hidden
+                  />
+                  {completionPopup.message}
+                </div>
+              </div>
+            )}
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span ref={uploadButtonRef} className="inline-flex">
+                    <Button
+                      variant="outline"
+                      className="gap-2 w-full sm:w-auto bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
+                      onClick={triggerExcelPick}
+                      disabled={!canCreate || bulkUploadState.status === "uploading"}
+                    >
+                      {bulkUploadState.status === "uploading" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileSpreadsheet className="h-4 w-4" />
+                      )}
+                      {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  sideOffset={6}
+                  className="relative overflow-visible rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm"
+                >
+                  <span
+                    className="absolute right-4 bottom-0 block h-0 w-0 translate-y-full border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[10px] border-t-slate-50"
+                    aria-hidden
+                  />
+                  {bulkUploadState.status === "uploading"
+                    ? "Upload in progress, please wait"
+                    : "Upload products from Excel file"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <a
+              href="/GsHwBU.xlsx"
+              download="sample-products.xlsx"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-emerald-200 bg-transparent text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 h-9 px-4 py-2 w-full sm:w-auto"
+            >
+              <Download className="h-4 w-4" />
+              Download sample Excel
+            </a>
             <Button
-              variant="outline"
-              className="gap-2 w-full sm:w-auto bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300"
-              onClick={triggerExcelPick}
+              className="gap-2 w-full sm:w-auto"
+              onClick={goToCreate}
               disabled={!canCreate || bulkUploadState.status === "uploading"}
             >
-              <FileSpreadsheet className="h-4 w-4" />
-              {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
-            </Button>
-            <Button className="gap-2 w-full sm:w-auto" onClick={goToCreate} disabled={!canCreate}>
               <Plus className="h-4 w-4" />
               Add Product
             </Button>
@@ -499,28 +587,7 @@ export default function ProductsPage() {
           </CardHeader>
 
           <CardContent className="px-3 sm:px-6">
-            {bulkUploadState.status === "uploading" ? (
-              <div className="mt-1 rounded-xl border bg-gradient-to-br from-emerald-50 to-white p-10">
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className="flex items-center gap-2 text-emerald-700 font-semibold">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing Excel upload
-                  </div>
-                  <div className="text-sm text-muted-foreground max-w-md">
-                    Your products are being uploaded. You can navigate to other pages and keep working.
-                    When you come back, this loader will stay here until the upload finishes.
-                  </div>
-                  <div className="mt-3 w-full max-w-md">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-                      <div className="h-2 w-1/2 animate-pulse rounded-full bg-emerald-500" />
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      File: {bulkUploadState.fileName}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : loading ? (
+            {loading ? (
               <div className="mt-1 rounded-xl border p-10 text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -551,7 +618,7 @@ export default function ProductsPage() {
                     renderCreatedDate={renderCreatedDate}
                     svgCardImage={svgCardImage}
                     canRead={canRead}
-                    canUpdate={canUpdate}
+                    canUpdate={canUpdate && bulkUploadState.status !== "uploading"}
                     canDelete={canDelete}
                   />
                 ))}
