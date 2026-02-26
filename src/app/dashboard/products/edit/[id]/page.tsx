@@ -890,15 +890,15 @@ export default function ProductEditPage() {
       
       await productsService.updateProduct(updatePayload);
       
-      // Extract fileName from URL and delete from files backend
+      // Only delete file from files backend when it is not a zip-gallery image (shared; remove = mapping only).
       const url = featuredImage.url;
-      if (url) {
+      const isZipGallery = url && String(url).includes("zip-gallery");
+      if (url && !isZipGallery) {
         try {
-          // Extract fileName from URL (e.g., http://localhost:3003/public/products/filename.png)
           const urlObj = new URL(url);
           const pathParts = urlObj.pathname.split("/");
           const fileName = pathParts[pathParts.length - 1];
-          if (fileName) {
+          if (fileName && /^[A-Za-z0-9._-]+$/.test(fileName)) {
             await productsService.deleteProductImage(fileName);
           }
         } catch (error) {

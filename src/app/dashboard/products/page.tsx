@@ -36,6 +36,7 @@ import {
   resetProductsBulkUploadState,
   subscribeProductsBulkUpload,
   startProductsBulkUploadExcel,
+  uploadZipGallery,
   deleteProduct,
   deleteProductImage,
   listProducts,
@@ -45,6 +46,14 @@ import {
   getAllCategoriesDropdown,
 } from "@/services/dropdowns";
 import { toast } from "react-toastify";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -79,6 +88,12 @@ export default function ProductsPage() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+
+  const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false);
+  const [uploadDialogStep, setUploadDialogStep] = React.useState<"ask" | "zip">("ask");
+  const [zipFile, setZipFile] = React.useState<File | null>(null);
+  const [zipUploading, setZipUploading] = React.useState(false);
+  const zipInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const [rows, setRows] = React.useState<ProductRow[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -177,6 +192,12 @@ export default function ProductsPage() {
       const parts = String(url).split("/").filter(Boolean);
       return parts.length ? parts[parts.length - 1] : null;
     }
+  }, []);
+
+  /** Only call KSR-FILES delete when the image was stored there (safe filename). External URLs are not stored. */
+  const isStoredImageFileName = React.useCallback((fileName: string | null): boolean => {
+    if (!fileName) return false;
+    return /^[A-Za-z0-9._-]+$/.test(fileName);
   }, []);
 
   const normalizeRows = React.useCallback((products: any[]): ProductRow[] => {
@@ -350,10 +371,34 @@ export default function ProductsPage() {
     });
   }, [completionPopup]);
 
-    const triggerExcelPick = () => {
+  const triggerExcelPick = () => {
     if (!canCreate) return;
-    if (bulkUploadState.status === "uploading") return;
-    fileInputRef.current?.click();
+    if (bulkUploadState.status === "uploading" || zipUploading) return;
+    setUploadDialogOpen(true);
+    setUploadDialogStep("ask");
+    setZipFile(null);
+  };
+
+  const openExcelFileInput = () => {
+    setUploadDialogOpen(false);
+    setUploadDialogStep("ask");
+    setZipFile(null);
+    setTimeout(() => fileInputRef.current?.click(), 100);
+  };
+
+  const handleZipUpload = async () => {
+    if (!zipFile) return;
+    try {
+      setZipUploading(true);
+      const res = await uploadZipGallery(zipFile);
+      const count = res?.uploaded?.length ?? 0;
+      notifySuccess(`Uploaded ${count} image(s) to gallery. Now select your Excel file.`);
+      openExcelFileInput();
+    } catch (e: unknown) {
+      notifyError((e as Error)?.message ?? "ZIP upload failed");
+    } finally {
+      setZipUploading(false);
+    }
   };
 
   const onExcelSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -407,7 +452,8 @@ export default function ProductsPage() {
     try {
       setDeleting(true);
       await deleteProduct(p.id);
-      if (fileName) {
+      const isZipGallery = (p.product_img_url ?? "").includes("zip-gallery");
+      if (fileName && isStoredImageFileName(fileName) && !isZipGallery) {
         try {
           await deleteProductImage(fileName);
         } catch (e) {
@@ -482,14 +528,20 @@ export default function ProductsPage() {
                       variant="outline"
                       className="gap-2 w-full sm:w-auto bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
                       onClick={triggerExcelPick}
-                      disabled={!canCreate || bulkUploadState.status === "uploading"}
+                      disabled={!canCreate || bulkUploadState.status === "uploading" || zipUploading}
                     >
                       {bulkUploadState.status === "uploading" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : zipUploading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <FileSpreadsheet className="h-4 w-4" />
                       )}
-                      {bulkUploadState.status === "uploading" ? "Uploading…" : "Upload Excel"}
+                      {bulkUploadState.status === "uploading"
+                        ? "Uploading…"
+                        : zipUploading
+                          ? "ZIP uploading…"
+                          : "Upload Excel"}
                     </Button>
                   </span>
                 </TooltipTrigger>
@@ -504,7 +556,9 @@ export default function ProductsPage() {
                   />
                   {bulkUploadState.status === "uploading"
                     ? "Upload in progress, please wait"
-                    : "Upload products from Excel file"}
+                    : zipUploading
+                      ? "ZIP upload in progress, please wait"
+                      : "Upload products from Excel file"}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -519,7 +573,7 @@ export default function ProductsPage() {
             <Button
               className="gap-2 w-full sm:w-auto"
               onClick={goToCreate}
-              disabled={!canCreate || bulkUploadState.status === "uploading"}
+              disabled={!canCreate || bulkUploadState.status === "uploading" || zipUploading}
             >
               <Plus className="h-4 w-4" />
               Add Product
@@ -542,6 +596,62 @@ export default function ProductsPage() {
           loading={deleting}
           onConfirm={confirmRemove}
         />
+
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Upload products from Excel</DialogTitle>
+              <DialogDescription>
+                {uploadDialogStep === "ask"
+                  ? "Do you want to upload product images as well? Upload a ZIP first, then in Excel use image columns with the full filename including extension (e.g. image.jpg or photo.png) to reference gallery images."
+                  : "Upload a ZIP file (max 5 GB) with images in an images/ folder. Only .zip is accepted."}
+              </DialogDescription>
+            </DialogHeader>
+            {uploadDialogStep === "ask" ? (
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={openExcelFileInput}>
+                  No, Excel only
+                </Button>
+                <Button
+                  onClick={() => setUploadDialogStep("zip")}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Yes, upload images (ZIP)
+                </Button>
+              </DialogFooter>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  ref={zipInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={(e) => setZipFile((e.target.files ?? [])[0] ?? null)}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => zipInputRef.current?.click()}
+                  disabled={zipUploading}
+                >
+                  {zipFile ? zipFile.name : "Choose ZIP file"}
+                </Button>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button variant="outline" onClick={() => setUploadDialogStep("ask")}>
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleZipUpload}
+                    disabled={!zipFile || zipUploading}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {zipUploading ? "Uploading…" : "Upload ZIP"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Card className="shadow-sm">
           <CardHeader className="space-y-3">
