@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ProductRow } from "./product-form";
+import { ProductRow } from "./product-form";
 import { useCurrency } from "@/contexts/currency-context";
 
 type Props = {
@@ -39,8 +39,8 @@ export function ProductCard({
   const { selectedCountry, convertAmount, getCurrencySymbol } = useCurrency();
   const [convertedPrice, setConvertedPrice] = React.useState<{ amount: number; symbol: string } | null>(null);
   
-  const imgSeed = (product.description || "").trim() || product.title;
-  const imageSrc = product.product_img_url || svgCardImage(imgSeed);
+  const noImageSrc = "/images/no-image.svg";
+  const imageSrc = product.product_img_url || noImageSrc;
   const statusLabel = product.is_active ? "Active" : "Inactive";
 
   // Use total_price if available, otherwise fall back to price
@@ -83,7 +83,7 @@ export function ProductCard({
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
           onError={(e) => {
-            e.currentTarget.src = svgCardImage(imgSeed);
+            e.currentTarget.src = noImageSrc;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
