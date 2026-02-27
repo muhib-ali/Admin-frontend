@@ -3,8 +3,10 @@
 import * as React from "react";
 import { ImageIcon, Play, Upload, Video, Star, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { DateRange } from "react-day-picker";
+
+import { useAddProductFormStore } from "@/stores/product-form-store";
+import type { ProductFormValues } from "@/stores/product-form-store";
 
 import galleryImageLogo from "../../../../../logos/gallery image logo.png";
 
@@ -24,12 +26,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { getAllBrandsDropdown, getAllCategoriesDropdown, getAllSubcategoriesDropdown, getAllTaxesDropdown, getAllSuppliersDropdown, getAllWarehousesDropdown, getAllCustomerVisibilityGroupsDropdown } from "@/services/dropdowns";
 import * as productsService from "@/services/products/index";
 import { listTaxes } from "@/services/taxes";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
+import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
 import { notifyError } from "@/utils/notify";
 
 type Option = { id: string; name: string };
@@ -105,6 +109,7 @@ type StoredProduct = {
 };
 
 const STORAGE_KEY = "admin_portal_static_products_v1";
+const DRAFT_KEY = "admin_new_product_form_draft";
 
 function readStoredProducts(): StoredProduct[] {
   try {
@@ -121,6 +126,40 @@ function writeStoredProducts(next: StoredProduct[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
+type NewProductDraft = {
+  values: ProductFormValues;
+  urlMediaBox: UrlMediaBox;
+  featuredSource: "upload" | "url" | null;
+};
+
+function readNewProductDraft(): NewProductDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as NewProductDraft;
+    if (!data || typeof data.values !== "object" || typeof data.urlMediaBox !== "object") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeNewProductDraft(draft: NewProductDraft) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // ignore quota or parse errors
+  }
+}
+
+function clearNewProductDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -135,15 +174,38 @@ export default function NewProductPage() {
   const canCreate = useHasPermission(ENTITY_PERMS.products.create);
   const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
+  // Set refresh flag on page load to detect actual refreshes
+  React.useEffect(() => {
+    // Set flag to detect if this is a refresh (not initial load)
+    if (performance.getEntriesByType && performance.getEntriesByType('navigation').length > 0) {
+      const navigationEntries = performance.getEntriesByType('navigation');
+      const lastNavigation = navigationEntries[navigationEntries.length - 1] as PerformanceNavigationTiming;
+      if (lastNavigation.type === 'reload' || sessionStorage.getItem('productFormVisited') === 'true') {
+        sessionStorage.setItem('productFormRefresh', 'true');
+      }
+    } else if (sessionStorage.getItem('productFormVisited') === 'true') {
+      sessionStorage.setItem('productFormRefresh', 'true');
+    }
+    // Mark page as visited
+    sessionStorage.setItem('productFormVisited', 'true');
+  }, []);
+
+  const values = useAddProductFormStore((s) => s.values);
+  const updateValues = useAddProductFormStore((s) => s.updateValues);
+  const storeSetValues = useAddProductFormStore((s) => s.setValues);
+  const replaceValues = useAddProductFormStore((s) => s.replaceValues);
+  const resetProductForm = useAddProductFormStore((s) => s.reset);
+
+  const media = useAddProductFormStore((s) => s.media);
+  const updateMedia = useAddProductFormStore((s) => s.updateMedia);
+  const setMedia = useAddProductFormStore((s) => s.setMedia);
+
   const normalizeVariantKey = React.useCallback((name: string) => {
     return String(name || "")
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim();
   }, []);
-
-  // Ref to track previous country to prevent infinite loops
-  const previousCountryRef = React.useRef<Country | null>(null);
 
   const [categories, setCategories] = React.useState<Option[]>([]);
   const [brands, setBrands] = React.useState<Option[]>([]);
@@ -156,38 +218,21 @@ export default function NewProductPage() {
   const [subcategories, setSubcategories] = React.useState<Option[]>([]);
   const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
-  const [values, setValues] = React.useState(() => ({
-    title: "",
-    description: "",
-    category_id: "",
-    subcategory_id: "",
-    brand_id: "",
-    supplier_id: "",
-    tax_id: "",
-    warehouse_id: "",
-    customer_groups: [] as string[],
-    visibility_wholesale: true,
-    visibility_retail: true,
-    is_active: true,
+  // Use global unsaved changes context
+  const { setHasUnsavedChanges } = useUnsavedChanges();
 
-    selling_price: "",
-    currency: getCurrencyCode(),
-    cost: "",
-    freight: "",
-    discount: "",
-    start_discount_date: "",
-    end_discount_date: "",
-    total_price: "",
-
-    stock_quantity: "",
-    weight: "",
-    length: "",
-    width: "",
-    height: "",
-
-    product_img_url: "",
-    product_video_url: "",
-  }));
+  const setValues = React.useCallback(
+    (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
+      if (typeof next === "function") {
+        updateValues(next);
+        setHasUnsavedChanges(true);
+        return;
+      }
+      storeSetValues(next);
+      setHasUnsavedChanges(true);
+    },
+    [storeSetValues, updateValues, setHasUnsavedChanges]
+  );
 
   const [variantsOpen, setVariantsOpen] = React.useState(false);
   const [variantOptions, setVariantOptions] = React.useState<string[]>([
@@ -209,23 +254,19 @@ export default function NewProductPage() {
   variantValuesRef.current = variantValues;
   const [newVariantName, setNewVariantName] = React.useState("");
 
-  const [featuredImage, setFeaturedImage] = React.useState<MediaItem | null>(null);
-  const [featuredBoxImages, setFeaturedBoxImages] = React.useState<MediaItem[]>([]);
-  const [featuredBoxCarouselIndex, setFeaturedBoxCarouselIndex] = React.useState(0);
+  const featuredImage = media.featuredImage as MediaItem | null;
+  const featuredBoxImages = media.featuredBoxImages as MediaItem[];
+  const featuredBoxCarouselIndex = media.featuredBoxCarouselIndex;
   const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const [videoFile, setVideoFile] = React.useState<MediaItem | null>(null);
+  const videoFile = media.videoFile as MediaItem | null;
   const videoInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const urlImageInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const [urlMediaBox, setUrlMediaBox] = React.useState<UrlMediaBox>(() => ({
-    imageUrlInput: "",
-    images: [],
-    videoUrlInput: "",
-    videoUrl: "",
-  }));
-  const [urlImageCarouselIndex, setUrlImageCarouselIndex] = React.useState(0);
+  const urlMediaBox = media.urlMediaBox as UrlMediaBox;
+  const urlImageCarouselIndex = media.urlImageCarouselIndex;
+
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([
     { id: crypto.randomUUID(), quantity: "", price: "" },
   ]);
@@ -233,74 +274,115 @@ export default function NewProductPage() {
   const [isUploading, setIsUploading] = React.useState(false);
   const [createdProductId, setCreatedProductId] = React.useState<string | null>(null);
 
-  const [featuredSource, setFeaturedSource] = React.useState<"upload" | "url" | null>(null);
+  const featuredSource = media.featuredSource;
 
-  // Date range state for discount dates
   const [discountDateRange, setDiscountDateRange] = React.useState<DateRange | undefined>();
-
-  // Helper functions to convert between date range and string values
-  const dateRangeToStrings = (range: DateRange | undefined) => {
-    if (!range) return { start: "", end: "" };
-    return {
-      start: range.from ? range.from.toISOString().split('T')[0] : "",
-      end: range.to ? range.to.toISOString().split('T')[0] : ""
-    };
-  };
-
-  const stringsToDateRange = (start: string, end: string) => {
-    if (!start && !end) return undefined;
-    return {
-      from: start ? new Date(start + 'T00:00:00') : undefined,
-      to: end ? new Date(end + 'T00:00:00') : undefined
-    };
-  };
 
   React.useEffect(() => {
     const ac = new AbortController();
 
     (async () => {
       try {
-        const [cats, brs, tax, sup, wh, cvg, taxData, defaultVTypes] = await Promise.all([
+        const [cats, brs, tax, sup, wh, cvg, defaultVTypes, taxData] = await Promise.all([
           getAllCategoriesDropdown({ signal: ac.signal }),
           getAllBrandsDropdown({ signal: ac.signal }),
           getAllTaxesDropdown({ signal: ac.signal }),
           getAllSuppliersDropdown({ signal: ac.signal }),
           getAllWarehousesDropdown({ signal: ac.signal }),
           getAllCustomerVisibilityGroupsDropdown({ signal: ac.signal }),
-          listTaxes(1, 100, undefined, { signal: ac.signal }),
           productsService.getDefaultVariantTypes(),
+          listTaxes(1, 100, undefined, { signal: ac.signal }),
         ]);
 
         setCategories((cats ?? []).map((c: any) => ({ id: c.value, name: c.label })));
         setBrands((brs ?? []).map((b: any) => ({ id: b.value, name: b.label })));
-        setTaxes((tax ?? []).map((t: any) => ({ id: t.value, name: t.label })));
+
+        const unifiedTaxMap = new Map<string, { id: string; title: string; rate: number }>();
+        setTaxes(
+          (tax ?? []).map((t: any) => {
+            const taxInfo = { id: t.value, name: t.label };
+            const matchingTaxRate = (taxData?.rows ?? []).find((tr: any) => tr.id === t.value);
+            if (matchingTaxRate) {
+              unifiedTaxMap.set(t.value, {
+                id: matchingTaxRate.id,
+                title: matchingTaxRate.title,
+                rate: matchingTaxRate.rate,
+              });
+            }
+            return taxInfo;
+          })
+        );
+
         setSuppliers((sup ?? []).map((s: any) => ({ id: s.value, name: s.label })));
         setWarehouses((wh ?? []).map((w: any) => ({ id: w.value, name: w.label })));
-        setTaxRows(taxData?.rows ?? []);
-        // Load default variant types from API (size, model, year)
-        const defaultVariantTypesData = defaultVTypes?.data ?? [];
-        setVariantTypes(defaultVariantTypesData.map((vt: any) => ({ id: vt.id, name: vt.name })));
+
+        const defaultVariantTypesData = (defaultVTypes as any)?.data ?? [];
+        setVariantTypes(
+          (defaultVariantTypesData as any[]).map((vt: any) => ({
+            id: vt.id,
+            name: vt.name,
+          }))
+        );
+
         setCustomerVisibilityGroups((cvg ?? []).map((c: any) => ({ id: c.value, name: c.label })));
+        setTaxRows(Array.from(unifiedTaxMap.values()));
       } catch (error: any) {
-        if (error?.code === "ERR_CANCELED" || error?.message === "canceled") return;
-        console.error("Failed to load dropdowns or tax records:", error);
+        if (error?.name !== "CanceledError" && error?.message !== "canceled") {
+          console.error("Error loading dropdown data:", error);
+        }
       }
     })();
 
     return () => ac.abort();
   }, []);
 
-  // Load subcategories when category is selected
+  // Restore draft from localStorage on mount (keeps form filled after refresh)
+  React.useEffect(() => {
+    const draft = readNewProductDraft();
+    if (draft?.values) {
+      replaceValues(draft.values);
+      setMedia({
+        urlMediaBox: draft.urlMediaBox,
+        featuredSource: draft.featuredSource,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to restore draft
+  }, []);
+
+  // Persist form values and URL media to localStorage so they survive refresh
+  React.useEffect(() => {
+    const hasContent =
+      (values.title ?? "").trim() !== "" ||
+      (values.description ?? "").trim() !== "" ||
+      (urlMediaBox.images?.length ?? 0) > 0 ||
+      (urlMediaBox.imageUrlInput ?? "").trim() !== "" ||
+      (urlMediaBox.videoUrl ?? "").trim() !== "";
+    if (!hasContent) {
+      clearNewProductDraft();
+      return;
+    }
+    writeNewProductDraft({
+      values: { ...values },
+      urlMediaBox: { ...urlMediaBox, images: urlMediaBox.images ?? [] },
+      featuredSource: featuredSource ?? null,
+    });
+  }, [values, urlMediaBox, featuredSource]);
+
   React.useEffect(() => {
     if (!values.category_id) {
       setSubcategories([]);
       return;
     }
+
     let cancelled = false;
     setSubcategoriesLoading(true);
     getAllSubcategoriesDropdown(values.category_id)
       .then((list) => {
-        if (!cancelled) setSubcategories((list ?? []).map((s: { label: string; value: string }) => ({ id: s.value, name: s.label })));
+        if (!cancelled) {
+          setSubcategories(
+            (list ?? []).map((s: { label: string; value: string }) => ({ id: s.value, name: s.label }))
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setSubcategories([]);
@@ -308,70 +390,29 @@ export default function NewProductPage() {
       .finally(() => {
         if (!cancelled) setSubcategoriesLoading(false);
       });
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [values.category_id]);
 
-  // Update form values when selected country changes
-  React.useEffect(() => {
-    if (!selectedCountry) return;
-
-    const targetCurrency = Object.keys(selectedCountry.currencies)[0];
-    const sourceCurrency = values.currency;
-
-    // Only update if currency is different from current
-    if (sourceCurrency === targetCurrency) return;
-
-    console.log(' Converting prices from', sourceCurrency, 'to', targetCurrency);
-
-    const convertField = async (value: string): Promise<string> => {
-      const numValue = Number(value) || 0;
-      if (numValue === 0) return value;
-
-      try {
-        const converted = await convertAmount(numValue, sourceCurrency, targetCurrency);
-        return String(converted);
-      } catch (error) {
-        console.error('Error converting field value:', error);
-        return value;
-      }
+  const dateRangeToStrings = (range: DateRange | undefined) => {
+    if (!range) return { start: "", end: "" };
+    return {
+      start: range.from ? range.from.toISOString().split("T")[0] : "",
+      end: range.to ? range.to.toISOString().split("T")[0] : "",
     };
+  };
 
-    const updatePrices = async () => {
-      const updatedValues = {
-        ...values,
-        currency: targetCurrency,
-        selling_price: await convertField(values.selling_price),
-        cost: await convertField(values.cost),
-        freight: await convertField(values.freight),
-        total_price: await convertField(values.total_price),
-      };
-
-      setValues(updatedValues);
-
-      // Update bulk pricing
-      const updatedBulkPricing = await Promise.all(
-        bulkPricing.map(async (row) => ({
-          ...row,
-          price: await convertField(row.price),
-        }))
-      );
-      setBulkPricing(updatedBulkPricing);
-    };
-
-    updatePrices();
-  }, [selectedCountry?.cca2]);
-
-  // Sync date range changes to values state
   React.useEffect(() => {
     const dateString = dateRangeToStrings(discountDateRange);
-    setValues(prev => ({
+    setValues((prev) => ({
       ...prev,
       start_discount_date: dateString.start,
-      end_discount_date: dateString.end
+      end_discount_date: dateString.end,
     }));
   }, [discountDateRange]);
 
-  // Cleanup blob URLs
   React.useEffect(() => {
     return () => {
       featuredBoxImages.forEach((m) => {
@@ -384,22 +425,22 @@ export default function NewProductPage() {
   }, [featuredBoxImages, videoFile]);
 
   React.useEffect(() => {
-    setFeaturedBoxCarouselIndex((prev) => {
-      if (featuredBoxImages.length === 0) return 0;
-      return Math.min(prev, featuredBoxImages.length - 1);
+    setMedia({
+      featuredBoxCarouselIndex:
+        featuredBoxImages.length === 0 ? 0 : Math.min(featuredBoxCarouselIndex, featuredBoxImages.length - 1),
     });
   }, [featuredBoxImages.length]);
 
   React.useEffect(() => {
-    setUrlImageCarouselIndex((prev) => {
-      if (urlMediaBox.images.length === 0) return 0;
-      return Math.min(prev, urlMediaBox.images.length - 1);
+    setMedia({
+      urlImageCarouselIndex:
+        urlMediaBox.images.length === 0 ? 0 : Math.min(urlImageCarouselIndex, urlMediaBox.images.length - 1),
     });
   }, [urlMediaBox.images.length]);
 
   React.useEffect(() => {
     if (featuredSource === "url" && urlMediaBox.images.length === 0) {
-      setFeaturedSource(null);
+      setMedia({ featuredSource: null });
     }
   }, [featuredSource, urlMediaBox.images.length]);
 
@@ -408,10 +449,10 @@ export default function NewProductPage() {
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024;
-    const remainingSlots = Math.max(0, 9 - (featuredBoxImages.length + urlMediaBox.images.length));
+    const remainingSlots = Math.max(0, 10 - (featuredBoxImages.length + urlMediaBox.images.length));
 
     if (remainingSlots <= 0) {
-      notifyError("Image limit reached", "You cannot add more than 9 images total.");
+      notifyError("Image limit reached", "You cannot add more than 10 images total.");
       return;
     }
 
@@ -420,7 +461,7 @@ export default function NewProductPage() {
 
     for (const file of Array.from(files)) {
       if (next.length >= remainingSlots) {
-        errors.push("You cannot select more than 9 images.");
+        errors.push("You cannot select more than 10 images.");
         break;
       }
       if (!allowedImageTypes.includes(file.type)) {
@@ -442,57 +483,63 @@ export default function NewProductPage() {
 
     if (errors.length > 0) setUploadErrors(errors);
 
-    if (errors.some((e) => e.includes("cannot select") || e.includes("cannot add") || e.includes("more than 9"))) {
-      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
+    if (errors.some((e) => e.includes("cannot select") || e.includes("cannot add") || e.includes("more than 10"))) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images).");
     }
 
     if (next.length > 0) {
-      setFeaturedBoxImages((prev) => {
-        const merged = [...prev, ...next];
-        if (!featuredImage && merged.length > 0) {
-          setFeaturedImage(merged[0]);
-        }
-        return merged;
+      updateMedia((prev) => {
+        const merged = [...prev.featuredBoxImages, ...next];
+        const nextFeatured = prev.featuredImage ?? (merged.length > 0 ? merged[0] : null);
+        return {
+          ...prev,
+          featuredBoxImages: merged,
+          featuredImage: nextFeatured,
+          featuredSource: "upload",
+        };
       });
-      setFeaturedSource("upload");
-      setUrlMediaBox((prev) => prev);
       setUploadErrors([]);
     }
   };
 
   const removeFeaturedImage = (id?: string) => {
     if (!id) {
-      setFeaturedBoxImages((prev) => {
-        prev.forEach((m) => {
+      updateMedia((prev) => {
+        prev.featuredBoxImages.forEach((m) => {
           if (m.url.startsWith("blob:")) URL.revokeObjectURL(m.url);
         });
-        return [];
+
+        return {
+          ...prev,
+          featuredBoxImages: [],
+          featuredImage: null,
+          featuredSource: prev.featuredSource === "upload" ? null : prev.featuredSource,
+          featuredBoxCarouselIndex: 0,
+        };
       });
-      setFeaturedImage(null);
-      setFeaturedSource((prev) => (prev === "upload" ? null : prev));
-      setFeaturedBoxCarouselIndex(0);
       return;
     }
 
-    setFeaturedBoxImages((prev) => {
-      const target = prev.find((x) => x.id === id);
+    updateMedia((prev) => {
+      const target = prev.featuredBoxImages.find((x) => x.id === id);
       if (target?.url.startsWith("blob:")) URL.revokeObjectURL(target.url);
-      const next = prev.filter((x) => x.id !== id);
-      if (featuredImage?.id === id) {
-        setFeaturedImage(next[0] ?? null);
-      }
-      if (next.length === 0) {
-        setFeaturedSource((prevSource) => (prevSource === "upload" ? null : prevSource));
-      }
-      return next;
+      const next = prev.featuredBoxImages.filter((x) => x.id !== id);
+      const nextFeatured = prev.featuredImage?.id === id ? (next[0] ?? null) : prev.featuredImage;
+      const nextSource = next.length === 0 && prev.featuredSource === "upload" ? null : prev.featuredSource;
+
+      return {
+        ...prev,
+        featuredBoxImages: next,
+        featuredImage: nextFeatured,
+        featuredSource: nextSource,
+      };
     });
   };
 
   const setFeaturedBoxImageAsFeatured = (id: string) => {
     const img = featuredBoxImages.find((x) => x.id === id) ?? null;
     if (!img) return;
-    setFeaturedImage(img);
-    setFeaturedSource("upload");
+    setMedia({ featuredImage: img, featuredSource: "upload" });
   };
 
   const handleVideo = (files: FileList | null) => {
@@ -513,34 +560,36 @@ export default function NewProductPage() {
 
     if (videoFile?.url?.startsWith("blob:")) URL.revokeObjectURL(videoFile.url);
 
-    setVideoFile({
-      id: crypto.randomUUID(),
-      kind: "video",
-      file,
-      url: URL.createObjectURL(file),
+    setMedia({
+      videoFile: {
+        id: crypto.randomUUID(),
+        kind: "video",
+        file,
+        url: URL.createObjectURL(file),
+      },
     });
     setUploadErrors([]);
   };
 
   const removeVideo = () => {
     if (videoFile?.url?.startsWith("blob:")) URL.revokeObjectURL(videoFile.url);
-    setVideoFile(null);
+    setMedia({ videoFile: null });
   };
 
   const totalGalleryUrlImages = featuredBoxImages.length + urlMediaBox.images.length;
-  const remainingUrlImageSlots = Math.max(0, 9 - totalGalleryUrlImages);
+  const remainingUrlImageSlots = Math.max(0, 10 - totalGalleryUrlImages);
 
   const setUrlBoxField = (patch: Partial<UrlMediaBox>) => {
-    setUrlMediaBox((prev) => ({ ...prev, ...patch }));
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, ...patch } }));
   };
 
   const addImageUrlToBox = () => {
     const raw = urlMediaBox.imageUrlInput.trim();
     if (!raw) return;
 
-    if (totalGalleryUrlImages >= 9) {
-      setUploadErrors(["You cannot add more than 9 images."]);
-      notifyError("Image limit reached", "You can only add 9 images total (Upload + URL Images).");
+    if (totalGalleryUrlImages >= 10) {
+      setUploadErrors(["You cannot add more than 10 images."]);
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images).");
       return;
     }
 
@@ -549,27 +598,37 @@ export default function NewProductPage() {
       return;
     }
 
-    setUrlMediaBox((prev) => ({
+    updateMedia((prev) => ({
       ...prev,
-      images: [...prev.images, { id: crypto.randomUUID(), url: raw }],
-      imageUrlInput: "",
+      urlMediaBox: {
+        ...prev.urlMediaBox,
+        images: [...prev.urlMediaBox.images, { id: crypto.randomUUID(), url: raw }],
+        imageUrlInput: "",
+      },
     }));
     setUploadErrors([]);
   };
 
   const removeImageUrlFromBox = (id: string) => {
-    setUrlMediaBox((prev) => ({ ...prev, images: prev.images.filter((x) => x.id !== id) }));
+    updateMedia((prev) => ({
+      ...prev,
+      urlMediaBox: { ...prev.urlMediaBox, images: prev.urlMediaBox.images.filter((x) => x.id !== id) },
+    }));
   };
 
   const setUrlImageAsFeatured = (id: string) => {
-    setFeaturedSource("url");
-    setFeaturedImage(null);
-    setUrlMediaBox((prev) => {
-      const index = prev.images.findIndex((x) => x.id === id);
+    updateMedia((prev) => {
+      const index = prev.urlMediaBox.images.findIndex((x) => x.id === id);
       if (index === -1) return prev;
-      const selected = prev.images[index];
-      const remaining = prev.images.filter((x) => x.id !== id);
-      return { ...prev, images: [selected, ...remaining] };
+      const selected = prev.urlMediaBox.images[index];
+      const remaining = prev.urlMediaBox.images.filter((x) => x.id !== id);
+
+      return {
+        ...prev,
+        featuredSource: "url",
+        featuredImage: null,
+        urlMediaBox: { ...prev.urlMediaBox, images: [selected, ...remaining] },
+      };
     });
   };
 
@@ -581,34 +640,20 @@ export default function NewProductPage() {
       return;
     }
 
-    setUrlMediaBox((prev) => ({ ...prev, videoUrl: raw }));
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, videoUrl: raw } }));
     setUploadErrors([]);
   };
 
   const removeVideoFromBox = () => {
-    setUrlMediaBox((prev) => ({ ...prev, videoUrl: "", videoUrlInput: "" }));
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, videoUrl: "", videoUrlInput: "" } }));
   };
 
-  // Note: Custom variants cannot be deleted on new product page since product doesn't exist yet
-  // Custom variants are only added after product creation in edit page
-  const deleteVariantOption = async (variantId: string, variantKey: string) => {
-    // Do nothing - custom variants can only be managed after product is created
-    console.log("Custom variants can only be deleted after product is created");
-  };
-
-  const selectedVariantKeys = React.useMemo(() => {
-    return variantOptions.filter((k) => Boolean(variantSelected[k]));
-  }, [variantOptions, variantSelected]);
-
-  // Note: Custom variants cannot be added on new product page since product doesn't exist yet
-  // Custom variants are only added after product creation in edit page
   const addVariantOption = async () => {
     const raw = newVariantName.trim();
     if (!raw) return;
     const key = normalizeVariantKey(raw);
     if (!key) return;
 
-    // Check if variant type already exists in the list
     if (variantOptions.includes(key)) {
       setVariantSelected((p) => ({ ...p, [key]: true }));
       setVariantsOpen(true);
@@ -616,7 +661,6 @@ export default function NewProductPage() {
       return;
     }
 
-    // For new product page, just add to local state (not persisted until product is saved)
     setVariantOptions((p) => [...p, key]);
     setVariantSelected((p) => ({ ...p, [key]: true }));
     setVariantValues((p) => ({ ...p, [key]: "" }));
@@ -624,14 +668,35 @@ export default function NewProductPage() {
     setNewVariantName("");
   };
 
+  const selectedVariantKeys = React.useMemo(() => {
+    return variantOptions.filter((k) => Boolean(variantSelected[k]));
+  }, [variantOptions, variantSelected]);
+
   const productDetailsComplete = React.useMemo(() => {
     return Boolean(
       values.title.trim() &&
       values.description.trim() &&
       values.category_id &&
-      values.brand_id
+      values.brand_id &&
+      values.supplier_id &&
+      values.selling_price.trim() &&
+      values.cost.trim() &&
+      values.currency &&
+      values.stock_quantity.trim() &&
+      totalGalleryUrlImages > 0
     );
-  }, [values.title, values.description, values.category_id, values.brand_id]);
+  }, [
+    values.title,
+    values.description,
+    values.category_id,
+    values.brand_id,
+    values.supplier_id,
+    values.selling_price,
+    values.cost,
+    values.currency,
+    values.stock_quantity,
+    totalGalleryUrlImages,
+  ]);
 
   const selectedTaxRate = React.useMemo(() => {
     const tax = taxRows.find((t) => t.id === values.tax_id);
@@ -669,6 +734,34 @@ export default function NewProductPage() {
   };
 
   const canSave = canCreate && productDetailsComplete;
+
+  const validateRequiredFields = React.useCallback(() => {
+    const missing: string[] = [];
+
+    if (!values.title.trim()) missing.push("Product Name");
+    if (!values.description.trim()) missing.push("Description");
+    if (!values.category_id) missing.push("Category");
+    if (!values.brand_id) missing.push("Brand");
+    if (!values.supplier_id) missing.push("Supplier");
+    if (!values.selling_price.trim()) missing.push("Selling Price");
+    if (!values.cost.trim()) missing.push("Cost");
+    if (!values.currency) missing.push("Currency");
+    if (!values.stock_quantity.trim()) missing.push("Stock Quantity");
+    if (totalGalleryUrlImages <= 0) missing.push("Featured Image");
+
+    return missing;
+  }, [
+    values.title,
+    values.description,
+    values.category_id,
+    values.brand_id,
+    values.supplier_id,
+    values.selling_price,
+    values.cost,
+    values.currency,
+    values.stock_quantity,
+    totalGalleryUrlImages,
+  ]);
 
   const saveProduct = async () => {
     if (!canSave || isUploading) return; // Prevent double submission
@@ -771,6 +864,7 @@ export default function NewProductPage() {
         variants: defaultVariants.length > 0 ? defaultVariants : undefined,
         product_img_url: featuredImage ? undefined : (firstUrlImage ? String(firstUrlImage).trim() : undefined),
         product_video_url: videoFile ? undefined : (videoUrl ? String(videoUrl).trim() : undefined),
+        imageUrls: urlMediaBox.images.length > 0 ? urlMediaBox.images.map((x) => x.url).filter(Boolean).slice(0, 10) : undefined,
         bulk_prices: await Promise.all(
           bulkPricing
             .filter(row => row.quantity && row.price)
@@ -848,6 +942,23 @@ export default function NewProductPage() {
         }
       }
 
+      // Upload non-featured gallery images (so all images appear on view/edit)
+      const galleryFilesToUpload: File[] =
+        featuredSource === "upload" && featuredImage
+          ? featuredBoxImages
+              .filter((m) => m.id !== featuredImage.id && m.file)
+              .map((m) => m.file as File)
+          : featuredBoxImages
+              .filter((m) => m.file)
+              .map((m) => m.file as File);
+      if (galleryFilesToUpload.length > 0) {
+        try {
+          await productsService.uploadProductImages(productId, galleryFilesToUpload);
+        } catch (error: any) {
+          setUploadErrors((prev) => [...prev, `Gallery images upload failed: ${error.message}`]);
+        }
+      }
+
       if (videoFile) {
         try {
           await productsService.uploadProductVideo(productId, videoFile.file);
@@ -859,6 +970,9 @@ export default function NewProductPage() {
       // Don't write to localStorage - product is already in backend
       // The products page should fetch from backend API, not localStorage
       // Writing to localStorage causes duplicate products in the UI
+
+      // Clear the form draft so next time we start fresh
+      clearNewProductDraft();
 
       // Show success message and redirect
       // Note: uploadErrors state will be checked after the function completes
@@ -1446,7 +1560,7 @@ export default function NewProductPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
-                    <div className="mt-1 text-xs text-muted-foreground">Select up to 9 images; the first becomes featured.</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; choose any as featured.</div>
                   </div>
 
                   <Button
@@ -1455,7 +1569,7 @@ export default function NewProductPage() {
                     size="sm"
                     className="gap-2"
                     onClick={() => featuredImageInputRef.current?.click()}
-                    disabled={totalGalleryUrlImages >= 9}
+                    disabled={totalGalleryUrlImages >= 10}
                   >
                     <Upload className="h-4 w-4" />
                     Upload
@@ -1489,7 +1603,7 @@ export default function NewProductPage() {
                   ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/9 uploaded</div>
+                        <div className="text-xs text-muted-foreground">{featuredBoxImages.length}/10 uploaded</div>
                         <button
                           type="button"
                           className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
@@ -1512,13 +1626,12 @@ export default function NewProductPage() {
                         if (!current) return null;
 
                         return (
-                          <div className="relative mx-auto h-72 w-full max-w-md overflow-hidden rounded-xl border bg-muted group">
-                            <Image
+                          <div className="relative mx-auto h-72 w-full overflow-hidden rounded-xl border bg-muted group">
+                            <img
                               src={current.url}
                               alt={current.file.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 33vw"
+                              className="h-full w-full object-cover"
+                              loading="lazy"
                             />
 
                             <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -1528,19 +1641,18 @@ export default function NewProductPage() {
                                 <Star className="h-3 w-3 fill-current" />
                                 Featured
                               </div>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFeaturedBoxImageAsFeatured(current.id);
-                              }}
-                              disabled={featuredSource === "url"}
-                              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white/90 px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
-                            >
-                              Set as Featured
-                            </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFeaturedBoxImageAsFeatured(current.id);
+                                }}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 pointer-events-none group-hover:pointer-events-auto"
+                              >
+                                Set as Featured
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -1548,7 +1660,7 @@ export default function NewProductPage() {
                                 e.stopPropagation();
                                 removeFeaturedImage(current.id);
                               }}
-                              className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                              className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                               aria-label="Remove image"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -1558,9 +1670,12 @@ export default function NewProductPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFeaturedBoxCarouselIndex((prev) =>
-                                  prev === 0 ? featuredBoxImages.length - 1 : prev - 1
-                                );
+                                setMedia({
+                                  featuredBoxCarouselIndex:
+                                    featuredBoxCarouselIndex === 0
+                                      ? featuredBoxImages.length - 1
+                                      : featuredBoxCarouselIndex - 1,
+                                });
                               }}
                               className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                               disabled={!canGoPrev}
@@ -1573,9 +1688,12 @@ export default function NewProductPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFeaturedBoxCarouselIndex((prev) =>
-                                  prev === featuredBoxImages.length - 1 ? 0 : prev + 1
-                                );
+                                setMedia({
+                                  featuredBoxCarouselIndex:
+                                    featuredBoxCarouselIndex === featuredBoxImages.length - 1
+                                      ? 0
+                                      : featuredBoxCarouselIndex + 1,
+                                });
                               }}
                               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                               disabled={!canGoNext}
@@ -1600,7 +1718,7 @@ export default function NewProductPage() {
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">URL Images & Video</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Add URL links for images/videos; image links share the 9-image limit.
+                      Add URL links for images/videos; image links share the 10-image limit.
                     </div>
                   </div>
 
@@ -1648,33 +1766,42 @@ export default function NewProductPage() {
                     {urlMediaBox.images.length > 0 ? (
                       (() => {
                         const current = urlMediaBox.images[urlImageCarouselIndex];
-                        const canGoPrev = urlMediaBox.images.length > 1;
-                        const canGoNext = urlMediaBox.images.length > 1;
                         const isFeaturedUrlImage =
                           featuredSource === "url" && urlMediaBox.images[0]?.id === current?.id;
+                        const canGoPrev = urlMediaBox.images.length > 1;
+                        const canGoNext = urlMediaBox.images.length > 1;
 
                         if (!current) return null;
 
                         return (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/9 uploaded</div>
+                              <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/10 uploaded</div>
                               <button
                                 type="button"
-                                className="text-sm font-semibold text-neutral-900 hover:text-neutral-700 focus-visible:text-neutral-700 disabled:text-neutral-300"
-                                onClick={() => removeImageUrlFromBox(current.id)}
+                                className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                                onClick={() => setUrlBoxField({ images: [] })}
+                                disabled={isUploading}
                               >
                                 Clear All
                               </button>
                             </div>
 
                             <div className="relative mx-auto h-32 w-full overflow-hidden rounded-xl border bg-muted group">
-                              <Image
+                              <img
                                 src={current.url}
                                 alt="URL image"
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, 33vw"
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  // Fallback: try without crossOrigin if it fails
+                                  if (target.crossOrigin === "anonymous") {
+                                    target.crossOrigin = "";
+                                    target.src = current.url;
+                                  }
+                                }}
                               />
 
                               <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -1692,8 +1819,7 @@ export default function NewProductPage() {
                                   e.stopPropagation();
                                   setUrlImageAsFeatured(current.id);
                                 }}
-                                disabled={featuredSource === "upload"}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
                               >
                                 Set as Featured
                               </button>
@@ -1704,7 +1830,7 @@ export default function NewProductPage() {
                                   e.stopPropagation();
                                   removeImageUrlFromBox(current.id);
                                 }}
-                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                 aria-label="Remove image"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -1713,11 +1839,14 @@ export default function NewProductPage() {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setUrlImageCarouselIndex((prev) =>
-                                    prev === 0 ? urlMediaBox.images.length - 1 : prev - 1
-                                  )
+                                  setMedia({
+                                    urlImageCarouselIndex:
+                                      urlImageCarouselIndex === 0
+                                        ? urlMediaBox.images.length - 1
+                                        : urlImageCarouselIndex - 1,
+                                  })
                                 }
-                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                 disabled={!canGoPrev}
                                 aria-label="Previous"
                               >
@@ -1727,18 +1856,21 @@ export default function NewProductPage() {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setUrlImageCarouselIndex((prev) =>
-                                    prev === urlMediaBox.images.length - 1 ? 0 : prev + 1
-                                  )
+                                  setMedia({
+                                    urlImageCarouselIndex:
+                                      urlImageCarouselIndex === urlMediaBox.images.length - 1
+                                        ? 0
+                                        : urlImageCarouselIndex + 1,
+                                  })
                                 }
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                 disabled={!canGoNext}
                                 aria-label="Next"
                               >
                                 <span className="text-sm">›</span>
                               </button>
 
-                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
                                 {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
                               </div>
                             </div>

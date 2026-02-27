@@ -387,6 +387,7 @@ export async function createProduct(payload: {
   bulk_prices?: { quantity: number; price_per_product: number }[];
   freight?: number;
   cost?: number;
+  imageUrls?: string[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -439,6 +440,7 @@ export async function updateProduct(payload: {
   bulk_prices?: { quantity: number; price_per_product: number }[];
   freight?: number;
   cost?: number;
+  image_urls?: string[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -569,6 +571,37 @@ export async function uploadFeaturedImage(productId: string, file: File) {
   }
 
   return { url: String(url), fileName: fileName ? String(fileName) : file.name };
+}
+
+export type ZipGalleryUploadResponse = {
+  uploaded: Array<{ fileName: string; url: string }>;
+};
+
+export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResponse> {
+  const token = await getAuthToken();
+  const headers: HeadersInit | undefined = token
+    ? { Authorization: `Bearer ${token}` }
+    : undefined;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch("/api/v1/zip-gallery/upload", {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = (json as { message?: string })?.message;
+    const error = (json as { error?: string })?.error;
+    const msg =
+      message && error ? `${message}: ${error}` : message || error || `ZIP upload failed (${res.status})`;
+    throw new Error(String(msg));
+  }
+
+  return json as ZipGalleryUploadResponse;
 }
 
 export async function deleteProductImage(fileName: string) {

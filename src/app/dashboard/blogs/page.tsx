@@ -407,7 +407,7 @@ export default function BlogsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 gap-2"
+                      className="h-9 gap-2 bg-emerald-100 border border-emerald-200 px-3 text-xs font-medium text-emerald-700 shadow-sm transition duration-150 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-px"
                       disabled={!canList || isExporting}
                     >
                       <Download className="h-4 w-4" />
