@@ -748,21 +748,23 @@ export default function ProductViewPage() {
                       </div>
                     )}
 
-                    {product.images?.map((image, index) => (
-                      <div key={image.id} className="flex-shrink-0">
-                        <div className="relative h-44 w-44 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-sm">
-                          <Image
-                            src={image.url}
-                            alt={`Image ${index + 1}`}
-                            fill
-                            className="object-cover"
-                          />
+                    {(product.images ?? [])
+                      .filter((image) => image.url !== product.product_img_url)
+                      .map((image, index) => (
+                        <div key={image.id} className="flex-shrink-0">
+                          <div className="relative h-44 w-44 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-sm">
+                            <Image
+                              src={image.url}
+                              alt={`Image ${index + 1}`}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="mt-2 text-xs text-neutral-500 truncate w-44">
+                            Image {index + 1}
+                          </div>
                         </div>
-                        <div className="mt-2 text-xs text-neutral-500 truncate w-44">
-                          Image {index + 1}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
 
                     {!product.product_img_url &&
                       (!product.images || product.images.length === 0) && (

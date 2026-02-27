@@ -387,6 +387,7 @@ export async function createProduct(payload: {
   bulk_prices?: { quantity: number; price_per_product: number }[];
   freight?: number;
   cost?: number;
+  imageUrls?: string[];
 }) {
   try {
     const { data } = await with429Retry(() =>
@@ -439,6 +440,7 @@ export async function updateProduct(payload: {
   bulk_prices?: { quantity: number; price_per_product: number }[];
   freight?: number;
   cost?: number;
+  image_urls?: string[];
 }) {
   try {
     const { data } = await with429Retry(() =>
