@@ -1059,11 +1059,54 @@ export default function ProductEditPage() {
       return {
         ...prev,
         featuredSource: "url",
-        featuredImage: null,
+        editFeaturedImage: null,
+        pendingFeaturedImage: null,
         urlMediaBox: { ...prev.urlMediaBox, images: [selected, ...remaining] },
       };
     });
+    setFeaturedImage(null);
+    setPendingFeaturedImage(null);
+    setHasUnsavedChanges(true);
   };
+
+  const setGalleryImageAsFeatured = React.useCallback(
+    (idToFeature: string) => {
+      const pendingFeatured = media.pendingFeaturedImage as MediaUpload | null;
+      const pendingGallery = media.pendingGalleryImages as MediaUpload[];
+      const gallery = media.editGalleryImages as StoredMediaItem[];
+      const featured = media.editFeaturedImage as StoredMediaItem | null;
+
+      if (idToFeature === featured?.id || idToFeature === pendingFeatured?.id) return;
+
+      const fromPending = pendingGallery.find((x) => x.id === idToFeature);
+      if (fromPending) {
+        setPendingFeaturedImage(fromPending);
+        setPendingGalleryImages((prev) => {
+          const withoutSelected = prev.filter((x) => x.id !== idToFeature);
+          return pendingFeatured ? [pendingFeatured, ...withoutSelected] : withoutSelected;
+        });
+        setFeaturedImage(null);
+        setMedia({ featuredSource: "upload" });
+        setHasUnsavedChanges(true);
+        return;
+      }
+
+      const fromGallery = gallery.find((x) => x.id === idToFeature);
+      if (fromGallery) {
+        setFeaturedImage({
+          id: fromGallery.id,
+          kind: "image",
+          name: fromGallery.name,
+          type: fromGallery.type || "image/jpeg",
+          url: fromGallery.url,
+        });
+        setPendingFeaturedImage(null);
+        setMedia({ featuredSource: "upload" });
+        setHasUnsavedChanges(true);
+      }
+    },
+    [media.pendingFeaturedImage, media.pendingGalleryImages, media.editGalleryImages, media.editFeaturedImage, setFeaturedImage, setMedia, setPendingFeaturedImage, setPendingGalleryImages, setHasUnsavedChanges]
+  );
 
   const addVideoUrlToBox = () => {
     const raw = urlMediaBox.videoUrlInput.trim();
@@ -1291,6 +1334,22 @@ export default function ProductEditPage() {
       }
       return p.filter((m) => m.id !== mediaId);
     });
+  };
+
+  const removeCurrentGalleryOrFeaturedImage = (mediaId: string) => {
+    if (featuredImage?.id === mediaId) {
+      removeFeaturedImage();
+      return;
+    }
+    if (pendingFeaturedImage?.id === mediaId) {
+      removePendingFeaturedImage();
+      return;
+    }
+    if (galleryImages.some((m) => m.id === mediaId)) {
+      removeGalleryImage(mediaId);
+      return;
+    }
+    removePendingGalleryImage(mediaId);
   };
 
   // Handle video (single)
@@ -2363,7 +2422,7 @@ export default function ProductEditPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
-                        <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; the first becomes featured.</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; choose any as featured.</div>
                       </div>
 
                       <Button
@@ -2459,7 +2518,30 @@ export default function ProductEditPage() {
                                     <Star className="h-3 w-3 fill-current" />
                                     Featured
                                   </div>
-                                ) : null}
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGalleryImageAsFeatured(current.id);
+                                    }}
+                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 pointer-events-none group-hover:pointer-events-auto"
+                                  >
+                                    Set as Featured
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeCurrentGalleryOrFeaturedImage(current.id);
+                                  }}
+                                  className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                  aria-label="Remove image"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
 
                                 <button
                                   type="button"
@@ -2599,7 +2681,7 @@ export default function ProductEditPage() {
                                       e.stopPropagation();
                                       setUrlImageAsFeatured(current.id);
                                     }}
-                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
+                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
                                   >
                                     Set as Featured
                                   </button>
@@ -2610,7 +2692,7 @@ export default function ProductEditPage() {
                                       e.stopPropagation();
                                       removeImageUrlFromBox(current.id);
                                     }}
-                                    className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                    className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                     aria-label="Remove image"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -2624,7 +2706,7 @@ export default function ProductEditPage() {
                                           urlImageCarouselIndex === 0 ? urlMediaBox.images.length - 1 : urlImageCarouselIndex - 1,
                                       })
                                     }
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                     disabled={!canGoPrev}
                                     aria-label="Previous"
                                   >
@@ -2639,14 +2721,14 @@ export default function ProductEditPage() {
                                           urlImageCarouselIndex === urlMediaBox.images.length - 1 ? 0 : urlImageCarouselIndex + 1,
                                       })
                                     }
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                     disabled={!canGoNext}
                                     aria-label="Next"
                                   >
                                     <span className="text-sm">›</span>
                                   </button>
 
-                                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
                                     {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
                                   </div>
                                 </div>
