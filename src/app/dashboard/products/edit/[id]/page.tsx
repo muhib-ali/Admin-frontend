@@ -8,10 +8,13 @@ import { listTaxes } from "@/services/taxes";
 import * as productsService from "@/services/products/index";
 import { useHasPermission } from "@/hooks/use-permission";
 import { useCurrency, Country } from "@/contexts/currency-context";
+import { useUnsavedChanges } from "@/contexts/UnsavedChangesContext";
 import { ENTITY_PERMS } from "@/rbac/permissions-map";
 import { notifyError, notifySuccess, notifyInfo } from "@/utils/notify";
-import { Upload, X, Video, Loader2, SearchX } from "lucide-react";
+import { Upload, X, Video, Loader2, SearchX, ImageIcon, Star } from "lucide-react";
 import Image from "next/image";
+import { useEditProductFormStore } from "@/stores/product-form-store";
+import type { ProductFormValues } from "@/stores/product-form-store";
 import PermissionBoundary from "@/components/permission-boundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +96,15 @@ type MediaUpload =
   | { id: string; kind: "image"; file: File }
   | { id: string; kind: "video"; file: File };
 
+type UrlImageItem = { id: string; url: string };
+
+type UrlMediaBox = {
+  imageUrlInput: string;
+  images: UrlImageItem[];
+  videoUrlInput: string;
+  videoUrl: string;
+};
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -123,6 +135,31 @@ export default function ProductEditPage() {
   const id = String(params?.id ?? "");
   const { selectedCountry, convertAmount, getCurrencyCode } = useCurrency();
 
+  // Set refresh flag on page load to detect actual refreshes
+  React.useEffect(() => {
+    // Set flag to detect if this is a refresh (not initial load)
+    if (performance.getEntriesByType && performance.getEntriesByType('navigation').length > 0) {
+      const navigationEntries = performance.getEntriesByType('navigation');
+      const lastNavigation = navigationEntries[navigationEntries.length - 1] as PerformanceNavigationTiming;
+      if (lastNavigation.type === 'reload' || sessionStorage.getItem('productFormVisited') === 'true') {
+        sessionStorage.setItem('productFormRefresh', 'true');
+      }
+    } else if (sessionStorage.getItem('productFormVisited') === 'true') {
+      sessionStorage.setItem('productFormRefresh', 'true');
+    }
+    // Mark page as visited
+    sessionStorage.setItem('productFormVisited', 'true');
+  }, []);
+
+  const values = useEditProductFormStore((s) => s.values);
+  const updateValues = useEditProductFormStore((s) => s.updateValues);
+  const storeSetValues = useEditProductFormStore((s) => s.setValues);
+  const resetProductForm = useEditProductFormStore((s) => s.reset);
+
+  const media = useEditProductFormStore((s) => s.media);
+  const setMedia = useEditProductFormStore((s) => s.setMedia);
+  const updateMedia = useEditProductFormStore((s) => s.updateMedia);
+
   const canUpdate = useHasPermission(ENTITY_PERMS.products.update);
 
   const [loading, setLoading] = React.useState(true);
@@ -145,33 +182,7 @@ export default function ProductEditPage() {
   const [subcategories, setSubcategories] = React.useState<Option[]>([]);
   const [subcategoriesLoading, setSubcategoriesLoading] = React.useState(false);
 
-  const [values, setValues] = React.useState(() => ({
-    title: "",
-    description: "",
-    category_id: "",
-    subcategory_id: "",
-    brand_id: "",
-    supplier_id: "",
-    tax_id: "",
-    warehouse_id: "",
-    customer_groups: [] as string[],
-    currency: getCurrencyCode(),
-    selling_price: "",
-    cost: "",
-    freight: "",
-    discount: "",
-    start_discount_date: "",
-    end_discount_date: "",
-    total_price: "",
-    stock_quantity: "",
-    weight: "",
-    length: "",
-    width: "",
-    height: "",
-    visibility_wholesale: true,
-    visibility_retail: true,
-    is_active: true,
-  }));
+  
 
   const [bulkPricing, setBulkPricing] = React.useState<BulkPricingRow[]>([]);
   const [variantsOpen, setVariantsOpen] = React.useState(false);
@@ -180,10 +191,21 @@ export default function ProductEditPage() {
   const [variantValues, setVariantValues] = React.useState<Record<string, string>>({});
   const [newVariantName, setNewVariantName] = React.useState("");
   const [recentlyAddedVariantTypes, setRecentlyAddedVariantTypes] = React.useState<Set<string>>(new Set());
-  const [featuredImage, setFeaturedImage] = React.useState<StoredMediaItem | null>(null); // Featured image (product_img_url)
-  const [galleryImages, setGalleryImages] = React.useState<StoredMediaItem[]>([]); // Gallery images
-  const [existingVideo, setExistingVideo] = React.useState<StoredMediaItem | null>(null); // Existing video
-  const [pendingFeaturedImage, setPendingFeaturedImage] = React.useState<MediaUpload | null>(null);
+  
+  // Use global unsaved changes context
+  const { setHasUnsavedChanges } = useUnsavedChanges();
+  const featuredImage = media.editFeaturedImage as StoredMediaItem | null; // Featured image (product_img_url)
+  const galleryImages = media.editGalleryImages as StoredMediaItem[]; // Gallery images
+  const existingVideo = media.editExistingVideo as StoredMediaItem | null; // Existing video
+  const pendingFeaturedImage = media.pendingFeaturedImage as MediaUpload | null;
+  const pendingGalleryImages = media.pendingGalleryImages as MediaUpload[]; // Pending gallery images
+  const pendingVideo = media.pendingVideo as MediaUpload | null; // Pending video
+
+  const featuredSource = media.featuredSource as "upload" | "url" | null;
+  const featuredBoxCarouselIndex = media.featuredBoxCarouselIndex;
+  const urlMediaBox = media.urlMediaBox as UrlMediaBox;
+  const urlImageCarouselIndex = media.urlImageCarouselIndex;
+  const urlImageInputRef = React.useRef<HTMLInputElement | null>(null);
   
   // Date range state for discount dates
   const [discountDateRange, setDiscountDateRange] = React.useState<DateRange>();
@@ -205,8 +227,142 @@ export default function ProductEditPage() {
     };
   };
   
-  const [pendingGalleryImages, setPendingGalleryImages] = React.useState<MediaUpload[]>([]); // Pending gallery images
-  const [pendingVideo, setPendingVideo] = React.useState<MediaUpload | null>(null); // Pending video
+  const setValues = React.useCallback(
+    (next: Partial<ProductFormValues> | ((prev: ProductFormValues) => ProductFormValues)) => {
+      if (typeof next === "function") {
+        updateValues(next);
+        setHasUnsavedChanges(true);
+        return;
+      }
+      storeSetValues(next);
+      setHasUnsavedChanges(true);
+    },
+    [storeSetValues, updateValues, setHasUnsavedChanges]
+  );
+
+  const setFeaturedImage = React.useCallback(
+    (next: StoredMediaItem | null | ((prev: StoredMediaItem | null) => StoredMediaItem | null)) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({
+          ...prev,
+          editFeaturedImage: next(prev.editFeaturedImage as unknown as StoredMediaItem | null),
+        }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ editFeaturedImage: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  const setGalleryImages = React.useCallback(
+    (next: StoredMediaItem[] | ((prev: StoredMediaItem[]) => StoredMediaItem[])) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({
+          ...prev,
+          editGalleryImages: next(prev.editGalleryImages as unknown as StoredMediaItem[]),
+        }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ editGalleryImages: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  const setExistingVideo = React.useCallback(
+    (next: StoredMediaItem | null | ((prev: StoredMediaItem | null) => StoredMediaItem | null)) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({
+          ...prev,
+          editExistingVideo: next(prev.editExistingVideo as unknown as StoredMediaItem | null),
+        }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ editExistingVideo: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  const setPendingFeaturedImage = React.useCallback(
+    (next: MediaUpload | null | ((prev: MediaUpload | null) => MediaUpload | null)) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({ ...prev, pendingFeaturedImage: next(prev.pendingFeaturedImage) }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ pendingFeaturedImage: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  const setPendingGalleryImages = React.useCallback(
+    (next: MediaUpload[] | ((prev: MediaUpload[]) => MediaUpload[])) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({ ...prev, pendingGalleryImages: next(prev.pendingGalleryImages) }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ pendingGalleryImages: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  const setPendingVideo = React.useCallback(
+    (next: MediaUpload | null | ((prev: MediaUpload | null) => MediaUpload | null)) => {
+      if (typeof next === "function") {
+        updateMedia((prev) => ({ ...prev, pendingVideo: next(prev.pendingVideo) }));
+        setHasUnsavedChanges(true);
+        return;
+      }
+      setMedia({ pendingVideo: next });
+      setHasUnsavedChanges(true);
+    },
+    [setMedia, updateMedia, setHasUnsavedChanges]
+  );
+
+  React.useEffect(() => {
+    // Only reset on explicit page refresh, not on navigation
+    const isPageRefresh = sessionStorage.getItem('productFormRefresh') === 'true';
+    
+    if (isPageRefresh) {
+      // Clear user data flag on page refresh
+      const userFormDataKey = `editProduct_${id}_userData`;
+      sessionStorage.removeItem(userFormDataKey);
+      
+      resetProductForm({
+        values: { currency: getCurrencyCode() },
+        media: {
+          editFeaturedImage: null,
+          editGalleryImages: [],
+          editExistingVideo: null,
+          pendingFeaturedImage: null,
+          pendingGalleryImages: [],
+          pendingVideo: null,
+          urlMediaBox: {
+            imageUrlInput: "",
+            images: [],
+            videoUrlInput: "",
+            videoUrl: "",
+          },
+          featuredBoxCarouselIndex: 0,
+          urlImageCarouselIndex: 0,
+        },
+      });
+      // Clear the refresh flag after using it
+      sessionStorage.removeItem('productFormRefresh');
+    }
+    
+    return () => {
+      // Don't reset on unmount to preserve state during navigation
+    };
+  }, [getCurrencyCode, resetProductForm, id]);
 
   const featuredImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const galleryImagesInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -427,44 +583,59 @@ export default function ProductEditPage() {
             }))
           ) : [];
 
-        setValues({
-          title: productData?.title ?? "",
-          description: productData?.description ?? "",
-          category_id: productData?.category_id ?? "",
-          subcategory_id: productData?.subcategory_id ?? productData?.subcategory?.id ?? "",
-          brand_id: productData?.brand_id ?? "",
-          supplier_id: productData?.supplier_id ?? "",
-          tax_id: productData?.tax_id ?? "",
-          warehouse_id: productData?.warehouse_id ?? "",
-          customer_groups: customerGroupIds,
-          currency: getCurrencyCode(),
-          selling_price: displaySellingPrice,
-          cost: displayCost,
-          freight: displayFreight,
-          discount: productData?.discount ? String(productData.discount) : "",
-          start_discount_date: formatDateForInput(productData?.start_discount_date),
-          end_discount_date: formatDateForInput(productData?.end_discount_date),
-          total_price: displayTotalPrice,
-          stock_quantity: String(productData?.stock_quantity ?? ""),
-          weight: productData?.weight ? String(productData.weight) : "",
-          length: productData?.length ? String(productData.length) : "",
-          width: productData?.width ? String(productData.width) : "",
-          height: productData?.height ? String(productData.height) : "",
-          visibility_wholesale: productData?.visibility_wholesale ?? true,
-          visibility_retail: productData?.visibility_retail ?? true,
-          is_active: productData?.is_active ?? true,
-        });
+        // Check if user has entered data in this specific product form
+        const userFormDataKey = `editProduct_${id}_userData`;
+        const hasUserEnteredData = sessionStorage.getItem(userFormDataKey) === 'true';
+        
+        // Check if current form has any user-entered data
+        const currentFormData = values.title || values.description || values.category_id;
+        
+        if (currentFormData) {
+          // Mark that user has entered data for this product
+          sessionStorage.setItem(userFormDataKey, 'true');
+        }
+        
+        // Only load API data if user hasn't entered data yet
+        if (!hasUserEnteredData) {
+          setValues({
+            title: productData?.title ?? "",
+            description: productData?.description ?? "",
+            category_id: productData?.category_id ?? "",
+            subcategory_id: productData?.subcategory_id ?? productData?.subcategory?.id ?? "",
+            brand_id: productData?.brand_id ?? "",
+            supplier_id: productData?.supplier_id ?? "",
+            tax_id: productData?.tax_id ?? "",
+            warehouse_id: productData?.warehouse_id ?? "",
+            customer_groups: customerGroupIds,
+            currency: getCurrencyCode(),
+            selling_price: displaySellingPrice,
+            cost: displayCost,
+            freight: displayFreight,
+            discount: productData?.discount ? String(productData.discount) : "",
+            start_discount_date: formatDateForInput(productData?.start_discount_date),
+            end_discount_date: formatDateForInput(productData?.end_discount_date),
+            total_price: displayTotalPrice,
+            stock_quantity: String(productData?.stock_quantity ?? ""),
+            weight: productData?.weight ? String(productData.weight) : "",
+            length: productData?.length ? String(productData.length) : "",
+            width: productData?.width ? String(productData.width) : "",
+            height: productData?.height ? String(productData.height) : "",
+            visibility_wholesale: productData?.visibility_wholesale ?? true,
+            visibility_retail: productData?.visibility_retail ?? true,
+            is_active: productData?.is_active ?? true,
+          });
 
-        // Sync date range with values
-        const dateRange = stringsToDateRange(
-          formatDateForInput(productData?.start_discount_date),
-          formatDateForInput(productData?.end_discount_date)
-        );
-        setDiscountDateRange(dateRange);
+          // Sync date range with values
+          const dateRange = stringsToDateRange(
+            formatDateForInput(productData?.start_discount_date),
+            formatDateForInput(productData?.end_discount_date)
+          );
+          setDiscountDateRange(dateRange);
 
-        // Load bulk pricing
-        if (convertedBulkPricing.length > 0) {
-          setBulkPricing(convertedBulkPricing);
+          // Load bulk pricing
+          if (convertedBulkPricing.length > 0) {
+            setBulkPricing(convertedBulkPricing);
+          }
         } else {
           setBulkPricing([]);
         }
@@ -571,12 +742,19 @@ export default function ProductEditPage() {
         
         setVariantSelected(selected);
         setVariantValues(variantValuesMap);
-        setFeaturedImage(featuredImageItem);
-        setGalleryImages(galleryImagesItems);
-        setExistingVideo(videoItem);
-        setPendingFeaturedImage(null);
-        setPendingGalleryImages([]);
-        setPendingVideo(null);
+        
+        // Only load media if user hasn't entered data yet
+        if (!hasUserEnteredData) {
+          setFeaturedImage(featuredImageItem);
+          setGalleryImages(galleryImagesItems);
+          setExistingVideo(videoItem);
+          setPendingFeaturedImage(null);
+          setPendingGalleryImages([]);
+          setPendingVideo(null);
+        }
+        
+        // Reset unsaved changes state after loading product data
+        setHasUnsavedChanges(false);
       } catch (error: any) {
         notifyError(error?.message || "Failed to load product");
       } finally {
@@ -829,6 +1007,119 @@ export default function ProductEditPage() {
     setBulkPricing((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== rowId)));
   };
 
+  const totalEditImages = React.useMemo(() => {
+    const featuredCount = (featuredImage ? 1 : 0) + (pendingFeaturedImage ? 1 : 0);
+    return featuredCount + galleryImages.length + pendingGalleryImages.length + (urlMediaBox.images?.length ?? 0);
+  }, [featuredImage, pendingFeaturedImage, galleryImages.length, pendingGalleryImages.length, urlMediaBox.images?.length]);
+
+  const hasAtLeastOneImage = totalEditImages > 0;
+
+  const setUrlBoxField = (patch: Partial<UrlMediaBox>) => {
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, ...patch } }));
+  };
+
+  const addImageUrlToBox = () => {
+    const raw = urlMediaBox.imageUrlInput.trim();
+    if (!raw) return;
+
+    if (totalEditImages >= 10) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images). ");
+      return;
+    }
+
+    if (!/^https?:\/\//i.test(raw)) {
+      notifyError("Please enter a valid image URL.");
+      return;
+    }
+
+    updateMedia((prev) => ({
+      ...prev,
+      urlMediaBox: {
+        ...prev.urlMediaBox,
+        images: [...prev.urlMediaBox.images, { id: crypto.randomUUID(), url: raw }],
+        imageUrlInput: "",
+      },
+    }));
+  };
+
+  const removeImageUrlFromBox = (idToRemove: string) => {
+    updateMedia((prev) => ({
+      ...prev,
+      urlMediaBox: { ...prev.urlMediaBox, images: prev.urlMediaBox.images.filter((x) => x.id !== idToRemove) },
+    }));
+  };
+
+  const setUrlImageAsFeatured = (idToFeature: string) => {
+    updateMedia((prev) => {
+      const index = prev.urlMediaBox.images.findIndex((x) => x.id === idToFeature);
+      if (index === -1) return prev;
+      const selected = prev.urlMediaBox.images[index];
+      const remaining = prev.urlMediaBox.images.filter((x) => x.id !== idToFeature);
+
+      return {
+        ...prev,
+        featuredSource: "url",
+        featuredImage: null,
+        urlMediaBox: { ...prev.urlMediaBox, images: [selected, ...remaining] },
+      };
+    });
+  };
+
+  const addVideoUrlToBox = () => {
+    const raw = urlMediaBox.videoUrlInput.trim();
+    if (!raw) return;
+    if (!/^https?:\/\//i.test(raw)) {
+      notifyError("Please enter a valid video URL.");
+      return;
+    }
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, videoUrl: raw, videoUrlInput: "" } }));
+  };
+
+  const removeVideoFromBox = () => {
+    updateMedia((prev) => ({ ...prev, urlMediaBox: { ...prev.urlMediaBox, videoUrl: "", videoUrlInput: "" } }));
+  };
+
+  const handleUploadImages = (files: FileList | null) => {
+    if (!files?.length) return;
+
+    const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+    const maxImageSize = 5 * 1024 * 1024;
+    const remainingSlots = Math.max(0, 10 - totalEditImages);
+
+    if (remainingSlots <= 0) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images). ");
+      return;
+    }
+
+    const picked = Array.from(files).slice(0, remainingSlots);
+    const errors: string[] = [];
+
+    const validFiles: File[] = [];
+    for (const file of picked) {
+      if (!allowedImageTypes.includes(file.type)) {
+        errors.push(`Invalid image type: ${file.name}. Only JPEG, PNG, and WebP are allowed`);
+        continue;
+      }
+      if (file.size > maxImageSize) {
+        errors.push(`Image ${file.name} is too large. Maximum size is 5MB`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (errors.length > 0) notifyError(errors.join(", "));
+    if (validFiles.length === 0) return;
+
+    const [first, ...rest] = validFiles;
+    setPendingFeaturedImage({ id: crypto.randomUUID(), kind: "image", file: first });
+    if (rest.length > 0) {
+      setPendingGalleryImages((p) => [
+        ...p,
+        ...rest.map((f) => ({ id: crypto.randomUUID(), kind: "image", file: f } as MediaUpload)),
+      ]);
+    }
+  };
+
   // Handle featured image (single)
   const handleFeaturedImage = (files: FileList | null) => {
     if (!files?.length) return;
@@ -843,6 +1134,11 @@ export default function ProductEditPage() {
     }
     if (file.size > maxImageSize) {
       notifyError(`Image ${file.name} is too large. Maximum size is 5MB`);
+      return;
+    }
+
+    if (totalEditImages >= 10) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images).");
       return;
     }
 
@@ -926,14 +1222,20 @@ export default function ProductEditPage() {
 
     const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxImageSize = 5 * 1024 * 1024; // 5MB
-    const maxGalleryImages = 10;
+    const maxTotalImages = 10;
+    const remainingSlots = Math.max(0, maxTotalImages - totalEditImages);
+
+    if (remainingSlots <= 0) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images). ");
+      return;
+    }
 
     const next: MediaUpload[] = [];
     const errors: string[] = [];
 
     for (const file of Array.from(files)) {
-      if (galleryImages.length + pendingGalleryImages.length + next.length >= maxGalleryImages) {
-        errors.push(`Maximum ${maxGalleryImages} gallery images allowed`);
+      if (next.length >= remainingSlots) {
+        errors.push("You cannot select more than 10 images.");
         break;
       }
       if (!allowedImageTypes.includes(file.type)) {
@@ -1026,6 +1328,16 @@ export default function ProductEditPage() {
 
   const save = async () => {
     if (!product || !canUpdate || isUpdating) return; // Prevent double submission
+
+    if (!hasAtLeastOneImage) {
+      notifyError("Featured image required", "Please add at least one image before saving.");
+      return;
+    }
+
+    if (totalEditImages > 10) {
+      notifyError("Image limit reached", "You can only add 10 images total (Upload + URL Images). ");
+      return;
+    }
 
     setIsUpdating(true);
     setUploadErrors([]);
@@ -1131,7 +1443,9 @@ export default function ProductEditPage() {
 
       // Preserve existing video URL if no new video is being uploaded
       // This prevents the video from being cleared when saving the form without video changes
-      if (!pendingVideo && existingVideo && existingVideo.url) {
+      if (!pendingVideo && urlMediaBox.videoUrl.trim()) {
+        productUpdateData.product_video_url = String(urlMediaBox.videoUrl).trim();
+      } else if (!pendingVideo && existingVideo && existingVideo.url) {
         const existingVideoUrl = String(existingVideo.url).trim();
         if (existingVideoUrl && existingVideoUrl !== "" && existingVideoUrl !== "null") {
           productUpdateData.product_video_url = existingVideoUrl;
@@ -1141,7 +1455,9 @@ export default function ProductEditPage() {
 
       // Preserve existing featured image URL if no new featured image is being uploaded
       // This prevents the featured image from being cleared when saving the form without image changes
-      if (!pendingFeaturedImage && featuredImage && featuredImage.url) {
+      if (!pendingFeaturedImage && featuredSource === "url" && urlMediaBox.images?.[0]?.url) {
+        productUpdateData.product_img_url = String(urlMediaBox.images[0].url).trim();
+      } else if (!pendingFeaturedImage && featuredImage && featuredImage.url) {
         const existingImageUrl = String(featuredImage.url).trim();
         if (existingImageUrl && existingImageUrl !== "" && existingImageUrl !== "null") {
           productUpdateData.product_img_url = existingImageUrl;
@@ -1433,6 +1749,13 @@ export default function ProductEditPage() {
         }
         
         notifySuccess("Product updated successfully!");
+        // Reset unsaved changes state after successful save
+        setHasUnsavedChanges(false);
+        
+        // Clear user data flag after successful save
+        const userFormDataKey = `editProduct_${id}_userData`;
+        sessionStorage.removeItem(userFormDataKey);
+        
         // Redirect to products list after successful update
         setTimeout(() => {
           router.push("/dashboard/products");
@@ -1459,10 +1782,10 @@ export default function ProductEditPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/dashboard/products/view/${id}`)}>
+            <Button variant="outline" onClick={() => router.push('/dashboard/products')}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={!product || !values.title.trim() || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800">
+            <Button onClick={save} disabled={!product || !values.title.trim() || !hasAtLeastOneImage || totalEditImages > 10 || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800">
               {isUpdating ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -2035,164 +2358,364 @@ export default function ProductEditPage() {
                 <CardTitle className="text-lg">Media</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 bg-gray-100">
-                <div className="space-y-6">
-                  {/* Featured Image Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                <div className="grid gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="flex h-full flex-col rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h4 className="text-sm font-medium">Featured Image</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Primary image for product listing (JPEG, PNG, WebP - max 5MB)
-                        </p>
+                        <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; the first becomes featured.</div>
                       </div>
+
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="gap-2"
                         onClick={() => featuredImageInputRef.current?.click()}
+                        disabled={totalEditImages >= 10}
                       >
                         <Upload className="h-4 w-4" />
-                        {featuredImage || pendingFeaturedImage ? "Change" : "Add Featured Image"}
+                        Upload
                       </Button>
                     </div>
-                    
+
                     <input
                       ref={featuredImageInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleFeaturedImage(e.target.files);
-                        if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
-                      }}
-                    />
-                    
-                    <div className="rounded-xl border p-3">
-                      {!featuredImage && !pendingFeaturedImage ? (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                          No featured image uploaded yet. This will be used as the primary product image.
-                        </div>
-                      ) : (
-                        <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
-                          <Image
-                            src={pendingFeaturedImageUrl || (featuredImage?.url || "")}
-                            alt={pendingFeaturedImage?.file.name || featuredImage?.name || "Featured Image"}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 100vw, 50vw"
-                          />
-                          <button
-                            type="button"
-                            onClick={pendingFeaturedImage ? removePendingFeaturedImage : removeFeaturedImage}
-                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
-                            aria-label="Remove featured image"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Gallery Images Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-medium">Gallery Images</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Additional images for product detail page (max 10 images - JPEG, PNG, WebP)
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => galleryImagesInputRef.current?.click()}
-                        disabled={galleryImages.length + pendingGalleryImages.length >= 10}
-                      >
-                        <Upload className="h-4 w-4" />
-                        Add Gallery Images
-                      </Button>
-                    </div>
-                    
-                    <input
-                      ref={galleryImagesInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       multiple
                       className="hidden"
                       onChange={(e) => {
-                        handleGalleryImages(e.target.files);
-                        if (galleryImagesInputRef.current) galleryImagesInputRef.current.value = "";
+                        handleUploadImages(e.target.files);
+                        if (featuredImageInputRef.current) featuredImageInputRef.current.value = "";
                       }}
                     />
-                    
-                    <div className="rounded-xl border p-3">
-                      {galleryImages.length === 0 && pendingGalleryImages.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                          No gallery images uploaded yet. Add up to 4 additional images.
+
+                    <div
+                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                      onClick={() => featuredImageInputRef.current?.click()}
+                    >
+                      {galleryImages.length === 0 && pendingGalleryImages.length === 0 && !pendingFeaturedImage && !featuredImage ? (
+                        <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200">
+                            <ImageIcon className="h-6 w-6 text-neutral-700" />
+                          </div>
+                          <div className="text-sm font-medium text-neutral-800">Click to upload images</div>
+                          <div className="text-xs text-neutral-500">Recommended: square image, high quality</div>
                         </div>
                       ) : (
-                        <div className="flex gap-3 overflow-x-auto scrollbar-stable">
-                          {galleryImages.map((m) => (
-                            <div
-                              key={m.id}
-                              className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-muted-foreground">{Math.min(10, totalEditImages)}/10 uploaded</div>
+                            <button
+                              type="button"
+                              className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (pendingFeaturedImageUrl) URL.revokeObjectURL(pendingFeaturedImageUrl);
+                                Object.values(pendingGalleryImageUrls).forEach((u) => URL.revokeObjectURL(u));
+                                setPendingFeaturedImage(null);
+                                setPendingGalleryImages([]);
+                              }}
+                              disabled={isUpdating}
                             >
-                              <Image
-                                src={m.url}
-                                alt={m.name}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeGalleryImage(m.id)}
-                                className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                                aria-label="Remove gallery image"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          {pendingGalleryImages.map((m) => {
-                            const blobUrl = pendingGalleryImageUrls[m.id];
-                            if (!blobUrl) return null;
+                              Clear All
+                            </button>
+                          </div>
+
+                          {(() => {
+                            const combined = [
+                              ...(featuredImage ? [{ id: featuredImage.id, url: featuredImage.url, name: featuredImage.name }] : []),
+                              ...(pendingFeaturedImage && pendingFeaturedImageUrl
+                                ? [{ id: pendingFeaturedImage.id, url: pendingFeaturedImageUrl, name: pendingFeaturedImage.file.name }]
+                                : []),
+                              ...galleryImages.map((m) => ({ id: m.id, url: m.url, name: m.name })),
+                              ...pendingGalleryImages
+                                .map((m) => ({ id: m.id, url: pendingGalleryImageUrls[m.id], name: m.file.name }))
+                                .filter((x) => Boolean(x.url)),
+                            ];
+
+                            const current = combined[featuredBoxCarouselIndex];
+                            const isFeatured =
+                              featuredSource === "upload" && Boolean(current && featuredImage && current.id === featuredImage.id);
+                            const canGoPrev = combined.length > 1;
+                            const canGoNext = combined.length > 1;
+
+                            if (!current) return null;
+
                             return (
-                              <div
-                                key={m.id}
-                                className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg border bg-muted"
-                              >
-                                <Image
-                                  src={blobUrl}
-                                  alt={m.file.name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              <div className="relative mx-auto h-72 w-full overflow-hidden rounded-xl border bg-muted group">
+                                <img
+                                  src={current.url}
+                                  alt={current.name}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
                                 />
+
+                                <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
+
+                                {isFeatured ? (
+                                  <div className="absolute left-2 top-2 rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-medium text-white flex items-center gap-1">
+                                    <Star className="h-3 w-3 fill-current" />
+                                    Featured
+                                  </div>
+                                ) : null}
+
                                 <button
                                   type="button"
-                                  onClick={() => removePendingGalleryImage(m.id)}
-                                  className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white hover:bg-red-700"
-                                  aria-label="Remove gallery image"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMedia({
+                                      featuredBoxCarouselIndex:
+                                        featuredBoxCarouselIndex === 0 ? combined.length - 1 : featuredBoxCarouselIndex - 1,
+                                    });
+                                  }}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
+                                  disabled={!canGoPrev}
+                                  aria-label="Previous"
                                 >
-                                  <X className="h-3.5 w-3.5" />
+                                  <span className="text-sm">‹</span>
                                 </button>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMedia({
+                                      featuredBoxCarouselIndex:
+                                        featuredBoxCarouselIndex === combined.length - 1 ? 0 : featuredBoxCarouselIndex + 1,
+                                    });
+                                  }}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
+                                  disabled={!canGoNext}
+                                  aria-label="Next"
+                                >
+                                  <span className="text-sm">›</span>
+                                </button>
+
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
+                                  {featuredBoxCarouselIndex + 1} / {combined.length}
+                                </div>
                               </div>
                             );
-                          })}
+                          })()}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Video Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium">Product Video</h4>
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-neutral-900">URL Images & Video</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Add URL links for images/videos; image links share the 10-image limit.</div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => urlImageInputRef.current?.focus()}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Images URLs (remaining {Math.max(0, 10 - totalEditImages)})</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            ref={urlImageInputRef}
+                            value={urlMediaBox.imageUrlInput}
+                            onChange={(e) => setUrlBoxField({ imageUrlInput: e.target.value })}
+                            placeholder="https://..."
+                            disabled={totalEditImages >= 10}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addImageUrlToBox();
+                              }
+                            }}
+                          />
+                          <Button type="button" variant="outline" onClick={addImageUrlToBox} disabled={totalEditImages >= 10}>
+                            Add
+                          </Button>
+                        </div>
+
+                        {urlMediaBox.images.length > 0 ? (
+                          (() => {
+                            const current = urlMediaBox.images[urlImageCarouselIndex];
+                            const isFeaturedUrlImage = featuredSource === "url" && urlMediaBox.images[0]?.id === current?.id;
+                            const canGoPrev = urlMediaBox.images.length > 1;
+                            const canGoNext = urlMediaBox.images.length > 1;
+
+                            if (!current) return null;
+
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs text-muted-foreground">{urlMediaBox.images.length}/10 uploaded</div>
+                                  <button
+                                    type="button"
+                                    className="text-sm font-semibold text-red-600 hover:text-red-700 focus-visible:text-red-700 disabled:text-red-300"
+                                    onClick={() => setUrlBoxField({ images: [] })}
+                                    disabled={isUpdating}
+                                  >
+                                    Clear All
+                                  </button>
+                                </div>
+
+                                <div className="relative mx-auto h-32 w-full overflow-hidden rounded-xl border bg-muted group">
+                                  <img
+                                    src={current.url}
+                                    alt="URL image"
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      if (target.crossOrigin === "anonymous") {
+                                        target.crossOrigin = "";
+                                        target.src = current.url;
+                                      }
+                                    }}
+                                  />
+
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
+
+                                  {isFeaturedUrlImage ? (
+                                    <div className="absolute left-2 top-2 rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-medium text-white flex items-center gap-1">
+                                      <Star className="h-3 w-3 fill-current" />
+                                      Featured
+                                    </div>
+                                  ) : null}
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setUrlImageAsFeatured(current.id);
+                                    }}
+                                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
+                                  >
+                                    Set as Featured
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeImageUrlFromBox(current.id);
+                                    }}
+                                    className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                    aria-label="Remove image"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setMedia({
+                                        urlImageCarouselIndex:
+                                          urlImageCarouselIndex === 0 ? urlMediaBox.images.length - 1 : urlImageCarouselIndex - 1,
+                                      })
+                                    }
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                    disabled={!canGoPrev}
+                                    aria-label="Previous"
+                                  >
+                                    <span className="text-sm">‹</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setMedia({
+                                        urlImageCarouselIndex:
+                                          urlImageCarouselIndex === urlMediaBox.images.length - 1 ? 0 : urlImageCarouselIndex + 1,
+                                      })
+                                    }
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                    disabled={!canGoNext}
+                                    aria-label="Next"
+                                  >
+                                    <span className="text-sm">›</span>
+                                  </button>
+
+                                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                                    {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                            <div className="text-xs text-neutral-500">Paste image URLs above; they will appear here.</div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Videos URL</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={urlMediaBox.videoUrlInput}
+                            onChange={(e) => setUrlBoxField({ videoUrlInput: e.target.value })}
+                            placeholder="https://..."
+                            disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(pendingVideo) || Boolean(existingVideo)}
+                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addVideoUrlToBox();
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={addVideoUrlToBox}
+                            disabled={Boolean(urlMediaBox.videoUrl.trim()) || Boolean(pendingVideo) || Boolean(existingVideo)}
+                          >
+                            Add
+                          </Button>
+                        </div>
+
+                        {urlMediaBox.videoUrl.trim() ? (
+                          <div className="flex items-center justify-between gap-3 rounded-xl border bg-neutral-50 px-3 py-2">
+                            <div className="min-w-0">
+                              <div className="text-[11px] text-neutral-500">Saved video URL</div>
+                              <div className="truncate text-xs text-neutral-700">{urlMediaBox.videoUrl}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={removeVideoFromBox}
+                              className="shrink-0 rounded-full bg-white/90 p-1 text-neutral-900 shadow-sm ring-1 ring-white/40 transition-all hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                              aria-label="Remove video"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed bg-neutral-50 p-4 text-center">
+                            <div className="text-xs text-neutral-500">Paste a video URL above</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-neutral-900">Video</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Upload one MP4/WebM/OGG/QuickTime clip (max 50MB).</div>
+                      </div>
+
                       <Button
                         type="button"
                         variant="outline"
@@ -2201,10 +2724,10 @@ export default function ProductEditPage() {
                         onClick={() => videoInputRef.current?.click()}
                       >
                         <Video className="h-4 w-4" />
-                        Add Video
+                        {pendingVideo || existingVideo ? "Change" : "Upload"}
                       </Button>
                     </div>
-                    
+
                     <input
                       ref={videoInputRef}
                       type="file"
@@ -2215,14 +2738,21 @@ export default function ProductEditPage() {
                         if (videoInputRef.current) videoInputRef.current.value = "";
                       }}
                     />
-                    
-                    <div className="rounded-xl border p-3">
+
+                    <div
+                      className="mt-4 cursor-pointer rounded-2xl border border-dashed bg-neutral-50 p-4 transition-colors hover:bg-neutral-100"
+                      onClick={() => videoInputRef.current?.click()}
+                    >
                       {!existingVideo && !pendingVideo ? (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                          No video uploaded yet. Add one video (MP4, WebM, OGG, QuickTime - max 50MB).
+                        <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200">
+                            <Video className="h-6 w-6 text-neutral-700" />
+                          </div>
+                          <div className="text-sm font-medium text-neutral-800">Click to upload product video</div>
+                          <div className="text-xs text-neutral-500">Keep it short and clear (recommended)</div>
                         </div>
                       ) : (
-                        <div className="relative h-48 w-full max-w-md overflow-hidden rounded-lg border bg-muted">
+                        <div className="relative h-72 w-full overflow-hidden rounded-xl border bg-muted group">
                           <video
                             src={pendingVideoUrl || (existingVideo?.url || "")}
                             className="h-full w-full object-cover"
@@ -2233,54 +2763,61 @@ export default function ProductEditPage() {
                           />
                           <button
                             type="button"
-                            onClick={pendingVideo ? removeVideo : async () => {
-                              // Remove video from backend
-                              if (existingVideo && id && product) {
-                                try {
-                                  // Use existing product state which already has all required fields
-                                  const basePrice = Number(product.price || values.selling_price || 0);
-                                  const cost = Number(values.cost || 0);
-                                  const freight = Number(values.freight || 0);
-                                  const discountPercent = Number(values.discount || 0);
-                                  
-                                  const totalCost = basePrice + cost + freight;
-                                  const priceAfterDiscount = discountPercent > 0 
-                                    ? totalCost - (totalCost * discountPercent) / 100 
-                                    : totalCost;
-
-                                  const updatePayload: any = {
-                                    id: id,
-                                    title: product.title || values.title || "",
-                                    price: basePrice,
-                                    stock_quantity: product.stock_quantity || values.stock_quantity || 0,
-                                    category_id: product.category_id || values.category_id || "",
-                                    brand_id: product.brand_id || values.brand_id || "",
-                                    currency: product.currency || values.currency || "NOK",
-                                    total_price: priceAfterDiscount,
-                                  };
-                                  
-                                  // Explicitly set product_video_url to empty string (backend will convert to null)
-                                  updatePayload.product_video_url = "";
-                                  
-                                  await productsService.updateProduct(updatePayload);
-                                  setExistingVideo(null);
-                                } catch (error: any) {
-                                  console.error("Failed to remove video:", error);
-                                  const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
-                                  notifyError(`Failed to remove video: ${errorMessage}`);
-                                }
-                              } else {
-                                setExistingVideo(null);
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (pendingVideo) {
+                                removeVideo();
+                                return;
                               }
+                              (async () => {
+                                if (existingVideo && id && product) {
+                                  try {
+                                    const basePrice = Number(product.price || values.selling_price || 0);
+                                    const cost = Number(values.cost || 0);
+                                    const freight = Number(values.freight || 0);
+                                    const discountPercent = Number(values.discount || 0);
+
+                                    const totalCost = basePrice + cost + freight;
+                                    const priceAfterDiscount = discountPercent > 0
+                                      ? totalCost - (totalCost * discountPercent) / 100
+                                      : totalCost;
+
+                                    const updatePayload: any = {
+                                      id: id,
+                                      title: product.title || values.title || "",
+                                      price: basePrice,
+                                      stock_quantity: product.stock_quantity || values.stock_quantity || 0,
+                                      category_id: product.category_id || values.category_id || "",
+                                      brand_id: product.brand_id || values.brand_id || "",
+                                      currency: product.currency || values.currency || "NOK",
+                                      total_price: priceAfterDiscount,
+                                    };
+
+                                    updatePayload.product_video_url = "";
+                                    await productsService.updateProduct(updatePayload);
+                                  } catch (error: any) {
+                                    const errorMessage = error?.response?.data?.message || error?.message || "Unknown error";
+                                    notifyError(`Failed to remove video: ${errorMessage}`);
+                                    return;
+                                  }
+                                }
+                                setExistingVideo(null);
+                              })();
                             }}
-                            className="absolute right-2 top-2 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                            className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                             aria-label="Remove video"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       )}
                     </div>
+
+                    {uploadErrors.map((error, index) => (
+                      <div key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                        {error}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
