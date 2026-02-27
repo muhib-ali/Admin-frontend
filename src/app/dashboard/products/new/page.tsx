@@ -109,6 +109,7 @@ type StoredProduct = {
 };
 
 const STORAGE_KEY = "admin_portal_static_products_v1";
+const DRAFT_KEY = "admin_new_product_form_draft";
 
 function readStoredProducts(): StoredProduct[] {
   try {
@@ -123,6 +124,40 @@ function readStoredProducts(): StoredProduct[] {
 
 function writeStoredProducts(next: StoredProduct[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
+
+type NewProductDraft = {
+  values: ProductFormValues;
+  urlMediaBox: UrlMediaBox;
+  featuredSource: "upload" | "url" | null;
+};
+
+function readNewProductDraft(): NewProductDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as NewProductDraft;
+    if (!data || typeof data.values !== "object" || typeof data.urlMediaBox !== "object") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeNewProductDraft(draft: NewProductDraft) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // ignore quota or parse errors
+  }
+}
+
+function clearNewProductDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -158,6 +193,7 @@ export default function NewProductPage() {
   const values = useAddProductFormStore((s) => s.values);
   const updateValues = useAddProductFormStore((s) => s.updateValues);
   const storeSetValues = useAddProductFormStore((s) => s.setValues);
+  const replaceValues = useAddProductFormStore((s) => s.replaceValues);
   const resetProductForm = useAddProductFormStore((s) => s.reset);
 
   const media = useAddProductFormStore((s) => s.media);
@@ -300,20 +336,37 @@ export default function NewProductPage() {
     return () => ac.abort();
   }, []);
 
+  // Restore draft from localStorage on mount (keeps form filled after refresh)
   React.useEffect(() => {
-    // Only reset on explicit page refresh, not on navigation
-    const isPageRefresh = sessionStorage.getItem('productFormRefresh') === 'true';
-    
-    if (isPageRefresh) {
-      resetProductForm({ values: { currency: getCurrencyCode() } });
-      // Clear the refresh flag after using it
-      sessionStorage.removeItem('productFormRefresh');
+    const draft = readNewProductDraft();
+    if (draft?.values) {
+      replaceValues(draft.values);
+      setMedia({
+        urlMediaBox: draft.urlMediaBox,
+        featuredSource: draft.featuredSource,
+      });
     }
-    
-    return () => {
-      // Don't reset on unmount to preserve state during navigation
-    };
-  }, [getCurrencyCode, resetProductForm]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to restore draft
+  }, []);
+
+  // Persist form values and URL media to localStorage so they survive refresh
+  React.useEffect(() => {
+    const hasContent =
+      (values.title ?? "").trim() !== "" ||
+      (values.description ?? "").trim() !== "" ||
+      (urlMediaBox.images?.length ?? 0) > 0 ||
+      (urlMediaBox.imageUrlInput ?? "").trim() !== "" ||
+      (urlMediaBox.videoUrl ?? "").trim() !== "";
+    if (!hasContent) {
+      clearNewProductDraft();
+      return;
+    }
+    writeNewProductDraft({
+      values: { ...values },
+      urlMediaBox: { ...urlMediaBox, images: urlMediaBox.images ?? [] },
+      featuredSource: featuredSource ?? null,
+    });
+  }, [values, urlMediaBox, featuredSource]);
 
   React.useEffect(() => {
     if (!values.category_id) {
@@ -888,6 +941,23 @@ export default function NewProductPage() {
         }
       }
 
+      // Upload non-featured gallery images (so all images appear on view/edit)
+      const galleryFilesToUpload: File[] =
+        featuredSource === "upload" && featuredImage
+          ? featuredBoxImages
+              .filter((m) => m.id !== featuredImage.id && m.file)
+              .map((m) => m.file as File)
+          : featuredBoxImages
+              .filter((m) => m.file)
+              .map((m) => m.file as File);
+      if (galleryFilesToUpload.length > 0) {
+        try {
+          await productsService.uploadProductImages(productId, galleryFilesToUpload);
+        } catch (error: any) {
+          setUploadErrors((prev) => [...prev, `Gallery images upload failed: ${error.message}`]);
+        }
+      }
+
       if (videoFile) {
         try {
           await productsService.uploadProductVideo(productId, videoFile.file);
@@ -899,6 +969,9 @@ export default function NewProductPage() {
       // Don't write to localStorage - product is already in backend
       // The products page should fetch from backend API, not localStorage
       // Writing to localStorage causes duplicate products in the UI
+
+      // Clear the form draft so next time we start fresh
+      clearNewProductDraft();
 
       // Show success message and redirect
       // Note: uploadErrors state will be checked after the function completes
@@ -1486,7 +1559,7 @@ export default function NewProductPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-neutral-900">Gallery Images</div>
-                    <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; the first becomes featured.</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Select up to 10 images; choose any as featured.</div>
                   </div>
 
                   <Button
@@ -1567,7 +1640,30 @@ export default function NewProductPage() {
                                 <Star className="h-3 w-3 fill-current" />
                                 Featured
                               </div>
-                            ) : null}
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFeaturedBoxImageAsFeatured(current.id);
+                                }}
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 pointer-events-none group-hover:pointer-events-auto"
+                              >
+                                Set as Featured
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFeaturedImage(current.id);
+                              }}
+                              className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                              aria-label="Remove image"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
 
                             <button
                               type="button"
@@ -1722,8 +1818,7 @@ export default function NewProductPage() {
                                   e.stopPropagation();
                                   setUrlImageAsFeatured(current.id);
                                 }}
-                                disabled={featuredSource === "upload"}
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500 disabled:opacity-40"
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-4 py-1 text-xs font-semibold text-neutral-900 shadow-[0_10px_20px_rgba(15,23,42,0.2)] opacity-0 transition-all duration-200 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_32px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-500"
                               >
                                 Set as Featured
                               </button>
@@ -1734,7 +1829,7 @@ export default function NewProductPage() {
                                   e.stopPropagation();
                                   removeImageUrlFromBox(current.id);
                                 }}
-                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all group-hover:opacity-100 hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                                className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-neutral-900 shadow-sm ring-1 ring-white/40 opacity-0 transition-all pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-white hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                                 aria-label="Remove image"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -1750,7 +1845,7 @@ export default function NewProductPage() {
                                         : urlImageCarouselIndex - 1,
                                   })
                                 }
-                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                 disabled={!canGoPrev}
                                 aria-label="Previous"
                               >
@@ -1767,14 +1862,14 @@ export default function NewProductPage() {
                                         : urlImageCarouselIndex + 1,
                                   })
                                 }
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 text-neutral-900 disabled:opacity-40"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-neutral-900 disabled:opacity-40"
                                 disabled={!canGoNext}
                                 aria-label="Next"
                               >
                                 <span className="text-sm">›</span>
                               </button>
 
-                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[10px] text-white">
                                 {urlImageCarouselIndex + 1} / {urlMediaBox.images.length}
                               </div>
                             </div>

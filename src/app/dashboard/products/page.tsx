@@ -526,7 +526,7 @@ export default function ProductsPage() {
                   <span ref={uploadButtonRef} className="inline-flex">
                     <Button
                       variant="outline"
-                      className="gap-2 w-full sm:w-auto bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
+                      className="gap-2 w-full sm:w-auto h-9 px-3 text-xs font-medium bg-emerald-100 border border-emerald-200 text-emerald-700 shadow-sm transition duration-150 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-px"
                       onClick={triggerExcelPick}
                       disabled={!canCreate || bulkUploadState.status === "uploading" || zipUploading}
                     >
@@ -565,7 +565,7 @@ export default function ProductsPage() {
             <a
               href="/GsHwBU.xlsx"
               download="sample-products.xlsx"
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-emerald-200 bg-transparent text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 h-9 px-4 py-2 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md h-9 px-3 text-xs font-medium bg-emerald-100 border border-emerald-200 text-emerald-700 shadow-sm transition duration-150 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 active:translate-y-px w-full sm:w-auto"
             >
               <Download className="h-4 w-4" />
               Download sample Excel
