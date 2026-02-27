@@ -1483,6 +1483,7 @@ export default function ProductEditPage() {
           .filter((v): v is { vtype_id: string; value: string } => {
             return v !== null && typeof v.vtype_id === "string" && v.vtype_id.trim() !== "";
           }),
+        image_urls: (urlMediaBox.images ?? []).map((x) => x.url).filter(Boolean).slice(0, 10),
         bulk_prices: await Promise.all(
           bulkPricing
             .filter(row => row.quantity && row.price)

@@ -864,6 +864,7 @@ export default function NewProductPage() {
         variants: defaultVariants.length > 0 ? defaultVariants : undefined,
         product_img_url: featuredImage ? undefined : (firstUrlImage ? String(firstUrlImage).trim() : undefined),
         product_video_url: videoFile ? undefined : (videoUrl ? String(videoUrl).trim() : undefined),
+        imageUrls: urlMediaBox.images.length > 0 ? urlMediaBox.images.map((x) => x.url).filter(Boolean).slice(0, 10) : undefined,
         bulk_prices: await Promise.all(
           bulkPricing
             .filter(row => row.quantity && row.price)
