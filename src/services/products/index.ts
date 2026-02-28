@@ -577,19 +577,31 @@ export type ZipGalleryUploadResponse = {
   uploaded: Array<{ fileName: string; url: string }>;
 };
 
+/**
+ * Upload ZIP to zip-gallery. Uses direct upload to Files backend when
+ * FILE_BACKEND_API_URL is set (avoids Next.js proxy timeout for large files).
+ */
 export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResponse> {
   const token = await getAuthToken();
-  const headers: HeadersInit | undefined = token
-    ? { Authorization: `Bearer ${token}` }
-    : undefined;
+  const headers: HeadersInit = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 
   const form = new FormData();
   form.append("file", file);
 
-  const res = await fetch("/api/v1/zip-gallery/upload", {
+  const filesBase = typeof process.env.FILE_BACKEND_API_URL === "string"
+    ? process.env.FILE_BACKEND_API_URL.trim()
+    : "";
+  const uploadUrl = filesBase
+    ? `${filesBase.replace(/\/$/, "")}/v1/zip-gallery/upload`
+    : "/api/v1/zip-gallery/upload";
+
+  const res = await fetch(uploadUrl, {
     method: "POST",
     body: form,
     headers,
+    credentials: filesBase ? "include" : "same-origin",
   });
 
   const json = await res.json().catch(() => ({}));
