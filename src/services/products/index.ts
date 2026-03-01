@@ -599,6 +599,9 @@ export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResp
   const base = filesBase ? filesBase.replace(/\/$/, "") : "";
 
   if (base) {
+    if (!token?.trim()) {
+      throw new Error("Login required for ZIP upload. Please sign in and try again.");
+    }
     return uploadZipGalleryChunked(base, file, headers);
   }
 
@@ -640,17 +643,59 @@ async function uploadZipGalleryChunked(
   file: File,
   headers: HeadersInit,
 ): Promise<ZipGalleryUploadResponse> {
+  let currentHeaders = headers;
+
+  const ensureAuthHeaders = async (): Promise<HeadersInit> => {
+    const token = await getAuthToken();
+    if (!token?.trim()) return currentHeaders;
+    return { ...currentHeaders, Authorization: `Bearer ${token}` };
+  };
+
   const initRes = await fetch(`${base}/v1/zip-gallery/upload/init`, {
     method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
+    headers: { ...currentHeaders, "Content-Type": "application/json" },
     credentials: "include",
   });
+  if (initRes.status === 401) {
+    currentHeaders = await ensureAuthHeaders();
+    const retryInit = await fetch(`${base}/v1/zip-gallery/upload/init`, {
+      method: "POST",
+      headers: { ...currentHeaders, "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!retryInit.ok) {
+      const err = await retryInit.json().catch(() => ({}));
+      throw new Error(
+        (err as { message?: string }).message || "File server rejected login. Ensure JWT_SECRET matches the admin backend."
+      );
+    }
+    const retryJson = (await retryInit.json()) as { uploadId: string };
+    if (!retryJson.uploadId) throw new Error("No uploadId returned");
+    return uploadZipGalleryChunkedWithUploadId(base, file, retryJson.uploadId, currentHeaders);
+  }
   if (!initRes.ok) {
     const err = await initRes.json().catch(() => ({}));
     throw new Error((err as { message?: string }).message || `Init failed (${initRes.status})`);
   }
   const { uploadId } = (await initRes.json()) as { uploadId: string };
   if (!uploadId) throw new Error("No uploadId returned");
+
+  return uploadZipGalleryChunkedWithUploadId(base, file, uploadId, currentHeaders);
+}
+
+async function uploadZipGalleryChunkedWithUploadId(
+  base: string,
+  file: File,
+  uploadId: string,
+  headers: HeadersInit,
+): Promise<ZipGalleryUploadResponse> {
+  let currentHeaders = headers;
+
+  const ensureAuthHeaders = async (): Promise<HeadersInit> => {
+    const token = await getAuthToken();
+    if (!token?.trim()) return currentHeaders;
+    return { ...currentHeaders, Authorization: `Bearer ${token}` };
+  };
 
   let offset = 0;
   let part = 0;
@@ -662,17 +707,28 @@ async function uploadZipGalleryChunked(
     form.append("chunk", chunk, "chunk");
 
     let lastErr: Error | null = null;
+    let didRetryAuth = false;
     for (let attempt = 0; attempt <= CHUNK_UPLOAD_MAX_RETRIES; attempt++) {
       try {
         const chunkRes = await fetch(`${base}/v1/zip-gallery/upload/chunk`, {
           method: "POST",
           body: form,
-          headers,
+          headers: currentHeaders,
           credentials: "include",
         });
+        if (chunkRes.status === 401 && !didRetryAuth) {
+          didRetryAuth = true;
+          currentHeaders = await ensureAuthHeaders();
+          await new Promise((r) => setTimeout(r, 300));
+          continue;
+        }
         if (!chunkRes.ok) {
           const err = await chunkRes.json().catch(() => ({}));
-          throw new Error((err as { message?: string }).message || `Chunk ${part} failed (${chunkRes.status})`);
+          const msg = (err as { message?: string }).message || `Chunk ${part} failed (${chunkRes.status})`;
+          if (chunkRes.status === 401) {
+            throw new Error("File server rejected login. Set JWT_SECRET on the file backend to match the admin backend.");
+          }
+          throw new Error(msg);
         }
         lastErr = null;
         break;
@@ -700,7 +756,7 @@ async function uploadZipGalleryChunked(
 
   const completeRes = await fetch(`${base}/v1/zip-gallery/upload/complete`, {
     method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
+    headers: { ...currentHeaders, "Content-Type": "application/json" },
     body: JSON.stringify({ uploadId }),
     credentials: "include",
   });
@@ -715,7 +771,7 @@ async function uploadZipGalleryChunked(
   while (Date.now() - started < JOB_POLL_MAX_WAIT_MS) {
     await new Promise((r) => setTimeout(r, JOB_POLL_INTERVAL_MS));
     const jobRes = await fetch(`${base}/v1/zip-gallery/jobs/${jobId}`, {
-      headers,
+      headers: currentHeaders,
       credentials: "include",
     });
     if (!jobRes.ok) throw new Error(`Job status failed (${jobRes.status})`);
