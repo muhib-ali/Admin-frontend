@@ -578,7 +578,7 @@ export type ZipGalleryUploadResponse = {
 };
 
 // Smaller chunks (10 MB) so each request finishes well under ~30–60s proxy/HTTP2 limits and avoids ERR_HTTP2_PROTOCOL_ERROR
-const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk (fewer requests = faster upload; backend allows up to 100 MB)
 const CHUNK_UPLOAD_MAX_RETRIES = 2;
 const JOB_POLL_INTERVAL_MS = 2000;
 const JOB_POLL_MAX_WAIT_MS = 60 * 60 * 1000; // 1 hour max wait for extraction
