@@ -579,7 +579,8 @@ export type ZipGalleryUploadResponse = {
 
 /**
  * Upload ZIP to zip-gallery. Uses direct upload to Files backend when
- * FILE_BACKEND_API_URL is set (avoids Next.js proxy timeout for large files).
+ * NEXT_PUBLIC_FILE_BACKEND_URL is set (avoids Next.js proxy timeout / HTTP2 errors for large files).
+ * In production (e.g. Railway) set NEXT_PUBLIC_FILE_BACKEND_URL to your deployed KSR-FILES URL.
  */
 export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResponse> {
   const token = await getAuthToken();
@@ -590,8 +591,8 @@ export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResp
   const form = new FormData();
   form.append("file", file);
 
-  const filesBase = typeof process.env.FILE_BACKEND_API_URL === "string"
-    ? process.env.FILE_BACKEND_API_URL.trim()
+  const filesBase = typeof process.env.NEXT_PUBLIC_FILE_BACKEND_URL === "string"
+    ? process.env.NEXT_PUBLIC_FILE_BACKEND_URL.trim()
     : "";
   const uploadUrl = filesBase
     ? `${filesBase.replace(/\/$/, "")}/v1/zip-gallery/upload`
