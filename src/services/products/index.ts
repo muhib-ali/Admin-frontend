@@ -577,10 +577,13 @@ export type ZipGalleryUploadResponse = {
   uploaded: Array<{ fileName: string; url: string }>;
 };
 
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk (keeps each request under Railway 5 min)
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_MAX_WAIT_MS = 60 * 60 * 1000; // 1 hour max wait for extraction
+
 /**
- * Upload ZIP to zip-gallery. Uses direct upload to Files backend when
- * NEXT_PUBLIC_FILE_BACKEND_URL is set (avoids Next.js proxy timeout / HTTP2 errors for large files).
- * In production (e.g. Railway) set NEXT_PUBLIC_FILE_BACKEND_URL to your deployed KSR-FILES URL.
+ * Upload ZIP to zip-gallery. When NEXT_PUBLIC_FILE_BACKEND_URL is set, uses chunked upload
+ * + background job (supports up to 5 GB on Railway's 5 min request limit). Otherwise uses proxy.
  */
 export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResponse> {
   const token = await getAuthToken();
@@ -588,24 +591,33 @@ export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResp
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const form = new FormData();
-  form.append("file", file);
-
   const filesBase = typeof process.env.NEXT_PUBLIC_FILE_BACKEND_URL === "string"
     ? process.env.NEXT_PUBLIC_FILE_BACKEND_URL.trim()
     : "";
-  const uploadUrl = filesBase
-    ? `${filesBase.replace(/\/$/, "")}/v1/zip-gallery/upload`
-    : "/api/v1/zip-gallery/upload";
+  const base = filesBase ? filesBase.replace(/\/$/, "") : "";
 
-  const res = await fetch(uploadUrl, {
+  if (base) {
+    return uploadZipGalleryChunked(base, file, headers);
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/v1/zip-gallery/upload", {
     method: "POST",
     body: form,
     headers,
-    credentials: filesBase ? "include" : "same-origin",
+    credentials: "same-origin",
   });
 
-  const json = await res.json().catch(() => ({}));
+  const text = await res.text();
+  const lastLine = text.trim().split("\n").filter(Boolean).pop() || "{}";
+  let json: { uploaded?: Array<{ fileName: string; url: string }>; error?: string; message?: string };
+  try {
+    json = JSON.parse(lastLine) as typeof json;
+  } catch {
+    json = {};
+  }
+
   if (!res.ok) {
     const message = (json as { message?: string })?.message;
     const error = (json as { error?: string })?.error;
@@ -614,7 +626,87 @@ export async function uploadZipGallery(file: File): Promise<ZipGalleryUploadResp
     throw new Error(String(msg));
   }
 
-  return json as ZipGalleryUploadResponse;
+  if ((json as { error?: string }).error) {
+    throw new Error(String((json as { error?: string }).error));
+  }
+
+  return (json?.uploaded != null ? { uploaded: json.uploaded } : json) as ZipGalleryUploadResponse;
+}
+
+async function uploadZipGalleryChunked(
+  base: string,
+  file: File,
+  headers: HeadersInit,
+): Promise<ZipGalleryUploadResponse> {
+  const initRes = await fetch(`${base}/v1/zip-gallery/upload/init`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!initRes.ok) {
+    const err = await initRes.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || `Init failed (${initRes.status})`);
+  }
+  const { uploadId } = (await initRes.json()) as { uploadId: string };
+  if (!uploadId) throw new Error("No uploadId returned");
+
+  let offset = 0;
+  let part = 0;
+  while (offset < file.size) {
+    const chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+    const form = new FormData();
+    form.append("uploadId", uploadId);
+    form.append("part", String(part));
+    form.append("chunk", chunk, "chunk");
+    const chunkRes = await fetch(`${base}/v1/zip-gallery/upload/chunk`, {
+      method: "POST",
+      body: form,
+      headers,
+      credentials: "include",
+    });
+    if (!chunkRes.ok) {
+      const err = await chunkRes.json().catch(() => ({}));
+      throw new Error((err as { message?: string }).message || `Chunk ${part} failed (${chunkRes.status})`);
+    }
+    offset += chunk.size;
+    part += 1;
+  }
+
+  const completeRes = await fetch(`${base}/v1/zip-gallery/upload/complete`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadId }),
+    credentials: "include",
+  });
+  if (!completeRes.ok) {
+    const err = await completeRes.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || `Complete failed (${completeRes.status})`);
+  }
+  const { jobId } = (await completeRes.json()) as { jobId: string };
+  if (!jobId) throw new Error("No jobId returned");
+
+  const started = Date.now();
+  while (Date.now() - started < JOB_POLL_MAX_WAIT_MS) {
+    await new Promise((r) => setTimeout(r, JOB_POLL_INTERVAL_MS));
+    const jobRes = await fetch(`${base}/v1/zip-gallery/jobs/${jobId}`, {
+      headers,
+      credentials: "include",
+    });
+    if (!jobRes.ok) throw new Error(`Job status failed (${jobRes.status})`);
+    const job = (await jobRes.json()) as {
+      status: string;
+      uploaded?: Array<{ fileName: string; url: string }>;
+      error?: string;
+    };
+    if (job.status === "completed" && job.uploaded) {
+      return { uploaded: job.uploaded };
+    }
+    if (job.status === "failed") {
+      throw new Error(job.error || "Extraction failed");
+    }
+  }
+
+  throw new Error("Extraction timed out; try again or use a smaller ZIP.");
 }
 
 export async function deleteProductImage(fileName: string) {
