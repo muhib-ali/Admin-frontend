@@ -577,7 +577,9 @@ export type ZipGalleryUploadResponse = {
   uploaded: Array<{ fileName: string; url: string }>;
 };
 
-const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk (keeps each request under Railway 5 min)
+// Smaller chunks (10 MB) so each request finishes well under ~30–60s proxy/HTTP2 limits and avoids ERR_HTTP2_PROTOCOL_ERROR
+const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
+const CHUNK_UPLOAD_MAX_RETRIES = 2;
 const JOB_POLL_INTERVAL_MS = 2000;
 const JOB_POLL_MAX_WAIT_MS = 60 * 60 * 1000; // 1 hour max wait for extraction
 
@@ -658,16 +660,40 @@ async function uploadZipGalleryChunked(
     form.append("uploadId", uploadId);
     form.append("part", String(part));
     form.append("chunk", chunk, "chunk");
-    const chunkRes = await fetch(`${base}/v1/zip-gallery/upload/chunk`, {
-      method: "POST",
-      body: form,
-      headers,
-      credentials: "include",
-    });
-    if (!chunkRes.ok) {
-      const err = await chunkRes.json().catch(() => ({}));
-      throw new Error((err as { message?: string }).message || `Chunk ${part} failed (${chunkRes.status})`);
+
+    let lastErr: Error | null = null;
+    for (let attempt = 0; attempt <= CHUNK_UPLOAD_MAX_RETRIES; attempt++) {
+      try {
+        const chunkRes = await fetch(`${base}/v1/zip-gallery/upload/chunk`, {
+          method: "POST",
+          body: form,
+          headers,
+          credentials: "include",
+        });
+        if (!chunkRes.ok) {
+          const err = await chunkRes.json().catch(() => ({}));
+          throw new Error((err as { message?: string }).message || `Chunk ${part} failed (${chunkRes.status})`);
+        }
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+        const msg = lastErr.message || "";
+        const isNetworkOrProtocol =
+          msg.includes("HTTP2") ||
+          msg.includes("ERR_") ||
+          msg.includes("Failed to fetch") ||
+          msg.includes("NetworkError") ||
+          lastErr.name === "TypeError";
+        if (attempt < CHUNK_UPLOAD_MAX_RETRIES && isNetworkOrProtocol) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw lastErr;
+      }
     }
+    if (lastErr) throw lastErr;
+
     offset += chunk.size;
     part += 1;
   }
