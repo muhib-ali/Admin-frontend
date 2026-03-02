@@ -137,7 +137,12 @@ export function ProductCard({
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-base text-gray-900 truncate">{product.title}</h3>
+            <h3
+              className="font-semibold text-base text-gray-900 truncate"
+              title={product.title}
+            >
+              {product.title}
+            </h3>
             <p className="mt-1 text-xs text-gray-500 truncate">
               {product.description || "No description"} • {product.brand?.name ?? "—"}
             </p>

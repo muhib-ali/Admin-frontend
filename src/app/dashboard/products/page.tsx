@@ -106,7 +106,7 @@ export default function ProductsPage() {
   const [brands, setBrands] = React.useState<BrandOption[]>([]);
 
   const [page, setPage] = React.useState(1);
-  const limit = 8;
+  const limit = 12;
   const [pagination, setPagination] = React.useState<any | null>(null);
 
   const [query, setQuery] = React.useState("");
@@ -751,7 +751,9 @@ export default function ProductsPage() {
 
                 return (
                   <>
-                    <div className="text-sm text-muted-foreground">Page {pagPage} of {totalPages}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Showing {pagStart} to {pagEnd} of {pagTotal} products
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2 justify-end">
                       <Button
@@ -768,6 +770,101 @@ export default function ProductsPage() {
                         <ChevronLeft className="h-4 w-4" />
                         Previous
                       </Button>
+
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const items: (number | "ellipsis")[] = [];
+
+                          if (totalPages <= 7) {
+                            for (let i = 1; i <= totalPages; i++) items.push(i);
+                          } else {
+                            const addPage = (n: number) => {
+                              if (!items.includes(n)) items.push(n);
+                            };
+
+                            addPage(1);
+                            addPage(2);
+
+                            const windowStart = Math.max(3, pagPage - 1);
+                            const windowEnd = Math.min(totalPages - 2, pagPage + 1);
+
+                            for (let i = windowStart; i <= windowEnd; i++) {
+                              addPage(i);
+                            }
+
+                            addPage(totalPages - 1);
+                            addPage(totalPages);
+
+                            items.sort((a, b) =>
+                              a === "ellipsis" || b === "ellipsis" ? 0 : a - b
+                            );
+
+                            const withEllipsis: (number | "ellipsis")[] = [];
+                            for (let i = 0; i < items.length; i++) {
+                              const cur = items[i];
+                              const prev = items[i - 1];
+                              if (
+                                typeof cur === "number" &&
+                                typeof prev === "number" &&
+                                cur - prev > 1
+                              ) {
+                                withEllipsis.push("ellipsis");
+                              }
+                              withEllipsis.push(cur);
+                            }
+
+                            return withEllipsis.map((item, idx) =>
+                              item === "ellipsis" ? (
+                                <span
+                                  key={`ellipsis-${idx}`}
+                                  className="px-2 text-xs text-muted-foreground select-none"
+                                >
+                                  ...
+                                </span>
+                              ) : (
+                                <Button
+                                  key={item}
+                                  variant="pagination"
+                                  clickVariant="default"
+                                  size="sm"
+                                  className={`h-8 min-w-8 px-2 ${
+                                    item === pagPage
+                                      ? "bg-primary text-primary-foreground"
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    setPage(item);
+                                    (document.activeElement as HTMLElement)?.blur();
+                                  }}
+                                >
+                                  {item}
+                                </Button>
+                              )
+                            );
+                          }
+
+                          return items.map((pageNum) => (
+                            <Button
+                              key={pageNum}
+                              variant="pagination"
+                              clickVariant="default"
+                              size="sm"
+                              className={`h-8 min-w-8 px-2 ${
+                                pageNum === pagPage
+                                  ? "bg-primary text-primary-foreground"
+                                  : ""
+                              }`}
+                              onClick={() => {
+                                if (typeof pageNum !== "number") return;
+                                setPage(pageNum);
+                                (document.activeElement as HTMLElement)?.blur();
+                              }}
+                            >
+                              {pageNum}
+                            </Button>
+                          ));
+                        })()}
+                      </div>
 
                       <Button
                         variant="pagination"
