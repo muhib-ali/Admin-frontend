@@ -1,18 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "react-toastify";
 import { PasswordField } from "@/components/ui/password-field";
 
+const SESSION_REPLACED_MSG =
+  "You were logged out because you logged in from another device. Please sign in again.";
+
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [sessionReplacedMessage, setSessionReplacedMessage] = useState(false);
+
+  // Single-session: show message when redirected after login from another device
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    if (reason === "session_replaced") {
+      setSessionReplacedMessage(true);
+      toast.info(SESSION_REPLACED_MSG, { autoClose: 6000 });
+      router.replace("/login", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -120,6 +136,24 @@ export default function LoginForm() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
+            {/* Single-session: logged out because logged in elsewhere */}
+            {sessionReplacedMessage && (
+              <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-800 px-4 py-3 rounded-r shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm">{SESSION_REPLACED_MSG}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSessionReplacedMessage(false)}
+                    className="shrink-0 p-1 rounded hover:bg-amber-100 text-amber-600"
+                    aria-label="Dismiss"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Error message */}
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-r shadow-sm">

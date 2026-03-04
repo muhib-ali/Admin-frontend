@@ -65,23 +65,23 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, [selectedCountry]);
 
   const loadCountries = useCallback(async () => {
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    // Get auth token (cookie is source of truth; avoid calling API on login page without token)
+    const token =
+      typeof document !== "undefined"
+        ? document.cookie.split("; ").find((row) => row.startsWith("access_token="))?.split("=")[1]
+        : null;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       console.log('🌍 Loading countries from:', `${baseURL}/currency/countries`);
-      
-      // Get auth token
-      const token = localStorage.getItem('access_token') || 
-                   document.cookie.split('; ').find(row => row.startsWith('access_token='))?.split('=')[1];
-      
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
       const response = await fetch(`${baseURL}/currency/countries`, {
         method: 'GET',
         headers,

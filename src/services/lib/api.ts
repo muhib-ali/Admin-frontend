@@ -8,6 +8,7 @@ const api = axios.create({
 });
 
 let isRefreshing = false;
+let isRedirectingToLogin = false; // prevent infinite loop when multiple 401s fire before page unloads
 let failedQueue: Array<{
   resolve: (value?: any) => void;
   reject: (reason?: any) => void;
@@ -70,6 +71,15 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/** Backend returns this when user logged in elsewhere (single-session). */
+function isSessionReplacedError(error: AxiosError): boolean {
+  const data = error?.response?.data as any;
+  if (!data) return false;
+  if (data?.code === "SESSION_REPLACED") return true;
+  const msg = typeof data?.message === "string" ? data.message : data?.message?.message ?? "";
+  return msg.toLowerCase().includes("another device");
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -84,10 +94,28 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // Already on login page: never redirect (avoids loop when login/layout triggers API calls)
+      if (typeof window !== "undefined" && window.location.pathname === "/login") {
+        return Promise.reject(error);
+      }
+
+      // Only one redirect: prevent infinite loop when many 401s fire before page unloads
+      if (isRedirectingToLogin) {
+        return Promise.reject(error);
+      }
+
+      // Single-session: logged in from another device → don't try refresh, redirect with reason
+      if (isSessionReplacedError(error)) {
+        isRedirectingToLogin = true;
+        await clearAuthAndRedirect("session_replaced");
+        return Promise.reject(error);
+      }
+
       const refreshToken = Cookies.get("refresh_token");
 
       if (!refreshToken) {
-        clearAuthAndRedirect();
+        isRedirectingToLogin = true;
+        await clearAuthAndRedirect();
         return Promise.reject(error);
       }
 
@@ -157,10 +185,13 @@ api.interceptors.response.use(
           // Don't clear auth on throttling - just reject the request
           return Promise.reject(refreshError);
         }
-        // For other errors, clear auth and redirect
+        // For other errors, clear auth and redirect (once)
         processQueue(refreshError, null);
         isRefreshing = false;
-        clearAuthAndRedirect();
+        if (!isRedirectingToLogin) {
+          isRedirectingToLogin = true;
+          await clearAuthAndRedirect();
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -169,14 +200,24 @@ api.interceptors.response.use(
   }
 );
 
-function clearAuthAndRedirect() {
+async function clearAuthAndRedirect(reason?: "session_replaced") {
   try {
+    // Clear NextAuth session first so middleware doesn't redirect /login → /dashboard (loop)
+    if (typeof window !== "undefined") {
+      try {
+        const { signOut } = await import("next-auth/react");
+        await signOut({ redirect: false });
+      } catch (_) {
+        // ignore if NextAuth not mounted yet
+      }
+    }
     Cookies.remove("access_token", { path: "/" });
     Cookies.remove("refresh_token", { path: "/" });
     if (typeof window !== "undefined") {
       localStorage.removeItem("user");
       localStorage.removeItem("permissions");
-      window.location.href = "/login";
+      const query = reason ? `?reason=${reason}` : "";
+      window.location.replace(`/login${query}`);
     }
   } catch (e) {
     console.error("[api] failed to clear auth:", e);
