@@ -140,6 +140,13 @@ export const ENTITY_PERMS = {
     update: "blogs/update",
     delete: "blogs/delete",
   },
+  cms: {
+    list:   "cms/getAll",
+    create: "cms/create",
+    read:   "cms/getById",
+    update: "cms/update",
+    delete: "cms/delete",
+  },
   dashboard: {
     overview: "dashboard/getAll",
   },
@@ -232,4 +239,6 @@ export const SCREEN_PERM: Record<string, string> = {
   "/dashboard/blogs/create":              ENTITY_PERMS.blogs.create,
   "/dashboard/blogs/[id]":                ENTITY_PERMS.blogs.read,
   "/dashboard/blogs/[id]/edit":           ENTITY_PERMS.blogs.update,
+
+  "/dashboard/cms":                       ENTITY_PERMS.cms.list,
 };

@@ -66,6 +66,7 @@ export const nav = [
   { href: "/dashboard/warehouses", label: "Warehouses", icon: "Box" as IconName },
   { href: "/dashboard/promo-codes", label: "Promo Codes", icon: "TicketPercent" as IconName },
   { href: "/dashboard/blogs", label: "Blogs", icon: "FileText" as IconName },
+  { href: "/dashboard/cms", label: "CMS Management", icon: "FileText" as IconName },
 ];
 
 export const nav_admin = [
