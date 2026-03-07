@@ -68,9 +68,9 @@ function ImageFieldBlock({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label>Image</Label>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="radio"
@@ -106,7 +106,7 @@ function ImageFieldBlock({
         />
       )}
       {imageSource === "upload" && (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-5 text-center text-sm text-muted-foreground">
           {onUpload ? (
             <>
               <input
@@ -133,15 +133,25 @@ function ImageFieldBlock({
                   "Choose image"
                 )}
               </Button>
-              {imageUrl && (
-                <p className="mt-2 text-xs truncate max-w-full" title={imageUrl}>
-                  Saved: {imageUrl}
-                </p>
-              )}
             </>
           ) : (
             "Upload not available"
           )}
+        </div>
+      )}
+      {imageUrl && (
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+            Preview
+          </div>
+          <div className="relative h-32 w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100">
+            <img
+              src={imageUrl}
+              alt="Section image preview"
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
         </div>
       )}
     </div>
@@ -290,71 +300,72 @@ export default function CmsFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{descriptionText}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base">Section</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="cms-section-key">Section Key *</Label>
-                <Input
-                  id="cms-section-key"
-                  placeholder="e.g. hero, features, testimonials"
-                  value={sectionKey}
-                  onChange={(e) => setSectionKey(e.target.value)}
-                  disabled={isViewMode}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cms-label">Label</Label>
-                <Input
-                  id="cms-label"
-                  placeholder="Short label"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  disabled={isViewMode}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cms-title">Title</Label>
-                <Input
-                  id="cms-title"
-                  placeholder="Section title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  disabled={isViewMode}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cms-desc">Description</Label>
-                <Textarea
-                  id="cms-desc"
-                  placeholder="Section description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  disabled={isViewMode}
-                />
-              </div>
-              <ImageFieldBlock
-                imageSource={sectionImageSource}
-                imageUrl={sectionImageUrl}
-                onSourceChange={setSectionImageSource}
-                onUrlChange={setSectionImageUrl}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-neutral-900">Section</p>
+              <p className="text-xs text-muted-foreground">
+                Define the main content for this home page section.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cms-section-key">Section Key *</Label>
+              <Input
+                id="cms-section-key"
+                placeholder="e.g. hero, features, testimonials"
+                value={sectionKey}
+                onChange={(e) => setSectionKey(e.target.value)}
                 disabled={isViewMode}
-                namePrefix="section"
-                onUpload={onUploadImage ? handleSectionImageUpload : undefined}
-                uploading={uploadingScope === "section"}
               />
-            </CardContent>
-          </Card>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cms-label">Label</Label>
+              <Input
+                id="cms-label"
+                placeholder="Short label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                disabled={isViewMode}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cms-title">Title</Label>
+              <Input
+                id="cms-title"
+                placeholder="Section title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={isViewMode}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cms-desc">Description</Label>
+              <Textarea
+                id="cms-desc"
+                placeholder="Section description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                disabled={isViewMode}
+              />
+            </div>
+            <ImageFieldBlock
+              imageSource={sectionImageSource}
+              imageUrl={sectionImageUrl}
+              onSourceChange={setSectionImageSource}
+              onUrlChange={setSectionImageUrl}
+              disabled={isViewMode}
+              namePrefix="section"
+              onUpload={onUploadImage ? handleSectionImageUpload : undefined}
+              uploading={uploadingScope === "section"}
+            />
+          </div>
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Sub-sections</span>
@@ -443,7 +454,7 @@ export default function CmsFormDialog({
             </Card>
           ))}
 
-          <DialogFooter>
+          <DialogFooter className="mt-2">
             <Button
               type="button"
               variant="outline"

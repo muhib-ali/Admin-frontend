@@ -3,22 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/utils/cn"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-sm hover:shadow-md active:shadow-sm active:translate-y-px",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300 disabled:pointer-events-none disabled:opacity-50 shadow-sm hover:shadow-md active:shadow-sm active:translate-y-px",
   {
     variants: {
       variant: {
         default:
-          "border-2 border-transparent bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-red-600 focus:!text-white focus:!border-transparent active:!bg-red-600 active:!text-white active:!border-transparent",
+          "border-2 border-transparent bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-red-600 focus:!text-white focus:!border-transparent focus-visible:ring-red-200 active:!bg-red-600 active:!text-white active:!border-transparent",
         destructive:
-          "border-2 border-red-600 bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-red-600 focus:!text-white focus:!border-red-600 active:!bg-red-600 active:!text-white active:!border-red-600",
+          "border-2 border-red-600 bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-red-600 focus:!text-white focus:!border-red-600 focus-visible:ring-red-200 active:!bg-red-600 active:!text-white active:!border-red-600",
         outline:
-          "border-2 border-gray-300 bg-transparent text-gray-700 hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-transparent focus:!text-gray-700 focus:!border-gray-300 active:!bg-transparent active:!text-gray-700 active:!border-gray-300",
+          "border-2 border-gray-300 bg-transparent text-gray-700 hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-transparent focus:!text-gray-700 focus:!border-gray-300 focus-visible:ring-gray-300 active:!bg-transparent active:!text-gray-700 active:!border-gray-300",
         secondary:
-          "border-2 border-red-600 bg-white text-red-600 hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-white focus:!text-red-600 focus:!border-red-600 active:!bg-white active:!text-red-600 active:!border-red-600",
+          "border-2 border-red-600 bg-white text-red-600 hover:bg-white hover:text-red-600 hover:border-red-600 focus:!bg-white focus:!text-red-600 focus:!border-red-600 focus-visible:ring-red-200 active:!bg-white active:!text-red-600 active:!border-red-600",
         pagination:
-          "border-2 border-red-500 bg-transparent text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 focus:!bg-transparent focus:!text-red-500 focus:!border-red-500 focus:hover:!bg-transparent focus:hover:!text-red-500 focus:hover:!border-red-500 focus-visible:!bg-transparent focus-visible:!text-red-500 focus-visible:!border-red-500 active:!bg-transparent active:!text-red-500 active:!border-red-500",
-        ghost: "hover:bg-gray-100 hover:text-gray-900",
-        link: "text-red-600 underline-offset-4 hover:underline hover:text-red-700",
+          "border-2 border-red-500 bg-transparent text-red-500 hover:bg-red-600 hover:text-white hover:border-red-600 focus:!bg-transparent focus:!text-red-500 focus:!border-red-500 focus:hover:!bg-transparent focus:hover:!text-red-500 focus:hover:!border-red-500 focus-visible:!bg-transparent focus-visible:!text-red-500 focus-visible:!border-red-500 focus-visible:ring-red-200 active:!bg-transparent active:!text-red-500 active:!border-red-500",
+        ghost: "hover:bg-gray-100 hover:text-gray-900 focus-visible:ring-gray-300",
+        link: "text-red-600 underline-offset-4 hover:underline hover:text-red-700 focus-visible:ring-red-200",
       },
       size: {
         default: "h-10 px-5 py-2.5",

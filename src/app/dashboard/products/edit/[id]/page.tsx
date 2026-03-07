@@ -1845,7 +1845,7 @@ export default function ProductEditPage() {
             <Button variant="outline" onClick={() => router.push('/dashboard/products')}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={!product || !values.title.trim() || !hasAtLeastOneImage || totalEditImages > 10 || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800">
+            <Button onClick={save} disabled={!product || !values.title.trim() || !hasAtLeastOneImage || totalEditImages > 10 || isUpdating || !canUpdate} className="bg-neutral-900 text-white hover:bg-neutral-800 border-2 border-neutral-900 focus:!bg-neutral-900 focus:!text-white focus:!border-neutral-900 focus-visible:!bg-neutral-900 focus-visible:!text-white focus-visible:!border-neutral-900 focus-visible:!ring-neutral-400 focus-visible:ring-offset-2 active:!bg-neutral-800 active:!text-white active:!border-neutral-800">
               {isUpdating ? "Saving..." : "Save"}
             </Button>
           </div>

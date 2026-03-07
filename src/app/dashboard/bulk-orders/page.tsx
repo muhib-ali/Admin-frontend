@@ -280,7 +280,7 @@ export default function BulkOrdersPage() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1 text-emerald-600 border-emerald-600 hover:bg-emerald-50"
+                                            className="gap-1 text-emerald-600 border-emerald-600 hover:bg-emerald-50 focus-visible:ring-emerald-200"
                                             onClick={() => handleAcceptItem(order.id, item.id)}
                                             disabled={isActionLoading}
                                           >
@@ -292,7 +292,7 @@ export default function BulkOrdersPage() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1 text-rose-600 border-rose-600 hover:bg-rose-50"
+                                            className="gap-1 text-rose-600 border-rose-600 hover:bg-rose-50 focus-visible:ring-rose-200"
                                             onClick={() => handleRejectItem(order.id, item.id)}
                                             disabled={isActionLoading}
                                           >

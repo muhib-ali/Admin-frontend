@@ -385,21 +385,18 @@ export default function BlogsPage() {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Blog Posts
-              </CardTitle>
-              <div className="flex items-center gap-3">
-                <div className="relative w-64">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Card className="shadow-sm">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <CardTitle className="text-xl sm:text-2xl">Blog Posts</CardTitle>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-[260px] md:w-[320px] lg:w-[350px] max-w-full">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search blogs..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="pl-8"
+                    className="h-9 pl-9 w-full"
                   />
                 </div>
                 <DropdownMenu>
@@ -428,9 +425,9 @@ export default function BlogsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6">
             <div className="mt-1 rounded-xl border overflow-hidden overflow-x-auto">
-              <Table className="min-w-210">
+              <Table className="w-full min-w-[640px]">
                 <TableHeader>
                   <TableRow className="bg-gray-200">
                     <TableHead className="rounded-tl-xl">Heading</TableHead>

@@ -101,6 +101,37 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+/** Normalize and validate video URL; return null if invalid or empty */
+function getValidVideoUrl(raw: string | undefined | null): string | null {
+  if (raw == null) return null;
+  const url = String(raw).trim();
+  if (url === "" || url === "null" || url === "undefined") return null;
+  return url;
+}
+
+/** Detect if URL is YouTube (watch / youtu.be / shorts) or Vimeo and return embed URL; otherwise null for direct video */
+function getEmbedVideoUrl(url: string): string | null {
+  try {
+    // YouTube normal + short links: keep original case for the video ID
+    const ytMatch =
+      url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/i) ||
+      url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/i);
+    if (ytMatch) {
+      const videoId = ytMatch[1];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    // Vimeo: vimeo.com/ID
+    const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+    if (vimeoMatch) {
+      return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    }
+  } catch {
+    // ignore malformed URLs
+  }
+  return null;
+}
+
 export default function ProductViewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -438,7 +469,7 @@ export default function ProductViewPage() {
             <Button
               onClick={() => router.push(`/dashboard/products/edit/${id}`)}
               disabled={!id || !product}
-              className="bg-neutral-900 text-white hover:bg-neutral-800"
+              className="bg-neutral-900 text-white hover:bg-neutral-800 border-2 border-neutral-900 focus:!bg-neutral-900 focus:!text-white focus:!border-neutral-900 focus-visible:!bg-neutral-900 focus-visible:!text-white focus-visible:!border-neutral-900 focus-visible:!ring-neutral-400 focus-visible:ring-offset-2 active:!bg-neutral-800 active:!text-white active:!border-neutral-800"
             >
               Edit
             </Button>
@@ -777,19 +808,45 @@ export default function ProductViewPage() {
 
                 <div className="space-y-3">
                   <SectionHeader title="Video" />
-                  {product.product_video_url ? (
-                    <div className="aspect-video overflow-hidden rounded-xl border border-neutral-200 bg-black shadow-sm">
-                      <video
-                        src={product.product_video_url}
-                        controls
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded-xl border border-neutral-200 bg-white flex items-center justify-center text-sm text-neutral-500">
-                      No video
-                    </div>
-                  )}
+                  {(() => {
+                    const rawVideoUrl = product.product_video_url ?? (product as any)?.product_video_url;
+                    const videoUrl = getValidVideoUrl(rawVideoUrl);
+                    if (!videoUrl) {
+                      return (
+                        <div className="aspect-video rounded-xl border border-neutral-200 bg-white flex items-center justify-center text-sm text-neutral-500">
+                          No video
+                        </div>
+                      );
+                    }
+                    const embedUrl = getEmbedVideoUrl(videoUrl);
+                    if (embedUrl) {
+                      return (
+                        <div className="aspect-video overflow-hidden rounded-xl border border-neutral-200 bg-black shadow-sm">
+                          <iframe
+                            src={embedUrl}
+                            title="Product video"
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="aspect-video overflow-hidden rounded-xl border border-neutral-200 bg-black shadow-sm">
+                        <video
+                          key={videoUrl}
+                          src={videoUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-contain"
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>

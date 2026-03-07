@@ -762,7 +762,7 @@ export default function RolesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 gap-1.5 bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 px-3 text-xs font-medium shadow-sm self-end sm:self-auto"
+                          className="h-9 gap-1.5 bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 focus-visible:ring-emerald-200 px-3 text-xs font-medium shadow-sm self-end sm:self-auto"
                         >
                           <Download className="h-4 w-4" />
                           <span className="hidden sm:inline">Export</span>

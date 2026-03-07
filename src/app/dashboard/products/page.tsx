@@ -608,13 +608,13 @@ export default function ProductsPage() {
               </DialogDescription>
             </DialogHeader>
             {uploadDialogStep === "ask" ? (
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter>
                 <Button variant="outline" onClick={openExcelFileInput}>
                   No, Excel only
                 </Button>
                 <Button
                   onClick={() => setUploadDialogStep("zip")}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-600 hover:bg-emerald-700 border-2 border-emerald-600 focus:!bg-emerald-600 focus:!text-white focus:!border-emerald-600 focus-visible:!bg-emerald-600 focus-visible:!text-white focus-visible:!border-emerald-600 focus-visible:!ring-emerald-200 focus-visible:ring-offset-2 active:!bg-emerald-700 active:!text-white active:!border-emerald-700"
                 >
                   Yes, upload images (ZIP)
                 </Button>
@@ -624,9 +624,18 @@ export default function ProductsPage() {
                 <input
                   ref={zipInputRef}
                   type="file"
-                  accept=".zip"
+                  accept=".zip,application/zip,application/x-zip-compressed"
                   className="hidden"
-                  onChange={(e) => setZipFile((e.target.files ?? [])[0] ?? null)}
+                  onChange={(e) => {
+                    const file = (e.target.files ?? [])[0];
+                    if (file && !/\.zip$/i.test(file.name)) {
+                      toast.error("Only ZIP files are allowed. Please select a .zip file.");
+                      e.target.value = "";
+                      setZipFile(null);
+                      return;
+                    }
+                    setZipFile(file ?? null);
+                  }}
                 />
                 <Button
                   variant="outline"
@@ -636,14 +645,14 @@ export default function ProductsPage() {
                 >
                   {zipFile ? zipFile.name : "Choose ZIP file"}
                 </Button>
-                <DialogFooter className="gap-2 sm:gap-0">
+                <DialogFooter>
                   <Button variant="outline" onClick={() => setUploadDialogStep("ask")}>
                     Back
                   </Button>
                   <Button
                     onClick={handleZipUpload}
                     disabled={!zipFile || zipUploading}
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-emerald-600 hover:bg-emerald-700 border-2 border-emerald-600 focus:!bg-emerald-600 focus:!text-white focus:!border-emerald-600 focus-visible:!bg-emerald-600 focus-visible:!text-white focus-visible:!border-emerald-600 focus-visible:!ring-emerald-200 focus-visible:ring-offset-2 active:!bg-emerald-700 active:!text-white active:!border-emerald-700"
                   >
                     {zipUploading ? "Uploading…" : "Upload ZIP"}
                   </Button>

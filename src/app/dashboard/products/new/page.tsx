@@ -994,7 +994,7 @@ export default function NewProductPage() {
             <p className="mt-1 text-sm text-muted-foreground">Create a new product</p>
           </div>
 
-          <Button disabled={!canSave || isUploading} onClick={saveProduct} className="bg-neutral-900 text-white hover:bg-neutral-800">
+          <Button disabled={!canSave || isUploading} onClick={saveProduct} className="bg-neutral-900 text-white hover:bg-neutral-800 border-2 border-neutral-900 focus:!bg-neutral-900 focus:!text-white focus:!border-neutral-900 focus-visible:!bg-neutral-900 focus-visible:!text-white focus-visible:!border-neutral-900 focus-visible:!ring-neutral-400 focus-visible:ring-offset-2 active:!bg-neutral-800 active:!text-white active:!border-neutral-800">
             {isUploading ? "Saving..." : "Save Product"}
           </Button>
         </div>
